@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddLocationAlt
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.AddReaction
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Close
@@ -83,6 +84,7 @@ import com.keltruc.mymemos.model.SyncStatus
 import com.keltruc.mymemos.ui.components.AttachmentStrip
 import com.keltruc.mymemos.ui.components.Avatar
 import com.keltruc.mymemos.ui.components.ColourPickerDialog
+import com.keltruc.mymemos.ui.components.DateTimePickerDialog
 import com.keltruc.mymemos.ui.components.tint
 import com.keltruc.mymemos.ui.components.MapPreview
 import com.keltruc.mymemos.ui.components.MemoContent
@@ -92,6 +94,7 @@ import java.time.format.DateTimeFormatter
 
 private val formatter: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM yyyy, HH:mm")
 private val shortFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM, HH:mm")
+private val reminderFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM, HH:mm")
 private val quickReactions = listOf("👍", "❤️", "😂", "😮", "😢", "🎉", "👀", "🔥", "✅")
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -115,6 +118,21 @@ fun MemoDetailScreen(
     var showReactions by remember { mutableStateOf(false) }
     var showReferencePicker by remember { mutableStateOf(false) }
     var showColour by remember { mutableStateOf(false) }
+    var showReminder by remember { mutableStateOf(false) }
+    val reminders by viewModel.reminders.collectAsStateWithLifecycle()
+    val exactHint by viewModel.exactAlarmHint.collectAsStateWithLifecycle()
+    LaunchedEffect(exactHint) {
+        if (exactHint) {
+            val result = snackbar.showSnackbar(context.getString(R.string.reminder_exact_hint), actionLabel = "Settings", duration = androidx.compose.material3.SnackbarDuration.Long)
+            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed && android.os.Build.VERSION.SDK_INT >= 31) {
+                runCatching { context.startActivity(Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + context.packageName))) }
+            }
+            viewModel.exactAlarmHint.value = false
+        }
+    }
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) showReminder = true
+    }
     var comment by remember { mutableStateOf("") }
 
     val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -159,6 +177,14 @@ fun MemoDetailScreen(
                             onClick = {
                                 overflow = false
                                 if (m.location != null) viewModel.clearLocation() else locationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.remind_me)) },
+                            leadingIcon = { Icon(Icons.Default.Alarm, null) },
+                            onClick = {
+                                overflow = false
+                                if (android.os.Build.VERSION.SDK_INT >= 33) notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS) else showReminder = true
                             },
                         )
                         DropdownMenuItem(
@@ -227,6 +253,14 @@ fun MemoDetailScreen(
             }
             if (m.attachments.isNotEmpty()) {
                 AttachmentStrip(attachments = m.attachments, serverUrl = state.account?.serverUrl.orEmpty(), thumbSize = 140)
+            }
+            reminders.forEach { r ->
+                AssistChip(
+                    onClick = { viewModel.removeReminder(r.id) },
+                    leadingIcon = { Icon(Icons.Default.Alarm, null, Modifier.size(16.dp)) },
+                    trailingIcon = { Icon(Icons.Default.Close, stringResource(R.string.reminder_remove), Modifier.size(16.dp)) },
+                    label = { Text(stringResource(R.string.reminder_set, reminderFormatter.format(java.time.Instant.ofEpochMilli(r.atEpochMs).atZone(ZoneId.systemDefault())))) },
+                )
             }
             m.location?.let { loc -> MapPreview(loc) }
             m.location?.let { loc ->
@@ -357,6 +391,10 @@ fun MemoDetailScreen(
             onConfirm = viewModel::submitPassword,
             onDismiss = viewModel::dismissPassword,
         )
+    }
+
+    if (showReminder) {
+        DateTimePickerDialog(onPicked = { viewModel.addReminder(it); showReminder = false }, onDismiss = { showReminder = false })
     }
 
     if (showColour) {

@@ -53,8 +53,24 @@ class MemoDetailViewModel @AssistedInject constructor(
     private val shareRepository: ShareRepository,
     private val locationProvider: LocationProvider,
     private val passwordSession: PasswordSession,
+    private val configRepository: com.keltruc.mymemos.data.config.ConfigRepository,
+    private val alarmScheduler: com.keltruc.mymemos.notify.AlarmScheduler,
     accountRepository: AccountRepository,
 ) : ViewModel() {
+    /** Set after adding a reminder when Android will only deliver it approximately. */
+    val exactAlarmHint = MutableStateFlow(false)
+
+    fun addReminder(at: java.time.Instant) = viewModelScope.launch {
+        val name = state.value.memo?.remoteName ?: run { message.value = "Sync this memo before setting a reminder."; return@launch }
+        configRepository.update { c ->
+            c.copy(reminders = c.reminders + com.keltruc.mymemos.model.Reminder(java.util.UUID.randomUUID().toString(), name, at.toEpochMilli()))
+        }
+        if (!alarmScheduler.canScheduleExact()) exactAlarmHint.value = true
+    }
+
+    fun removeReminder(id: String) = viewModelScope.launch {
+        configRepository.update { c -> c.copy(reminders = c.reminders.filterNot { it.id == id }) }
+    }
     /** Plain text of a locked memo once the password is known; null while locked. */
     val unlockedText = MutableStateFlow<String?>(null)
     val passwordError = MutableStateFlow<String?>(null)
@@ -105,6 +121,11 @@ class MemoDetailViewModel @AssistedInject constructor(
     private val route = MemoDetailRoute(localId)
     private val account = accountRepository.activeAccount.filterNotNull()
     private val memo = memoRepository.observeMemo(route.localId)
+    /** Reminders for this memo, from the config memo. */
+    val reminders: StateFlow<List<com.keltruc.mymemos.model.Reminder>> = combine(memo, configRepository.config) { m, c ->
+        c.reminders.filter { it.memoRemoteName == m?.remoteName }.sortedBy { it.atEpochMs }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     private val shares = MutableStateFlow<List<MemoShare>?>(null)
     private val message = MutableStateFlow<String?>(null)
 

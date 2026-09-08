@@ -1,6 +1,8 @@
 package com.keltruc.mymemos.ui.settings
 
 import androidx.compose.foundation.clickable
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -83,6 +85,8 @@ fun SettingsScreen(onBack: () -> Unit, nav: SettingsNav, viewModel: SettingsView
     val serverPrefs by viewModel.serverPrefs.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val passwordRemembered by viewModel.passwordRemembered.collectAsStateWithLifecycle()
+    val weeklyDigest by viewModel.weeklyDigest.collectAsStateWithLifecycle()
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> if (granted) viewModel.setWeeklyDigest(true) }
     val snackbar = remember { SnackbarHostState() }
     var editProfile by remember { mutableStateOf(false) }
     var editPassword by remember { mutableStateOf(false) }
@@ -161,6 +165,17 @@ fun SettingsScreen(onBack: () -> Unit, nav: SettingsNav, viewModel: SettingsView
             LinkRow(Icons.Default.Key, stringResource(R.string.access_tokens), nav.onTokens)
             LinkRow(Icons.Default.Webhook, stringResource(R.string.webhooks), nav.onWebhooks)
             LinkRow(Icons.Default.Key, stringResource(R.string.change_password)) { editPassword = true }
+
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.digest)) },
+                supportingContent = { Text(stringResource(R.string.digest_hint)) },
+                trailingContent = {
+                    Switch(checked = weeklyDigest, onCheckedChange = { on ->
+                        if (on && android.os.Build.VERSION.SDK_INT >= 33) notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS) else viewModel.setWeeklyDigest(on)
+                    })
+                },
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+            )
 
             Section(stringResource(R.string.settings_editor))
             LinkRow(Icons.Default.Description, stringResource(R.string.templates), nav.onTemplates)
