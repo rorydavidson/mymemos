@@ -29,6 +29,12 @@ data class Settings(
     val collapsedGroups: Set<String> = emptySet(),
     /** Show the timeline as one-line rows instead of cards. */
     val compactList: Boolean = false,
+    /**
+     * Order the timeline by when memos were last changed rather than when they were written. The
+     * dates shown on cards and at the top of the detail screen follow the same choice, so what you
+     * are sorting on is always the date you can see.
+     */
+    val sortByModified: Boolean = false,
 )
 
 @Singleton
@@ -38,6 +44,7 @@ class AppPreferences @Inject constructor(@ApplicationContext private val context
     private val tiles = booleanPreferencesKey("map_tiles")
     private val collapsed = stringSetPreferencesKey("collapsed_groups")
     private val compact = booleanPreferencesKey("compact_list")
+    private val byModified = booleanPreferencesKey("sort_by_modified")
 
     val settings: Flow<Settings> = context.dataStore.data.map { p ->
         Settings(
@@ -46,6 +53,7 @@ class AppPreferences @Inject constructor(@ApplicationContext private val context
             mapTiles = p[tiles] ?: false,
             collapsedGroups = p[collapsed].orEmpty(),
             compactList = p[compact] ?: false,
+            sortByModified = p[byModified] ?: false,
         )
     }
 
@@ -65,6 +73,10 @@ class AppPreferences @Inject constructor(@ApplicationContext private val context
 
     suspend fun setCompactList(enabled: Boolean) {
         context.dataStore.edit { it[compact] = enabled }
+    }
+
+    suspend fun setSortByModified(enabled: Boolean) {
+        context.dataStore.edit { it[byModified] = enabled }
     }
 
     suspend fun setGroupCollapsed(key: String, collapsedNow: Boolean) {

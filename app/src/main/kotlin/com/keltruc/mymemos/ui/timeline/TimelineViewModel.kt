@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -64,6 +65,16 @@ class TimelineViewModel @Inject constructor(
         .map { it.collapsedGroups }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
+    /** Whether the timeline is ordered, grouped and dated by the modified time. */
+    val sortByModified: StateFlow<Boolean> = preferences.settings
+        .map { it.sortByModified }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setSortByModified(enabled: Boolean) = viewModelScope.launch {
+        preferences.setSortByModified(enabled)
+    }
+
     /** Whether the timeline draws one-line rows rather than cards. */
     val compactList: StateFlow<Boolean> = preferences.settings
         .map { it.compactList }
@@ -88,9 +99,11 @@ class TimelineViewModel @Inject constructor(
 
     private val account = accountRepository.activeAccount.filterNotNull()
 
-    private val memos = combine(account, query.debounce(150), selectedTag, showArchived, shortcutResults) { acc, q, tag, archived, names ->
+    private val filters = combine(account, query.debounce(150), selectedTag, showArchived, shortcutResults) { acc, q, tag, archived, names ->
         listOf(acc, q, tag, archived, names)
-    }.flatMapLatest { v ->
+    }
+
+    private val memos = combine(filters, sortByModified) { v, byModified -> v to byModified }.flatMapLatest { (v, byModified) ->
         val acc = v[0] as Account
         val q = v[1] as String
         val tag = v[2] as String?
@@ -99,7 +112,7 @@ class TimelineViewModel @Inject constructor(
         val names = v[4] as List<String>?
         val base = when {
             names != null -> shortcutRepository.observeMemos(acc.id, names.ifEmpty { listOf("") })
-            q.isBlank() -> memoRepository.observeTimeline(acc.id, if (archived) MemoState.ARCHIVED else MemoState.NORMAL)
+            q.isBlank() -> memoRepository.observeTimeline(acc.id, byModified, if (archived) MemoState.ARCHIVED else MemoState.NORMAL)
             else -> memoRepository.search(acc.id, q)
         }
         base.map { list -> if (tag == null) list else list.filter { tag in it.tags } }

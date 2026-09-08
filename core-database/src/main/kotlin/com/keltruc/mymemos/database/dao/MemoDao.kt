@@ -22,15 +22,19 @@ data class MemoWithAttachments(
 @Dao
 interface MemoDao {
 
+    /**
+     * [byModified] picks which date the timeline is ordered on. Room cannot parameterise an ORDER
+     * BY, so the choice is made inside the expression instead.
+     */
     @Transaction
     @Query(
         """
         SELECT * FROM memos
         WHERE accountId = :accountId AND state = :state AND syncStatus != 'PENDING_DELETE' AND parent IS NULL AND tagsJoined NOT LIKE '%mymemos/config%'
-        ORDER BY pinned DESC, createTimeEpochMs DESC
+        ORDER BY pinned DESC, (CASE WHEN :byModified THEN updateTimeEpochMs ELSE createTimeEpochMs END) DESC
         """,
     )
-    fun observeTimeline(accountId: Long, state: String = "NORMAL"): Flow<List<MemoWithAttachments>>
+    fun observeTimeline(accountId: Long, byModified: Boolean, state: String = "NORMAL"): Flow<List<MemoWithAttachments>>
 
     @Transaction
     @Query(

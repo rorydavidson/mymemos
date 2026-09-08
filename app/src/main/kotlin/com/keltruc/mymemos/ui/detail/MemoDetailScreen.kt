@@ -121,6 +121,7 @@ fun MemoDetailScreen(
     var showReminder by remember { mutableStateOf(false) }
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
     val exactHint by viewModel.exactAlarmHint.collectAsStateWithLifecycle()
+    val sortByModified by viewModel.sortByModified.collectAsStateWithLifecycle()
     val exactHintText = stringResource(R.string.reminder_exact_hint)
     LaunchedEffect(exactHint) {
         if (exactHint) {
@@ -228,7 +229,7 @@ fun MemoDetailScreen(
                 }
             }
             Text(
-                formatter.format(m.createTime.atZone(ZoneId.systemDefault())),
+                formatter.format(m.timelineTime(sortByModified).atZone(ZoneId.systemDefault())),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -354,8 +355,12 @@ fun MemoDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
                 modifier = Modifier.padding(bottom = 24.dp),
             ) {
-                // The date at the top of the screen is when the memo was written; this is when it
-                // last changed, which for an untouched memo is the same moment.
+                // Both, always, whichever one the date at the top of the screen is showing.
+                Text(
+                    stringResource(R.string.created_on, formatter.format(m.createTime.atZone(ZoneId.systemDefault()))),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Text(
                     stringResource(R.string.last_modified, formatter.format(m.updateTime.atZone(ZoneId.systemDefault()))),
                     style = MaterialTheme.typography.labelSmall,

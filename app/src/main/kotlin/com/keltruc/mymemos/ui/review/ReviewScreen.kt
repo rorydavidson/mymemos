@@ -185,6 +185,9 @@ private fun MemoList(
             Column {
                 label?.let { Text(it.uppercase(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)) }
                 MemoCard(
+                    // Review is about revisiting what you wrote, so it dates memos by when they
+                    // were written whatever the timeline is sorted on.
+                    byModified = false,
                     memo = memo,
                     serverUrl = serverUrl,
                     onClick = { onOpenMemo(memo.localId) },

@@ -2,6 +2,7 @@ package com.keltruc.mymemos.ui.detail
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.keltruc.mymemos.data.prefs.AppPreferences
 import com.keltruc.mymemos.data.crypto.MemoCipher
 import com.keltruc.mymemos.data.crypto.PasswordSession
 import com.keltruc.mymemos.data.repository.AccountRepository
@@ -56,7 +57,13 @@ class MemoDetailViewModel @AssistedInject constructor(
     private val configRepository: com.keltruc.mymemos.data.config.ConfigRepository,
     private val alarmScheduler: com.keltruc.mymemos.notify.AlarmScheduler,
     accountRepository: AccountRepository,
+    preferences: AppPreferences,
 ) : ViewModel() {
+    /** Which date the date at the top of the screen shows, matching the timeline's order. */
+    val sortByModified: StateFlow<Boolean> = preferences.settings
+        .map { it.sortByModified }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     /** Set after adding a reminder when Android will only deliver it approximately. */
     val exactAlarmHint = MutableStateFlow(false)
 

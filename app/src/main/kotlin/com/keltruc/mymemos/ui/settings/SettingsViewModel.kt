@@ -57,6 +57,8 @@ class SettingsViewModel @Inject constructor(
 
     fun setMapTiles(enabled: Boolean) = viewModelScope.launch { preferences.setMapTiles(enabled) }
 
+    fun setSortByModified(enabled: Boolean) = viewModelScope.launch { preferences.setSortByModified(enabled) }
+
     fun saveProfile(displayName: String, description: String, email: String) = viewModelScope.launch {
         val acc = account.value ?: return@launch
         runCatching { settingsRepository.updateProfile(acc, displayName, description, email) }

@@ -72,6 +72,23 @@ class TimelineGroupingTest {
     }
 
     @Test
+    fun `grouping by modified uses the update time`() {
+        // Written in July, edited today: created-order puts it in a July group, modified-order
+        // puts it under Today.
+        val edited = memo(LocalDate.of(2026, 7, 1)).copy(
+            updateTime = today.atTime(LocalTime.NOON).toInstant(ZoneOffset.UTC),
+        )
+        assertEquals(
+            listOf("July 2026"),
+            TimelineGrouping.group(listOf(edited), today, zone, Locale.UK, byModified = false).map { it.label },
+        )
+        assertEquals(
+            listOf("Today"),
+            TimelineGrouping.group(listOf(edited), today, zone, Locale.UK, byModified = true).map { it.label },
+        )
+    }
+
+    @Test
     fun `pinned memos lead, whatever their date`() {
         val groups = TimelineGrouping.group(
             listOf(memo(LocalDate.of(2026, 7, 1), pinned = true), memo(LocalDate.of(2026, 9, 8))),

@@ -122,7 +122,8 @@ fun TimelineScreen(
 
     val collapsedGroups by viewModel.collapsedGroups.collectAsStateWithLifecycle()
     val compactList by viewModel.compactList.collectAsStateWithLifecycle()
-    val grouped = remember(state.memos) { TimelineGrouping.group(state.memos) }
+    val sortByModified by viewModel.sortByModified.collectAsStateWithLifecycle()
+    val grouped = remember(state.memos, sortByModified) { TimelineGrouping.group(state.memos, byModified = sortByModified) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -201,12 +202,14 @@ fun TimelineScreen(
                         if (compactList) {
                             CompactMemoRow(
                                 memo = memo,
+                                byModified = sortByModified,
                                 onClick = { onOpenMemo(memo.localId) },
                                 modifier = Modifier.animateItem(),
                             )
                         } else {
                             MemoCard(
                                 memo = memo,
+                                byModified = sortByModified,
                                 serverUrl = state.account?.serverUrl.orEmpty(),
                                 onClick = { onOpenMemo(memo.localId) },
                                 onToggleTask = { line, checked -> viewModel.toggleTask(memo, line, checked) },
