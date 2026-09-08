@@ -122,9 +122,10 @@ Rory reordered this on 8 September: 4, 5 and 6 come before 3, which is now last.
      that quietly published someone's notes would be a much worse surprise than one that did not.
    - `MemoRepository.create` gained optional `createdAtEpochMs`/`updatedAtEpochMs`; the sync
      engine already sent `createTime` on create, so nothing else needed changing.
-7. **Last modified in the memo detail.** Asked for on 8 September, not started. Show a memo's
-   update time in small text at the bottom of `MemoDetailScreen`, near the existing
-   "Private · memos/..." line.
+7. **Last modified in the memo detail.** Done on `feature/detail-modified`. A "Last modified"
+   line sits with the visibility and id line at the foot of `MemoDetailScreen`. It is always
+   shown, even when it matches the created date at the top of the screen: for an untouched
+   memo, "never edited" is itself worth knowing.
 
 ## Geofenced reminders
 

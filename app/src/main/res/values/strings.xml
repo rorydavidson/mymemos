@@ -62,6 +62,7 @@
     <string name="untitled">Untitled</string>
     <string name="group_collapse">Collapse</string>
     <string name="group_expand">Expand</string>
+    <string name="last_modified">Last modified %1$s</string>
     <string name="pick_a_date">Pick a date</string>
     <string name="setting_map_tiles">Map previews</string>
     <string name="setting_map_tiles_hint">Show a map under memos that have a location. This asks openstreetmap.org for tiles, which tells them roughly where your memos are. Left off, no map is drawn and nothing leaves the device.</string>
