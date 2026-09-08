@@ -66,6 +66,7 @@ class SyncEngine @Inject constructor(
     private val registry: ApiClientRegistry,
     private val attachmentStore: AttachmentStore,
     private val widgets: WidgetRefresher,
+    private val preferences: com.keltruc.mymemos.data.prefs.AppPreferences,
     private val json: Json,
 ) {
     private val mutex = Mutex()
@@ -366,9 +367,15 @@ class SyncEngine @Inject constructor(
 
     // ---- pull ------------------------------------------------------------------------
 
+    /**
+     * Delta pulls cannot see deletions made elsewhere, so every [RECONCILE_INTERVAL_MS]
+     * (or on an explicit full refresh) the whole list is fetched and local rows the server
+     * no longer has are dropped. Rows with queued edits are left alone.
+     */
     private suspend fun pull(account: AccountEntity, api: MemosApi, full: Boolean) {
-        val since = account.lastSyncEpochMs?.takeUnless { full }
         val startedAt = System.currentTimeMillis()
+        val reconcileDue = full || startedAt - preferences.lastReconcile(account.id) > RECONCILE_INTERVAL_MS
+        val since = account.lastSyncEpochMs?.takeUnless { reconcileDue }
         val fetched = mutableListOf<MemoDto>()
         for (state in listOf("NORMAL", "ARCHIVED")) {
             var token: String? = null
@@ -401,6 +408,7 @@ class SyncEngine @Inject constructor(
             if (since == null) {
                 val keep = fetched.map { it.name }.ifEmpty { listOf("") }
                 memoDao.deleteSyncedNotIn(account.id, keep)
+                preferences.setLastReconcile(account.id, startedAt)
             }
             accountDao.setLastSync(account.id, startedAt)
         }
@@ -451,6 +459,7 @@ class SyncEngine @Inject constructor(
 
     private companion object {
         const val TAG = "SyncEngine"
+        const val RECONCILE_INTERVAL_MS = 6 * 60 * 60 * 1000L
     }
 
     @kotlinx.serialization.Serializable
