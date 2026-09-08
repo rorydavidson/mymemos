@@ -136,8 +136,9 @@ interface MemoDao {
     @Query("SELECT * FROM memos WHERE accountId = :accountId AND state = 'NORMAL' AND parent IS NULL AND hasIncompleteTasks = 1 AND syncStatus != 'PENDING_DELETE' ORDER BY pinned DESC, updateTimeEpochMs DESC")
     fun observeWithOpenTasks(accountId: Long): Flow<List<MemoWithAttachments>>
 
-    @Query("SELECT * FROM memos WHERE accountId = :accountId AND tagsJoined LIKE '%mymemos/config%' AND syncStatus != 'PENDING_DELETE' ORDER BY createTimeEpochMs LIMIT 1")
-    fun observeConfigMemo(accountId: Long): Flow<MemoEntity?>
+    /** Creator is NULL until the memo has been pushed, so locally created config counts as ours. */
+    @Query("SELECT * FROM memos WHERE accountId = :accountId AND tagsJoined LIKE '%mymemos/config%' AND (creator IS NULL OR creator = :creator) AND syncStatus != 'PENDING_DELETE' ORDER BY createTimeEpochMs LIMIT 1")
+    fun observeConfigMemo(accountId: Long, creator: String): Flow<MemoEntity?>
 
     @Transaction
     @Query("SELECT * FROM memos WHERE accountId = :accountId AND state = 'NORMAL' AND parent IS NULL AND syncStatus != 'PENDING_DELETE' AND tagsJoined NOT LIKE '%mymemos/config%' ORDER BY pinned DESC, createTimeEpochMs DESC LIMIT :limit")

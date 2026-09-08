@@ -23,6 +23,10 @@ import javax.inject.Inject
  *      --es content "Call the plumber #home" --es visibility PRIVATE --ez pinned false --ez open false
  *
  * With `open` true the editor opens prefilled instead of saving straight away.
+ *
+ * Callers need the `com.keltruc.mymemos.permission.CREATE_MEMO` permission (declared in the
+ * manifest, granted by the user), and a silent save is never PUBLIC: anything world-visible
+ * has to go through the editor so the user sees it first.
  */
 @AndroidEntryPoint
 class CreateMemoActivity : ComponentActivity() {
@@ -43,6 +47,7 @@ class CreateMemoActivity : ComponentActivity() {
             return
         }
         val visibility = runCatching { Visibility.valueOf(intent.getStringExtra(EXTRA_VISIBILITY).orEmpty()) }.getOrDefault(Visibility.PRIVATE)
+            .let { if (it == Visibility.PUBLIC) Visibility.PROTECTED else it }
         val pinned = intent.getBooleanExtra(EXTRA_PINNED, false)
         val app = applicationContext
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {

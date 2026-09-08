@@ -10,6 +10,13 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Automation apps must hold this to create memos without the editor being shown. -->
+    <permission
+        android:name="com.keltruc.mymemos.permission.CREATE_MEMO"
+        android:label="@string/permission_create_memo_label"
+        android:description="@string/permission_create_memo_description"
+        android:protectionLevel="dangerous" />
+
     <application
         android:name=".MyMemosApplication"
         android:allowBackup="false"
@@ -47,6 +54,7 @@
         <activity
             android:name=".intents.CreateMemoActivity"
             android:exported="true"
+            android:permission="com.keltruc.mymemos.permission.CREATE_MEMO"
             android:excludeFromRecents="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <intent-filter>
