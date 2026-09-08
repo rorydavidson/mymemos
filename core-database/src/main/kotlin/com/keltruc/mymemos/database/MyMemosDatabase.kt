@@ -10,6 +10,7 @@ import com.keltruc.mymemos.database.dao.PendingOpDao
 import com.keltruc.mymemos.database.dao.ReactionDao
 import com.keltruc.mymemos.database.dao.RelationDao
 import com.keltruc.mymemos.database.dao.ShortcutDao
+import com.keltruc.mymemos.database.dao.TemplateDao
 import com.keltruc.mymemos.database.entity.AccountEntity
 import com.keltruc.mymemos.database.entity.AttachmentEntity
 import com.keltruc.mymemos.database.entity.MemoEntity
@@ -18,15 +19,16 @@ import com.keltruc.mymemos.database.entity.MemoRelationEntity
 import com.keltruc.mymemos.database.entity.PendingOpEntity
 import com.keltruc.mymemos.database.entity.ReactionEntity
 import com.keltruc.mymemos.database.entity.ShortcutEntity
+import com.keltruc.mymemos.database.entity.TemplateEntity
 
 @Database(
     entities = [
         AccountEntity::class, MemoEntity::class, MemoFtsEntity::class, AttachmentEntity::class, PendingOpEntity::class,
-        MemoRelationEntity::class, ReactionEntity::class, ShortcutEntity::class,
+        MemoRelationEntity::class, ReactionEntity::class, ShortcutEntity::class, TemplateEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
 )
 abstract class MyMemosDatabase : RoomDatabase() {
     abstract fun accountDao(): AccountDao
@@ -36,6 +38,7 @@ abstract class MyMemosDatabase : RoomDatabase() {
     abstract fun relationDao(): RelationDao
     abstract fun reactionDao(): ReactionDao
     abstract fun shortcutDao(): ShortcutDao
+    abstract fun templateDao(): TemplateDao
 
     companion object {
         const val NAME = "mymemos.db"

@@ -4,6 +4,7 @@ import android.util.Base64
 import androidx.room.withTransaction
 import com.keltruc.mymemos.data.attachments.AttachmentStore
 import com.keltruc.mymemos.data.auth.ApiClientRegistry
+import com.keltruc.mymemos.data.widget.WidgetRefresher
 import com.keltruc.mymemos.data.mapper.relationEntities
 import com.keltruc.mymemos.data.mapper.toEntity
 import com.keltruc.mymemos.data.mapper.toRfc3339
@@ -64,6 +65,7 @@ class SyncEngine @Inject constructor(
     private val shortcutDao: ShortcutDao,
     private val registry: ApiClientRegistry,
     private val attachmentStore: AttachmentStore,
+    private val widgets: WidgetRefresher,
     private val json: Json,
 ) {
     private val mutex = Mutex()
@@ -85,6 +87,7 @@ class SyncEngine @Inject constructor(
             pull(account, api, fullPull)
             runCatching { pullShortcuts(account, api) }
             _state.update { it.copy(running = false, lastSuccess = Instant.now()) }
+            widgets.refresh()
             Outcome.Success
         } catch (e: Exception) {
             val message = e.message ?: e.javaClass.simpleName
@@ -289,14 +292,14 @@ class SyncEngine @Inject constructor(
             )
             memoDao.upsert(fork)
             pendingOpDao.insert(PendingOpEntity(accountId = account.id, memoLocalId = forkId, type = Type.CREATE))
-            memoDao.upsert(server.toEntity(account.id, local.localId))
+            memoDao.upsert(server.toEntity(account.id, local.localId, local.colour))
         }
     }
 
     private suspend fun absorbServerMemo(local: MemoEntity, server: MemoDto, keepPending: Boolean) {
         db.withTransaction {
             // CreateMemoComment's response does not echo `parent`; keep what we know locally.
-            val entity = server.toEntity(local.accountId, local.localId).copy(parent = server.parent ?: local.parent).let {
+            val entity = server.toEntity(local.accountId, local.localId, local.colour).copy(parent = server.parent ?: local.parent).let {
                 if (keepPending) {
                     // Later ops still queued: keep local content so they push the right thing.
                     it.copy(
@@ -345,7 +348,7 @@ class SyncEngine @Inject constructor(
                 val existing = memoDao.getByRemoteName(account.id, dto.name)
                 // A row with queued ops is ahead of the server; leave it for the next push.
                 if (existing != null && (existing.syncStatus != SyncStatus.SYNCED.name || pendingOpDao.countForMemo(existing.localId) > 0)) continue
-                val entity = dto.toEntity(account.id, existing?.localId)
+                val entity = dto.toEntity(account.id, existing?.localId, existing?.colour)
                 memoDao.upsert(entity)
                 reconcileAttachments(entity.localId, dto)
                 reconcileSocial(entity.localId, dto)

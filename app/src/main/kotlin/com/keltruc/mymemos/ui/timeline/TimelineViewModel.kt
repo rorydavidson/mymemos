@@ -3,6 +3,7 @@ package com.keltruc.mymemos.ui.timeline
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.keltruc.mymemos.data.repository.AccountRepository
+import com.keltruc.mymemos.data.repository.AccountSettingsRepository
 import com.keltruc.mymemos.data.repository.MemoRepository
 import com.keltruc.mymemos.data.repository.ShortcutRepository
 import com.keltruc.mymemos.model.Shortcut
@@ -12,6 +13,7 @@ import com.keltruc.mymemos.data.sync.SyncState
 import com.keltruc.mymemos.model.Account
 import com.keltruc.mymemos.model.Memo
 import com.keltruc.mymemos.model.MemoState
+import com.keltruc.mymemos.model.NoteColour
 import com.keltruc.mymemos.ui.components.toggleTaskLine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -38,6 +40,7 @@ data class TimelineUiState(
     val showArchived: Boolean = false,
     val shortcuts: List<Shortcut> = emptyList(),
     val selectedShortcut: Shortcut? = null,
+    val streak: Int = 0,
     val sync: SyncState = SyncState(),
     val failedOps: List<FailedOp> = emptyList(),
     val refreshing: Boolean = false,
@@ -50,7 +53,9 @@ class TimelineViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val memoRepository: MemoRepository,
     private val shortcutRepository: ShortcutRepository,
+    private val settingsRepository: AccountSettingsRepository,
 ) : ViewModel() {
+    val unreadNotifications: StateFlow<Int> = settingsRepository.unreadNotifications
 
     private val query = MutableStateFlow("")
     private val selectedTag = MutableStateFlow<String?>(null)
@@ -80,13 +85,21 @@ class TimelineViewModel @Inject constructor(
         base.map { list -> if (tag == null) list else list.filter { tag in it.tags } }
     }
     private val shortcuts = account.flatMapLatest { shortcutRepository.observe(it.id) }
+    private val streak = account.flatMapLatest { memoRepository.observeActiveDays(it.id) }.map { days ->
+        // Consecutive days ending today, or yesterday if nothing written yet today.
+        var day = java.time.LocalDate.now()
+        if (day !in days) day = day.minusDays(1)
+        var n = 0
+        while (day in days) { n++; day = day.minusDays(1) }
+        n
+    }
 
     private val tags = account.flatMapLatest { memoRepository.observeTags(it.id) }
     private val sync = account.flatMapLatest { memoRepository.observeSyncState(it.id) }
     private val failed = account.flatMapLatest { memoRepository.observeFailedOps(it.id) }
 
     val state: StateFlow<TimelineUiState> = combine(
-        listOf(accountRepository.activeAccount, memos, tags, query, selectedTag, showArchived, sync, failed, refreshing, message, shortcuts, selectedShortcut),
+        listOf(accountRepository.activeAccount, memos, tags, query, selectedTag, showArchived, sync, failed, refreshing, message, shortcuts, selectedShortcut, streak),
     ) { v ->
         @Suppress("UNCHECKED_CAST")
         TimelineUiState(
@@ -102,11 +115,13 @@ class TimelineViewModel @Inject constructor(
             message = v[9] as String?,
             shortcuts = v[10] as List<Shortcut>,
             selectedShortcut = v[11] as Shortcut?,
+            streak = v[12] as Int,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TimelineUiState())
 
     init {
         refresh()
+        viewModelScope.launch { settingsRepository.refreshUnreadCount(account.first()) }
     }
 
     fun onQuery(value: String) { query.value = value }
@@ -156,6 +171,8 @@ class TimelineViewModel @Inject constructor(
     }
 
     fun delete(memo: Memo) = viewModelScope.launch { memoRepository.delete(memo.localId) }
+
+    fun setColour(memo: Memo, colour: NoteColour?) = viewModelScope.launch { memoRepository.setColour(memo.localId, colour) }
 
     fun toggleTask(memo: Memo, lineIndex: Int, checked: Boolean) = viewModelScope.launch {
         toggleTaskLine(memo.content, lineIndex, checked)?.let { memoRepository.updateContent(memo.localId, it) }

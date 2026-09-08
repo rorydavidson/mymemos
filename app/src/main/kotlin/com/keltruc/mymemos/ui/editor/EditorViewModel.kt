@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.keltruc.mymemos.data.repository.AccountRepository
 import com.keltruc.mymemos.data.repository.MemoRepository
+import com.keltruc.mymemos.data.repository.TemplateRepository
+import com.keltruc.mymemos.model.Template
 import com.keltruc.mymemos.model.Attachment
 import com.keltruc.mymemos.model.Visibility
 import com.keltruc.mymemos.navigation.EditorRoute
@@ -42,7 +44,13 @@ class EditorViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val memoRepository: MemoRepository,
     private val accountRepository: AccountRepository,
+    templateRepository: TemplateRepository,
 ) : ViewModel() {
+    val templates: StateFlow<List<Template>> = templateRepository.templates
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun expand(template: Template): String = TemplateRepository.expand(template.body)
+
     private val route = savedStateHandle.toRoute<EditorRoute>()
     private var localId: String? = route.localId
 
@@ -59,7 +67,9 @@ class EditorViewModel @Inject constructor(
             val account = accountRepository.activeAccount.filterNotNull().first()
             val id = localId
             if (id == null) {
-                _state.update { it.copy(loaded = true, serverUrl = account.serverUrl) }
+                _state.update { it.copy(loaded = true, serverUrl = account.serverUrl, content = route.initialText.orEmpty()) }
+                // Shared images: the memo has to exist before a file can hang off it.
+                route.initialImages.map(Uri::parse).forEach { uri -> attach(uri) }
             } else {
                 val memo = memoRepository.observeMemo(id).first()
                 _state.update {

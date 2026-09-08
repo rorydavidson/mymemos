@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -79,6 +80,8 @@ import com.keltruc.mymemos.model.MemoState
 import com.keltruc.mymemos.model.SyncStatus
 import com.keltruc.mymemos.ui.components.AttachmentStrip
 import com.keltruc.mymemos.ui.components.Avatar
+import com.keltruc.mymemos.ui.components.ColourPickerDialog
+import com.keltruc.mymemos.ui.components.tint
 import com.keltruc.mymemos.ui.components.MemoContent
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -94,7 +97,8 @@ fun MemoDetailScreen(
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onOpenMemo: (String) -> Unit,
-    viewModel: MemoDetailViewModel = hiltViewModel(),
+    showBack: Boolean = true,
+    viewModel: MemoDetailViewModel = hiltViewModel<MemoDetailViewModel, MemoDetailViewModel.Factory>(key = localId) { it.create(localId) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -103,6 +107,7 @@ fun MemoDetailScreen(
     var overflow by remember { mutableStateOf(false) }
     var showReactions by remember { mutableStateOf(false) }
     var showReferencePicker by remember { mutableStateOf(false) }
+    var showColour by remember { mutableStateOf(false) }
     var comment by remember { mutableStateOf("") }
 
     val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -114,13 +119,13 @@ fun MemoDetailScreen(
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = state.memo?.colour?.tint() ?: MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {},
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = state.memo?.colour?.tint() ?: MaterialTheme.colorScheme.background),
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
+                    if (showBack) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
                 },
                 actions = {
                     val m = state.memo ?: return@TopAppBar
@@ -148,6 +153,11 @@ fun MemoDetailScreen(
                                 overflow = false
                                 if (m.location != null) viewModel.clearLocation() else locationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                             },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.colour)) },
+                            leadingIcon = { Icon(Icons.Default.Palette, null) },
+                            onClick = { overflow = false; showColour = true },
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.delete)) },
@@ -296,6 +306,14 @@ fun MemoDetailScreen(
                 context.startActivity(Intent.createChooser(send, null))
             },
             onDismiss = viewModel::closeShares,
+        )
+    }
+
+    if (showColour) {
+        ColourPickerDialog(
+            current = state.memo?.colour,
+            onPick = { viewModel.setColour(it); showColour = false },
+            onDismiss = { showColour = false },
         )
     }
 

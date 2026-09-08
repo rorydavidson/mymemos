@@ -7,6 +7,7 @@ import com.keltruc.mymemos.database.entity.MemoEntity
 import com.keltruc.mymemos.database.entity.MemoRelationEntity
 import com.keltruc.mymemos.database.entity.ReactionEntity
 import com.keltruc.mymemos.database.entity.ShortcutEntity
+import com.keltruc.mymemos.database.entity.TemplateEntity
 import com.keltruc.mymemos.model.Account
 import com.keltruc.mymemos.model.Attachment
 import com.keltruc.mymemos.model.AuthMethod
@@ -14,6 +15,8 @@ import com.keltruc.mymemos.model.Location
 import com.keltruc.mymemos.model.Memo
 import com.keltruc.mymemos.model.MemoShare
 import com.keltruc.mymemos.model.MemoState
+import com.keltruc.mymemos.model.NoteColour
+import com.keltruc.mymemos.model.Template
 import com.keltruc.mymemos.model.Reaction
 import com.keltruc.mymemos.model.Reference
 import com.keltruc.mymemos.model.Shortcut
@@ -57,8 +60,11 @@ fun AccountEntity.toModel() = Account(
     serverVersion = serverVersion,
 )
 
-/** Server memo → entity. Keeps [existingLocalId] so a re-pull does not change identity. */
-fun MemoDto.toEntity(accountId: Long, existingLocalId: String? = null): MemoEntity {
+/**
+ * Server memo → entity. Keeps [existingLocalId] so a re-pull does not change identity, and
+ * [existingColour] because the server knows nothing about local tints.
+ */
+fun MemoDto.toEntity(accountId: Long, existingLocalId: String? = null, existingColour: String? = null): MemoEntity {
     val update = parseInstant(updateTime)
     return MemoEntity(
         localId = existingLocalId ?: UUID.randomUUID().toString(),
@@ -83,6 +89,7 @@ fun MemoDto.toEntity(accountId: Long, existingLocalId: String? = null): MemoEnti
         syncStatus = SyncStatus.SYNCED.name,
         baseUpdateTimeEpochMs = update.toEpochMilli(),
         parent = parent,
+        colour = existingColour,
     )
 }
 
@@ -158,7 +165,10 @@ fun MemoEntity.toModel(attachments: List<Attachment> = emptyList()) = Memo(
     attachments = attachments,
     syncStatus = runCatching { SyncStatus.valueOf(syncStatus) }.getOrDefault(SyncStatus.SYNCED),
     parent = parent,
+    colour = colour?.let { c -> runCatching { NoteColour.valueOf(c) }.getOrNull() },
 )
+
+fun TemplateEntity.toModel() = Template(id, title, body)
 
 /** Server URL for an uploaded attachment; null while it is still local-only. */
 fun Attachment.remoteUrl(serverUrl: String, thumbnail: Boolean = false): String? {

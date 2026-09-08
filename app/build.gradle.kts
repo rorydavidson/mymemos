@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -6,16 +8,36 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+// Release signing comes from keystore.properties (git-ignored) or the matching environment
+// variables on CI. Without either, release builds are produced unsigned.
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun signingValue(key: String): String? = keystoreProps.getProperty(key) ?: System.getenv(key.uppercase().replace('.', '_'))
+
 android {
     namespace = "com.keltruc.mymemos"
     compileSdk = 37
+
+    signingConfigs {
+        create("release") {
+            val storePath = signingValue("store.file")
+            if (storePath != null) {
+                storeFile = rootProject.file(storePath)
+                storePassword = signingValue("store.password")
+                keyAlias = signingValue("key.alias")
+                keyPassword = signingValue("key.password")
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.keltruc.mymemos"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -24,6 +46,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (signingValue("store.file") != null) signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
@@ -43,6 +66,7 @@ kotlin {
 dependencies {
     implementation(project(":core-model"))
     implementation(project(":core-data"))
+    implementation(project(":core-database"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
@@ -63,6 +87,15 @@ dependencies {
     implementation(libs.work.runtime)
     implementation(libs.hilt.work)
     ksp(libs.hilt.androidx.compiler)
+    implementation(libs.splashscreen)
+    implementation(libs.material3.window.size)
+    implementation(libs.commonmark)
+    implementation(libs.commonmark.tables)
+    implementation(libs.commonmark.strikethrough)
+    implementation(libs.commonmark.tasklist)
+    implementation(libs.commonmark.autolink)
+    implementation(libs.glance.appwidget)
+    implementation(libs.glance.material3)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     implementation(libs.kotlinx.serialization.json)

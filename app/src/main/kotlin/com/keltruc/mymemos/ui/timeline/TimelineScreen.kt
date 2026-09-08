@@ -27,12 +27,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -67,6 +71,7 @@ import com.keltruc.mymemos.R
 import com.keltruc.mymemos.model.Memo
 import com.keltruc.mymemos.model.Shortcut
 import com.keltruc.mymemos.ui.components.Avatar
+import com.keltruc.mymemos.ui.components.ColourPickerDialog
 import com.keltruc.mymemos.ui.components.MemoCard
 import com.keltruc.mymemos.ui.sync.SyncStatusChip
 import com.keltruc.mymemos.ui.sync.SyncStatusSheet
@@ -83,13 +88,17 @@ fun TimelineScreen(
     onEditMemo: (String) -> Unit,
     onSettings: () -> Unit,
     onManageShortcuts: () -> Unit,
+    onNotifications: () -> Unit,
+    onReview: () -> Unit,
     viewModel: TimelineViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val unread by viewModel.unreadNotifications.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var showSync by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<Memo?>(null) }
     var showReauth by remember { mutableStateOf(false) }
+    var colouring by remember { mutableStateOf<Memo?>(null) }
 
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -130,6 +139,9 @@ fun TimelineScreen(
                         onToggleArchived = viewModel::toggleArchived,
                         onShortcut = viewModel::onShortcut,
                         onManageShortcuts = onManageShortcuts,
+                        unread = unread,
+                        onNotifications = onNotifications,
+                        onReview = onReview,
                     )
                 }
                 if (state.sync.authExpired) {
@@ -171,7 +183,9 @@ fun TimelineScreen(
                             onPin = { viewModel.togglePin(memo) },
                             onArchive = { viewModel.toggleArchive(memo) },
                             onDelete = { pendingDelete = memo },
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp),
+                            onColour = { colouring = memo },
+                            onTagClick = { viewModel.onTag(it) },
+                            modifier = Modifier.animateItem().padding(horizontal = 16.dp, vertical = 7.dp),
                         )
                     }
                 }
@@ -186,6 +200,14 @@ fun TimelineScreen(
             onSyncNow = { viewModel.refresh(); showSync = false },
             onRetryFailed = { viewModel.retryFailed(); showSync = false },
             onDismiss = { showSync = false },
+        )
+    }
+
+    colouring?.let { memo ->
+        ColourPickerDialog(
+            current = memo.colour,
+            onPick = { viewModel.setColour(memo, it); colouring = null },
+            onDismiss = { colouring = null },
         )
     }
 
@@ -239,10 +261,13 @@ private fun Header(
     onToggleArchived: () -> Unit,
     onShortcut: (Shortcut?) -> Unit,
     onManageShortcuts: () -> Unit,
+    unread: Int,
+    onNotifications: () -> Unit,
+    onReview: () -> Unit,
 ) {
     Column(Modifier.statusBarsPadding().padding(top = 8.dp)) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+            Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             state.account?.let { acc ->
@@ -257,15 +282,27 @@ private fun Header(
             Column(Modifier.weight(1f)) {
                 Text(
                     stringResource(if (state.showArchived) R.string.show_archived else R.string.timeline_title),
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.headlineSmall,
+                    maxLines = 1,
                 )
                 Text(
-                    stringResource(R.string.greeting_memos, state.memos.size),
+                    stringResource(R.string.greeting_memos, state.memos.size) +
+                        if (state.streak > 1) " · " + stringResource(R.string.streak, state.streak) else "",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             SyncStatusChip(state.sync, onClick = onSync)
+            IconButton(onClick = onReview) {
+                Icon(Icons.Default.CalendarMonth, contentDescription = stringResource(R.string.review), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            IconButton(onClick = onNotifications) {
+                BadgedBox(badge = { if (unread > 0) Badge { Text(unread.toString()) } }) {
+                    Icon(Icons.Default.Notifications, contentDescription = stringResource(R.string.notifications), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             IconButton(onClick = onToggleArchived) {
                 Icon(
                     if (state.showArchived) Icons.Default.Inbox else Icons.Default.Archive,

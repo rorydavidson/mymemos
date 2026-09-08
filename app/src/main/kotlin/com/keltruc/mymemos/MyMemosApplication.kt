@@ -8,7 +8,11 @@ import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.keltruc.mymemos.data.auth.ActiveSession
+import com.keltruc.mymemos.data.repository.TemplateRepository
 import com.keltruc.mymemos.data.sync.SyncScheduler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import dagger.hilt.android.HiltAndroidApp
 import okhttp3.OkHttpClient
 import javax.inject.Inject
@@ -19,6 +23,7 @@ class MyMemosApplication : Application(), Configuration.Provider, SingletonImage
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var activeSession: ActiveSession
     @Inject lateinit var syncScheduler: SyncScheduler
+    @Inject lateinit var templates: TemplateRepository
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
@@ -26,6 +31,7 @@ class MyMemosApplication : Application(), Configuration.Provider, SingletonImage
     override fun onCreate() {
         super.onCreate()
         syncScheduler.ensurePeriodic()
+        CoroutineScope(Dispatchers.IO).launch { templates.seedDefaultsIfEmpty() }
     }
 
     override fun newImageLoader(context: Context): ImageLoader {

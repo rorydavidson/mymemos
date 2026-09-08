@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Unarchive
@@ -58,7 +59,9 @@ fun MemoCard(
     onPin: () -> Unit,
     onArchive: () -> Unit,
     onDelete: () -> Unit,
+    onColour: () -> Unit,
     modifier: Modifier = Modifier,
+    onTagClick: ((String) -> Unit)? = null,
 ) {
     var menu by remember { mutableStateOf(false) }
     val conflict = memo.syncStatus == SyncStatus.CONFLICT
@@ -67,6 +70,7 @@ fun MemoCard(
             shape = MaterialTheme.shapes.medium,
             color = when {
                 conflict -> MaterialTheme.colorScheme.errorContainer
+                memo.colour != null -> memo.colour!!.tint()
                 memo.pinned -> MaterialTheme.colorScheme.secondaryContainer
                 else -> MaterialTheme.colorScheme.surfaceContainer
             },
@@ -78,7 +82,7 @@ fun MemoCard(
                 .combinedClickable(onClick = onClick, onLongClick = { menu = true }),
         ) {
             Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                MemoContent(content = memo.content, onToggleTask = onToggleTask, maxLines = 12)
+                MemoContent(content = memo.content, onToggleTask = onToggleTask, onTagClick = onTagClick, maxLines = 12)
                 AttachmentStrip(attachments = memo.attachments, serverUrl = serverUrl, thumbSize = 88)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
@@ -113,6 +117,11 @@ fun MemoCard(
                 text = { Text(stringResource(if (memo.state == MemoState.ARCHIVED) R.string.unarchive else R.string.archive)) },
                 leadingIcon = { Icon(if (memo.state == MemoState.ARCHIVED) Icons.Default.Unarchive else Icons.Default.Archive, null) },
                 onClick = { menu = false; onArchive() },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.colour)) },
+                leadingIcon = { Icon(Icons.Default.Palette, null) },
+                onClick = { menu = false; onColour() },
             )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.delete)) },

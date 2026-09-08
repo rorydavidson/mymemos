@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.MyMemos" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+    <style name="Theme.MyMemos.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#15130F</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.MyMemos</item>
+    </style>
+</resources>

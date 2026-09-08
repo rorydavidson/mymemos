@@ -1,9 +1,7 @@
 package com.keltruc.mymemos.ui.detail
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
 import com.keltruc.mymemos.data.repository.AccountRepository
 import com.keltruc.mymemos.data.repository.MemoRepository
 import com.keltruc.mymemos.data.repository.ShareRepository
@@ -16,6 +14,9 @@ import com.keltruc.mymemos.model.Reaction
 import com.keltruc.mymemos.model.Reference
 import com.keltruc.mymemos.navigation.MemoDetailRoute
 import com.keltruc.mymemos.ui.components.toggleTaskLine
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,7 +31,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 data class DetailUiState(
     val memo: Memo? = null,
@@ -44,15 +44,20 @@ data class DetailUiState(
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
-@HiltViewModel
-class MemoDetailViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+@HiltViewModel(assistedFactory = MemoDetailViewModel.Factory::class)
+class MemoDetailViewModel @AssistedInject constructor(
+    @Assisted private val localId: String,
     private val memoRepository: MemoRepository,
     private val shareRepository: ShareRepository,
     private val locationProvider: LocationProvider,
     accountRepository: AccountRepository,
 ) : ViewModel() {
-    private val route = savedStateHandle.toRoute<MemoDetailRoute>()
+    @AssistedFactory
+    interface Factory {
+        fun create(localId: String): MemoDetailViewModel
+    }
+
+    private val route = MemoDetailRoute(localId)
     private val account = accountRepository.activeAccount.filterNotNull()
     private val memo = memoRepository.observeMemo(route.localId)
     private val shares = MutableStateFlow<List<MemoShare>?>(null)
@@ -125,6 +130,8 @@ class MemoDetailViewModel @Inject constructor(
     }
 
     fun delete() = viewModelScope.launch { state.value.memo?.let { memoRepository.delete(it.localId) } }
+
+    fun setColour(colour: com.keltruc.mymemos.model.NoteColour?) = viewModelScope.launch { memoRepository.setColour(route.localId, colour) }
 
     fun keepConflictCopy() = viewModelScope.launch { state.value.memo?.let { memoRepository.resolveConflict(it.localId) } }
 

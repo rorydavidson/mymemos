@@ -14,6 +14,7 @@ import com.keltruc.mymemos.model.Reaction
 import com.keltruc.mymemos.model.Reference
 import com.keltruc.mymemos.data.prefs.AppPreferences
 import com.keltruc.mymemos.data.text.TaskListSorter
+import com.keltruc.mymemos.data.widget.WidgetRefresher
 import com.keltruc.mymemos.data.sync.FailedOp
 import com.keltruc.mymemos.data.sync.SyncEngine
 import com.keltruc.mymemos.data.sync.SyncScheduler
@@ -41,7 +42,11 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.UUID
+import com.keltruc.mymemos.model.NoteColour
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -63,6 +68,7 @@ class MemoRepository @Inject constructor(
     private val engine: SyncEngine,
     private val scheduler: SyncScheduler,
     private val preferences: AppPreferences,
+    private val widgets: WidgetRefresher,
     private val json: Json,
 ) {
     // ---- reads -----------------------------------------------------------------------
@@ -71,6 +77,8 @@ class MemoRepository @Inject constructor(
         memoDao.observeTimeline(accountId, state.name).map { rows -> rows.map { it.toModel() } }
 
     fun observeMemo(localId: String): Flow<Memo?> = memoDao.observeByLocalId(localId).map { it?.toModel() }
+
+    suspend fun observeMemoOnce(localId: String): Memo? = memoDao.getByLocalId(localId)?.toModel()
 
     fun search(accountId: Long, query: String): Flow<List<Memo>> {
         val ftsQuery = query.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
@@ -111,6 +119,7 @@ class MemoRepository @Inject constructor(
     suspend fun retryFailed(accountId: Long) {
         pendingOpDao.retryFailed(accountId)
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     // ---- writes ----------------------------------------------------------------------
@@ -147,6 +156,7 @@ class MemoRepository @Inject constructor(
             pendingOpDao.insert(PendingOpEntity(accountId = accountId, memoLocalId = localId, type = Type.CREATE))
         }
         scheduler.syncNow()
+        widgets.refresh()
         return localId
     }
 
@@ -185,6 +195,7 @@ class MemoRepository @Inject constructor(
             }
         }
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     suspend fun setPinned(localId: String, pinned: Boolean) = simpleFieldOp(localId, Type.SET_PINNED) { it.copy(pinned = pinned) }
@@ -218,6 +229,7 @@ class MemoRepository @Inject constructor(
             }
         }
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     suspend fun addAttachment(localId: String, uri: Uri) {
@@ -252,6 +264,7 @@ class MemoRepository @Inject constructor(
             )
         }
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     suspend fun removeAttachment(attachmentLocalId: String) {
@@ -278,6 +291,7 @@ class MemoRepository @Inject constructor(
             }
         }
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     // ---- comments, reactions, references, location -----------------------------------
@@ -293,7 +307,7 @@ class MemoRepository @Inject constructor(
             for (dto in comments) {
                 val existing = memoDao.getByRemoteName(account.id, dto.name)
                 if (existing != null && existing.syncStatus != SyncStatus.SYNCED.name) continue
-                memoDao.upsert(dto.toEntity(account.id, existing?.localId).copy(parent = parentRemoteName))
+                memoDao.upsert(dto.toEntity(account.id, existing?.localId, existing?.colour).copy(parent = parentRemoteName))
             }
         }
     }
@@ -316,6 +330,7 @@ class MemoRepository @Inject constructor(
             pendingOpDao.insert(PendingOpEntity(accountId = accountId, memoLocalId = localId, type = Type.CREATE_COMMENT))
         }
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     fun observeReactions(memoLocalId: String): Flow<List<Reaction>> =
@@ -351,6 +366,7 @@ class MemoRepository @Inject constructor(
             }
         }
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     fun observeReferences(memoLocalId: String): Flow<List<Reference>> =
@@ -373,6 +389,7 @@ class MemoRepository @Inject constructor(
             queueRelations(memo)
         }
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     suspend fun removeReference(memoLocalId: String, relatedRemoteName: String) {
@@ -382,6 +399,7 @@ class MemoRepository @Inject constructor(
             queueRelations(memo)
         }
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     private suspend fun queueRelations(memo: MemoEntity) {
@@ -397,6 +415,55 @@ class MemoRepository @Inject constructor(
     /** Candidates for the reference picker: synced, top-level memos matching [query]. */
     suspend fun pickReferenceCandidates(accountId: Long, query: String): List<Memo> =
         memoDao.pickerSearch(accountId, query).map { it.toModel() }.filter { it.remoteName != null }
+
+    /** Local-only tint; never touches the server. */
+    suspend fun setColour(localId: String, colour: NoteColour?) {
+        memoDao.setColour(localId, colour?.name)
+        widgets.refresh()
+    }
+
+    fun observeCreatedOn(accountId: Long, day: LocalDate, zone: ZoneId = ZoneId.systemDefault()): Flow<List<Memo>> {
+        val from = day.atStartOfDay(zone).toInstant().toEpochMilli()
+        val to = day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        return memoDao.observeCreatedBetween(accountId, from, to).map { rows -> rows.map { it.toModel() } }
+    }
+
+    /** Days with at least one memo, for streaks and "on this day". */
+    fun observeActiveDays(accountId: Long, zone: ZoneId = ZoneId.systemDefault()): Flow<Set<LocalDate>> =
+        memoDao.observeCreateTimes(accountId).map { times -> times.map { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }.toSet() }
+
+    suspend fun memosWithLocation(accountId: Long): List<Memo> = memoDao.withLocation(accountId).map { it.toModel() }
+
+    /** Nodes and reference edges for the graph view. */
+    suspend fun referenceGraph(accountId: Long): Pair<List<Memo>, List<Pair<String, String>>> {
+        val memos = memoDao.allForExport(accountId).map { it.toModel() }.filter { it.remoteName != null && !it.isComment }
+        val byLocal = memos.associateBy { it.localId }
+        val byRemote = memos.associateBy { it.remoteName }
+        val edges = memoDao.allReferences().mapNotNull { r ->
+            val from = byLocal[r.memoLocalId] ?: return@mapNotNull null
+            val to = byRemote[r.relatedRemoteName] ?: return@mapNotNull null
+            from.localId to to.localId
+        }
+        val connected = edges.flatMap { listOf(it.first, it.second) }.toSet()
+        return memos.filter { it.localId in connected } to edges
+    }
+
+    /** Memos with unticked tasks, newest first, for the tasks widget. */
+    suspend fun memosWithOpenTasks(accountId: Long): List<Memo> =
+        memoDao.withOpenTasks(accountId).map { it.toModel() }
+
+    /** Pinned then most recent memos, for the recents widget. */
+    suspend fun recentForWidget(accountId: Long, limit: Int): List<Memo> =
+        memoDao.recent(accountId, limit).map { it.toModel() }
+
+    /** Local id for a server memo name, pulling it if we do not hold it yet. */
+    suspend fun ensureLocal(account: Account, remoteName: String): String? {
+        memoDao.getByRemoteName(account.id, remoteName)?.let { return it.localId }
+        val dto = runCatching { registry.api(account.serverUrl, account.userResourceName).getMemo(remoteName) }.getOrNull() ?: return null
+        val entity = dto.toEntity(account.id)
+        memoDao.upsert(entity)
+        return entity.localId
+    }
 
     /** Marks a conflict fork as dealt with: it stays as an ordinary memo. */
     suspend fun resolveConflict(localId: String) {
@@ -421,6 +488,7 @@ class MemoRepository @Inject constructor(
             }
         }
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     companion object {

@@ -10,6 +10,7 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.keltruc.mymemos.database.entity.AttachmentEntity
 import com.keltruc.mymemos.database.entity.MemoEntity
+import com.keltruc.mymemos.database.entity.MemoRelationEntity
 import kotlinx.coroutines.flow.Flow
 
 data class MemoWithAttachments(
@@ -71,6 +72,27 @@ interface MemoDao {
     @Query("DELETE FROM memos WHERE localId = :localId")
     suspend fun deleteByLocalId(localId: String)
 
+    @Transaction
+    @Query("SELECT * FROM memos WHERE accountId = :accountId AND syncStatus != 'PENDING_DELETE' ORDER BY createTimeEpochMs")
+    suspend fun allForExport(accountId: Long): List<MemoWithAttachments>
+
+    @Query("SELECT * FROM memo_relations WHERE type = 'REFERENCE'")
+    suspend fun allReferences(): List<MemoRelationEntity>
+
+    @Query("UPDATE memos SET colour = :colour WHERE localId = :localId")
+    suspend fun setColour(localId: String, colour: String?)
+
+    @Transaction
+    @Query("SELECT * FROM memos WHERE accountId = :accountId AND parent IS NULL AND syncStatus != 'PENDING_DELETE' AND createTimeEpochMs >= :fromEpochMs AND createTimeEpochMs < :toEpochMs ORDER BY createTimeEpochMs")
+    fun observeCreatedBetween(accountId: Long, fromEpochMs: Long, toEpochMs: Long): Flow<List<MemoWithAttachments>>
+
+    @Query("SELECT createTimeEpochMs FROM memos WHERE accountId = :accountId AND parent IS NULL AND syncStatus != 'PENDING_DELETE'")
+    fun observeCreateTimes(accountId: Long): Flow<List<Long>>
+
+    @Transaction
+    @Query("SELECT * FROM memos WHERE accountId = :accountId AND parent IS NULL AND syncStatus != 'PENDING_DELETE' AND latitude IS NOT NULL ORDER BY createTimeEpochMs DESC")
+    suspend fun withLocation(accountId: Long): List<MemoWithAttachments>
+
     @Query("UPDATE memos SET syncStatus = :status WHERE localId = :localId")
     suspend fun setSyncStatus(localId: String, status: String)
 
@@ -105,6 +127,14 @@ interface MemoDao {
         """,
     )
     suspend fun deleteSyncedNotIn(accountId: Long, keepRemoteNames: List<String>)
+
+    @Transaction
+    @Query("SELECT * FROM memos WHERE accountId = :accountId AND state = 'NORMAL' AND parent IS NULL AND hasIncompleteTasks = 1 AND syncStatus != 'PENDING_DELETE' ORDER BY pinned DESC, updateTimeEpochMs DESC LIMIT 20")
+    suspend fun withOpenTasks(accountId: Long): List<MemoWithAttachments>
+
+    @Transaction
+    @Query("SELECT * FROM memos WHERE accountId = :accountId AND state = 'NORMAL' AND parent IS NULL AND syncStatus != 'PENDING_DELETE' ORDER BY pinned DESC, createTimeEpochMs DESC LIMIT :limit")
+    suspend fun recent(accountId: Long, limit: Int): List<MemoWithAttachments>
 
     @Query("DELETE FROM memos WHERE accountId = :accountId AND parent = :parentRemoteName")
     suspend fun deleteCommentsOf(accountId: Long, parentRemoteName: String)

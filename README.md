@@ -38,7 +38,21 @@ Then:
 Google Sans Flex, bundled under the SIL Open Font License 1.1 (see `app/GOOGLE_SANS_FLEX_OFL.txt`).
 "Google Sans Flex" is a trademark of Google LLC; its use here does not imply affiliation.
 
+## Release builds
+
+Copy `keystore.properties.example` to `keystore.properties` and point it at your keystore;
+`./gradlew :app:assembleRelease` then produces a signed, shrunk APK. CI (`.gitea/workflows/ci.yml`,
+mirrored for GitHub) runs unit tests, lint and both builds, signing when the `STORE_*`/`KEY_*`
+secrets are set.
+
+## Automation
+
+`am start -a com.keltruc.mymemos.action.CREATE_MEMO --es content "text" --es visibility PRIVATE --ez pinned false --ez open false`
+creates a memo without opening the app; `open true` opens the editor prefilled. Sharing text or
+images from any app does the same through the share sheet.
+
 ## Status
 
-Phase 1: sign in (password or personal access token), pull and browse memos, offline
-search and tag filter. The sync engine (outbox, conflict merge, attachments) is phase 2.
+Feature complete against Memos v0.30: offline-first editing with an outbox and three-way
+merge, attachments, comments, reactions, references, share links, location, shortcuts,
+profile and instance administration, widgets, templates, review, export and encrypted backup.
