@@ -101,12 +101,17 @@ class SyncEngine @Inject constructor(
     // ---- push ------------------------------------------------------------------------
 
     private suspend fun push(account: AccountEntity, api: MemosApi) {
-        for (op in pendingOpDao.queued(account.id)) {
+        // Always take the head of a fresh queue: every outcome below removes the op from it
+        // (delete, park as failed, or a recovery that rewrites the queue) or throws.
+        // CREATE ops go first so a memo exists before anything that hangs off it.
+        while (true) {
+            val op = pendingOpDao.queued(account.id).sortedWith(compareBy({ it.type != Type.CREATE }, { it.id })).firstOrNull() ?: break
             try {
                 applyOp(account, api, op)
                 pendingOpDao.delete(op.id)
             } catch (e: ApiException) {
                 if (e.isUnauthenticated) throw e
+                if (e.isNotFound && recoverMissingRemote(account, op)) continue
                 // Server refused this op; park it rather than block everything behind it.
                 pendingOpDao.update(op.copy(attempts = op.attempts + 1, lastError = e.message, failed = e.httpStatus in 400..499))
                 if (e.httpStatus !in 400..499) throw e
@@ -115,6 +120,45 @@ class SyncEngine @Inject constructor(
                 throw e
             }
         }
+    }
+
+    /**
+     * The server no longer has the memo an op targets (deleted elsewhere). Rather than lose
+     * the local edits, turn the row back into a brand-new memo and let the outbox create it.
+     * Comments on a vanished parent are dropped. Returns false if there is nothing to recover.
+     */
+    private suspend fun recoverMissingRemote(account: AccountEntity, op: PendingOpEntity): Boolean {
+        val memo = memoDao.getByLocalId(op.memoLocalId) ?: return false
+        if (op.type == Type.DELETE || op.type == Type.DELETE_REACTION || memo.remoteName == null) return false
+        db.withTransaction {
+            pendingOpDao.deleteForMemo(memo.localId)
+            if (memo.parent != null) {
+                memoDao.deleteByLocalId(memo.localId)
+                return@withTransaction
+            }
+            memoDao.upsert(memo.copy(remoteName = null, syncStatus = SyncStatus.PENDING_CREATE.name, baseUpdateTimeEpochMs = null))
+            // Uploaded attachments went with the memo; re-upload the ones we still hold, drop the rest.
+            for (a in attachmentDao.forMemo(memo.localId)) {
+                if (a.localPath != null || attachmentStore.file(a.localId).exists()) {
+                    attachmentDao.update(a.copy(remoteName = null))
+                    pendingOpDao.insert(
+                        PendingOpEntity(
+                            accountId = account.id, memoLocalId = memo.localId, type = Type.ADD_ATTACHMENT,
+                            payloadJson = json.encodeToString(AttachmentPayload(a.localId)),
+                        ),
+                    )
+                } else {
+                    attachmentDao.deleteByLocalId(a.localId)
+                }
+            }
+            reactionDao.deleteSyncedForMemo(memo.localId)
+            pendingOpDao.insert(PendingOpEntity(accountId = account.id, memoLocalId = memo.localId, type = Type.CREATE))
+            if (relationDao.references(memo.localId).isNotEmpty()) {
+                pendingOpDao.insert(PendingOpEntity(accountId = account.id, memoLocalId = memo.localId, type = Type.SET_RELATIONS))
+            }
+        }
+        android.util.Log.w(TAG, "memo ${memo.remoteName} vanished from server; recreating from local copy")
+        return true
     }
 
     private suspend fun applyOp(account: AccountEntity, api: MemosApi, op: PendingOpEntity) {
