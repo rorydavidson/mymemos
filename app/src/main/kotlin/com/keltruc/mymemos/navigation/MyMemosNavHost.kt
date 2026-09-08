@@ -9,6 +9,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.keltruc.mymemos.ui.detail.MemoDetailScreen
+import com.keltruc.mymemos.ui.editor.EditorScreen
 import com.keltruc.mymemos.ui.signin.SignInScreen
 import com.keltruc.mymemos.ui.timeline.TimelineScreen
 import kotlinx.serialization.Serializable
@@ -16,6 +17,7 @@ import kotlinx.serialization.Serializable
 @Serializable object SignInRoute
 @Serializable object TimelineRoute
 @Serializable data class MemoDetailRoute(val localId: String)
+@Serializable data class EditorRoute(val localId: String? = null)
 
 @Composable
 fun MyMemosNavHost() {
@@ -33,11 +35,22 @@ fun MyMemosNavHost() {
         is SessionState.SignedIn -> {
             NavHost(navController, startDestination = TimelineRoute) {
                 composable<TimelineRoute> {
-                    TimelineScreen(onOpenMemo = { navController.navigate(MemoDetailRoute(it)) })
+                    TimelineScreen(
+                        onOpenMemo = { navController.navigate(MemoDetailRoute(it)) },
+                        onNewMemo = { navController.navigate(EditorRoute()) },
+                        onEditMemo = { navController.navigate(EditorRoute(it)) },
+                    )
                 }
                 composable<MemoDetailRoute> { entry ->
                     val route = entry.toRoute<MemoDetailRoute>()
-                    MemoDetailScreen(localId = route.localId, onBack = { navController.popBackStack() })
+                    MemoDetailScreen(
+                        localId = route.localId,
+                        onBack = { navController.popBackStack() },
+                        onEdit = { navController.navigate(EditorRoute(route.localId)) },
+                    )
+                }
+                composable<EditorRoute> {
+                    EditorScreen(onDone = { navController.popBackStack() })
                 }
             }
         }

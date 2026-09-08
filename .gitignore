@@ -10,3 +10,4 @@ build/
 *.keystore
 *.jks
 /keystore.properties
+.vscode/settings.json

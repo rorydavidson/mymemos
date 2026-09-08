@@ -122,3 +122,11 @@ fun MemoEntity.toModel(attachments: List<Attachment> = emptyList()) = Memo(
     attachments = attachments,
     syncStatus = runCatching { SyncStatus.valueOf(syncStatus) }.getOrDefault(SyncStatus.SYNCED),
 )
+
+/** Server URL for an uploaded attachment; null while it is still local-only. */
+fun Attachment.remoteUrl(serverUrl: String, thumbnail: Boolean = false): String? {
+    externalLink?.let { return it }
+    val name = remoteName ?: return null
+    val base = "${serverUrl.trimEnd('/')}/file/$name/${java.net.URLEncoder.encode(filename, "UTF-8").replace("+", "%20")}"
+    return if (thumbnail) "$base?thumbnail=true" else base
+}

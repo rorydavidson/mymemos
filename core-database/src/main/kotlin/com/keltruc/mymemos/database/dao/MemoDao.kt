@@ -71,6 +71,12 @@ interface MemoDao {
     @Query("DELETE FROM memos WHERE localId = :localId")
     suspend fun deleteByLocalId(localId: String)
 
+    @Query("UPDATE memos SET syncStatus = :status WHERE localId = :localId")
+    suspend fun setSyncStatus(localId: String, status: String)
+
+    @Query("SELECT * FROM memos WHERE accountId = :accountId AND syncStatus = 'CONFLICT'")
+    fun observeConflicts(accountId: Long): Flow<List<MemoEntity>>
+
     @Query(
         """
         DELETE FROM memos WHERE accountId = :accountId AND syncStatus = 'SYNCED'

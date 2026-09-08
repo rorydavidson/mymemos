@@ -81,7 +81,6 @@ class AccountRepository @Inject constructor(
         registry.evict(account.serverUrl, account.userResourceName)
         memoDao.deleteAllForAccount(account.id)
         accountDao.delete(account.id)
-        accountDao.observeAll()
     }
 
     private suspend fun saveAccount(serverUrl: String, user: UserDto, method: AuthMethod): Account {
