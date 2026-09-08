@@ -48,4 +48,14 @@
     <string name="conflict_banner">This copy could not be merged with the server. Edit it or keep it as is.</string>
     <string name="conflict_keep">Keep as new memo</string>
     <string name="offline_saved">Saved offline. Will sync when connected.</string>
+    <string name="settings">Settings</string>
+    <string name="settings_editor">Editor</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="setting_sort_completed">Sink completed tasks</string>
+    <string name="setting_sort_completed_hint">When you save a memo, ticked tasks move below the unticked ones in each list.</string>
+    <string name="setting_dynamic_colour">Wallpaper colours</string>
+    <string name="setting_dynamic_colour_hint">Use your device\'s Material You palette instead of the app\'s own.</string>
+    <string name="today">Today</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="greeting_memos">%1$d memos</string>
 </resources>

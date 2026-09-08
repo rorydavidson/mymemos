@@ -29,6 +29,7 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.security.crypto)
+    implementation(libs.datastore.preferences)
     implementation(libs.work.runtime)
     implementation(libs.hilt.work)
     ksp(libs.hilt.androidx.compiler)

@@ -10,6 +10,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.keltruc.mymemos.ui.detail.MemoDetailScreen
 import com.keltruc.mymemos.ui.editor.EditorScreen
+import com.keltruc.mymemos.ui.settings.SettingsScreen
 import com.keltruc.mymemos.ui.signin.SignInScreen
 import com.keltruc.mymemos.ui.timeline.TimelineScreen
 import kotlinx.serialization.Serializable
@@ -18,6 +19,7 @@ import kotlinx.serialization.Serializable
 @Serializable object TimelineRoute
 @Serializable data class MemoDetailRoute(val localId: String)
 @Serializable data class EditorRoute(val localId: String? = null)
+@Serializable object SettingsRoute
 
 @Composable
 fun MyMemosNavHost() {
@@ -39,6 +41,7 @@ fun MyMemosNavHost() {
                         onOpenMemo = { navController.navigate(MemoDetailRoute(it)) },
                         onNewMemo = { navController.navigate(EditorRoute()) },
                         onEditMemo = { navController.navigate(EditorRoute(it)) },
+                        onSettings = { navController.navigate(SettingsRoute) },
                     )
                 }
                 composable<MemoDetailRoute> { entry ->
@@ -51,6 +54,9 @@ fun MyMemosNavHost() {
                 }
                 composable<EditorRoute> {
                     EditorScreen(onDone = { navController.popBackStack() })
+                }
+                composable<SettingsRoute> {
+                    SettingsScreen(onBack = { navController.popBackStack() })
                 }
             }
         }

@@ -4,6 +4,8 @@ import android.net.Uri
 import androidx.room.withTransaction
 import com.keltruc.mymemos.data.attachments.AttachmentStore
 import com.keltruc.mymemos.data.mapper.toModel
+import com.keltruc.mymemos.data.prefs.AppPreferences
+import com.keltruc.mymemos.data.text.TaskListSorter
 import com.keltruc.mymemos.data.sync.FailedOp
 import com.keltruc.mymemos.data.sync.SyncEngine
 import com.keltruc.mymemos.data.sync.SyncScheduler
@@ -41,6 +43,7 @@ class MemoRepository @Inject constructor(
     private val attachmentStore: AttachmentStore,
     private val engine: SyncEngine,
     private val scheduler: SyncScheduler,
+    private val preferences: AppPreferences,
     private val json: Json,
 ) {
     // ---- reads -----------------------------------------------------------------------
@@ -93,7 +96,8 @@ class MemoRepository @Inject constructor(
 
     // ---- writes ----------------------------------------------------------------------
 
-    suspend fun create(accountId: Long, content: String, visibility: Visibility, pinned: Boolean = false): String {
+    suspend fun create(accountId: Long, rawContent: String, visibility: Visibility, pinned: Boolean = false): String {
+        val content = applyContentRules(rawContent)
         val now = System.currentTimeMillis()
         val localId = UUID.randomUUID().toString()
         val entity = MemoEntity(
@@ -127,7 +131,8 @@ class MemoRepository @Inject constructor(
         return localId
     }
 
-    suspend fun updateContent(localId: String, content: String) {
+    suspend fun updateContent(localId: String, rawContent: String) {
+        val content = applyContentRules(rawContent)
         db.withTransaction {
             val memo = memoDao.getByLocalId(localId) ?: return@withTransaction
             if (memo.content == content) return@withTransaction
@@ -258,6 +263,10 @@ class MemoRepository @Inject constructor(
     suspend fun resolveConflict(localId: String) {
         memoDao.setSyncStatus(localId, SyncStatus.PENDING_CREATE.name)
     }
+
+    /** User-chosen tidy-ups applied to every save, e.g. sinking ticked tasks. */
+    private suspend fun applyContentRules(content: String): String =
+        if (preferences.current().sortCompletedTasks) TaskListSorter.sortCompletedToBottom(content) else content
 
     private suspend fun simpleFieldOp(localId: String, type: String, change: (MemoEntity) -> MemoEntity) {
         db.withTransaction {

@@ -1,7 +1,7 @@
 package com.keltruc.mymemos.ui.components
 
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,12 +20,11 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,7 +44,7 @@ import com.keltruc.mymemos.model.Visibility
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-private val formatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm")
+private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -61,42 +60,40 @@ fun MemoCard(
     modifier: Modifier = Modifier,
 ) {
     var menu by remember { mutableStateOf(false) }
+    val conflict = memo.syncStatus == SyncStatus.CONFLICT
     Box(modifier) {
-        Card(
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = when {
+                conflict -> MaterialTheme.colorScheme.errorContainer
+                memo.pinned -> MaterialTheme.colorScheme.secondaryContainer
+                else -> MaterialTheme.colorScheme.surfaceContainer
+            },
+            tonalElevation = 0.dp,
+            shadowElevation = if (memo.pinned) 0.dp else 1.dp,
             modifier = Modifier
                 .fillMaxWidth()
                 .combinedClickable(onClick = onClick, onLongClick = { menu = true }),
-            colors = CardDefaults.cardColors(
-                containerColor = when {
-                    memo.syncStatus == SyncStatus.CONFLICT -> MaterialTheme.colorScheme.errorContainer
-                    memo.pinned -> MaterialTheme.colorScheme.secondaryContainer
-                    else -> MaterialTheme.colorScheme.surfaceContainer
-                },
-            ),
         ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                MemoContent(content = memo.content, onToggleTask = onToggleTask, maxLines = 12)
+                AttachmentStrip(attachments = memo.attachments, serverUrl = serverUrl, thumbSize = 88)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        formatter.format(memo.createTime.atZone(ZoneId.systemDefault())),
+                        timeFormatter.format(memo.createTime.atZone(ZoneId.systemDefault())),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(Modifier.padding(horizontal = 4.dp))
-                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            if (memo.syncStatus == SyncStatus.CONFLICT) SmallIcon(Icons.Default.Warning)
-                            else if (memo.isPendingLocalChange) SmallIcon(Icons.Default.CloudOff)
-                            when (memo.visibility) {
-                                Visibility.PRIVATE -> SmallIcon(Icons.Default.Lock)
-                                Visibility.PUBLIC -> SmallIcon(Icons.Default.Public)
-                                Visibility.PROTECTED -> Unit
-                            }
-                            if (memo.pinned) SmallIcon(Icons.Default.PushPin)
-                        }
+                    Spacer(Modifier.weight(1f))
+                    if (conflict) SmallIcon(Icons.Default.Warning, MaterialTheme.colorScheme.error)
+                    else if (memo.isPendingLocalChange) SmallIcon(Icons.Default.CloudOff)
+                    when (memo.visibility) {
+                        Visibility.PRIVATE -> SmallIcon(Icons.Default.Lock)
+                        Visibility.PUBLIC -> SmallIcon(Icons.Default.Public)
+                        Visibility.PROTECTED -> Unit
                     }
+                    if (memo.pinned) SmallIcon(Icons.Default.PushPin, MaterialTheme.colorScheme.secondary)
                 }
-                MemoContent(content = memo.content, onToggleTask = onToggleTask, maxLines = 10)
-                AttachmentStrip(attachments = memo.attachments, serverUrl = serverUrl, thumbSize = 72)
             }
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
@@ -125,6 +122,6 @@ fun MemoCard(
 }
 
 @Composable
-private fun SmallIcon(icon: ImageVector) {
-    Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun SmallIcon(icon: ImageVector, tint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant) {
+    Icon(icon, contentDescription = null, modifier = Modifier.size(15.dp), tint = tint)
 }
