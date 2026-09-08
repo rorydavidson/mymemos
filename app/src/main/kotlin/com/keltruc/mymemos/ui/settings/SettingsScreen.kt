@@ -185,6 +185,9 @@ fun SettingsScreen(onBack: () -> Unit, nav: SettingsNav, viewModel: SettingsView
                 LinkRow(Icons.Default.Dns, stringResource(R.string.admin_instance), nav.onAdminInstance)
             }
 
+            Section(stringResource(R.string.about))
+            AboutSection()
+
             OutlinedButton(onClick = viewModel::signOut, modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 32.dp)) {
                 Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
                 Text("  " + stringResource(R.string.sign_out))

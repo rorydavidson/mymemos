@@ -12,3 +12,8 @@
 -dontwarn retrofit2.KotlinExtensions$*
 -if interface * { @retrofit2.http.* <methods>; }
 -keep,allowobfuscation interface <1>
+# Tink (via EncryptedSharedPreferences) references error-prone annotations that are compile-only.
+-dontwarn com.google.errorprone.annotations.**
+# Room entities, DTOs and models are only touched through reflection-free code, but keep names
+# of serialisable classes so kotlinx.serialization descriptors stay stable.
+-keep class com.keltruc.mymemos.network.dto.** { *; }

@@ -185,7 +185,7 @@ fun TimelineScreen(
                             onDelete = { pendingDelete = memo },
                             onColour = { colouring = memo },
                             onTagClick = { viewModel.onTag(it) },
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp),
+                            modifier = Modifier.animateItem().padding(horizontal = 16.dp, vertical = 7.dp),
                         )
                     }
                 }

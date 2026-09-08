@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.LocationManager
 import android.os.Build
+import android.os.Looper
 import androidx.core.content.ContextCompat
 import com.keltruc.mymemos.model.Location
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -42,16 +43,7 @@ class LocationProvider @Inject constructor(@ApplicationContext private val conte
         }.filter { runCatching { manager.isProviderEnabled(it) }.getOrDefault(false) }
         var fix: android.location.Location? = null
         for (provider in candidates) {
-            fix = withTimeoutOrNull(8_000) {
-                suspendCancellableCoroutine { cont ->
-                    try {
-                        @Suppress("MissingPermission")
-                        manager.getCurrentLocation(provider, null, context.mainExecutor) { loc -> cont.resume(loc) }
-                    } catch (e: SecurityException) {
-                        cont.resume(null)
-                    }
-                }
-            } ?: runCatching {
+            fix = withTimeoutOrNull(8_000) { currentFrom(manager, provider) } ?: runCatching {
                 @Suppress("MissingPermission")
                 manager.getLastKnownLocation(provider)
             }.getOrNull()
@@ -64,6 +56,21 @@ class LocationProvider @Inject constructor(@ApplicationContext private val conte
         val placeholder = placeName(fix.latitude, fix.longitude)
         return Location(placeholder, fix.latitude, fix.longitude)
     }
+
+    @Suppress("MissingPermission")
+    private suspend fun currentFrom(manager: LocationManager, provider: String): android.location.Location? =
+        suspendCancellableCoroutine { cont ->
+            try {
+                if (Build.VERSION.SDK_INT >= 30) {
+                    manager.getCurrentLocation(provider, null, ContextCompat.getMainExecutor(context)) { loc -> cont.resume(loc) }
+                } else {
+                    @Suppress("DEPRECATION")
+                    manager.requestSingleUpdate(provider, { loc -> cont.resume(loc) }, Looper.getMainLooper())
+                }
+            } catch (e: SecurityException) {
+                cont.resume(null)
+            }
+        }
 
     private suspend fun placeName(lat: Double, lon: Double): String = withContext(Dispatchers.IO) {
         if (!Geocoder.isPresent()) return@withContext ""

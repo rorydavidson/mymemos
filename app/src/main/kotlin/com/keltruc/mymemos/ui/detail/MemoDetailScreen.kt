@@ -97,7 +97,8 @@ fun MemoDetailScreen(
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onOpenMemo: (String) -> Unit,
-    viewModel: MemoDetailViewModel = hiltViewModel(),
+    showBack: Boolean = true,
+    viewModel: MemoDetailViewModel = hiltViewModel<MemoDetailViewModel, MemoDetailViewModel.Factory>(key = localId) { it.create(localId) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -124,7 +125,7 @@ fun MemoDetailScreen(
                 title = {},
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = state.memo?.colour?.tint() ?: MaterialTheme.colorScheme.background),
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
+                    if (showBack) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
                 },
                 actions = {
                     val m = state.memo ?: return@TopAppBar

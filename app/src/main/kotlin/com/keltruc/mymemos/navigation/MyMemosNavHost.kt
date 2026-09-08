@@ -1,6 +1,25 @@
 package com.keltruc.mymemos.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.keltruc.mymemos.R
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -44,8 +63,9 @@ import kotlinx.serialization.Serializable
 @Serializable object DataRoute
 
 @Composable
-fun MyMemosNavHost() {
+fun MyMemosNavHost(twoPane: Boolean = false) {
     val navController = rememberNavController()
+    var paneMemo by rememberSaveable { mutableStateOf<String?>(null) }
     val sessionViewModel: SessionViewModel = hiltViewModel()
     val session by sessionViewModel.state.collectAsStateWithLifecycle()
     val pending by sessionViewModel.pendingDestination.collectAsStateWithLifecycle()
@@ -69,8 +89,48 @@ fun MyMemosNavHost() {
             }
         }
         is SessionState.SignedIn -> {
-            NavHost(navController, startDestination = TimelineRoute) {
+            NavHost(
+                navController,
+                startDestination = TimelineRoute,
+                enterTransition = { fadeIn(tween(220)) + slideInHorizontally(tween(260)) { it / 8 } },
+                exitTransition = { fadeOut(tween(160)) },
+                popEnterTransition = { fadeIn(tween(220)) },
+                popExitTransition = { fadeOut(tween(160)) + slideOutHorizontally(tween(260)) { it / 8 } },
+            ) {
                 composable<TimelineRoute> {
+                    if (twoPane) {
+                        Row(Modifier.fillMaxSize()) {
+                            Box(Modifier.weight(0.42f)) {
+                                TimelineScreen(
+                                    onOpenMemo = { paneMemo = it },
+                                    onNewMemo = { navController.navigate(EditorRoute()) },
+                                    onEditMemo = { navController.navigate(EditorRoute(it)) },
+                                    onSettings = { navController.navigate(SettingsRoute) },
+                                    onManageShortcuts = { navController.navigate(ShortcutsRoute) },
+                                    onNotifications = { navController.navigate(NotificationsRoute) },
+                                    onReview = { navController.navigate(ReviewRoute) },
+                                )
+                            }
+                            VerticalDivider()
+                            Box(Modifier.weight(0.58f).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                                val id = paneMemo
+                                if (id == null) {
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text(stringResource(R.string.pane_placeholder), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                } else {
+                                    MemoDetailScreen(
+                                        localId = id,
+                                        onBack = { paneMemo = null },
+                                        onEdit = { navController.navigate(EditorRoute(id)) },
+                                        onOpenMemo = { paneMemo = it },
+                                        showBack = false,
+                                    )
+                                }
+                            }
+                        }
+                        return@composable
+                    }
                     TimelineScreen(
                         onOpenMemo = { navController.navigate(MemoDetailRoute(it)) },
                         onNewMemo = { navController.navigate(EditorRoute()) },

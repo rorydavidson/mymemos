@@ -3,4 +3,9 @@
     <style name="Theme.MyMemos" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowLightStatusBar">true</item>
     </style>
+    <style name="Theme.MyMemos.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#F1ECE4</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.MyMemos</item>
+    </style>
 </resources>
