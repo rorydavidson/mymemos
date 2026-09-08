@@ -25,7 +25,7 @@ interface MemoDao {
     @Query(
         """
         SELECT * FROM memos
-        WHERE accountId = :accountId AND state = :state AND syncStatus != 'PENDING_DELETE'
+        WHERE accountId = :accountId AND state = :state AND syncStatus != 'PENDING_DELETE' AND parent IS NULL
         ORDER BY pinned DESC, createTimeEpochMs DESC
         """,
     )
@@ -36,7 +36,7 @@ interface MemoDao {
         """
         SELECT memos.* FROM memos
         JOIN memos_fts ON memos.rowid = memos_fts.rowid
-        WHERE memos.accountId = :accountId AND memos.syncStatus != 'PENDING_DELETE'
+        WHERE memos.accountId = :accountId AND memos.syncStatus != 'PENDING_DELETE' AND memos.parent IS NULL
           AND memos_fts MATCH :query
         ORDER BY memos.createTimeEpochMs DESC
         """,
@@ -71,6 +71,33 @@ interface MemoDao {
     @Query("DELETE FROM memos WHERE localId = :localId")
     suspend fun deleteByLocalId(localId: String)
 
+    @Query("UPDATE memos SET syncStatus = :status WHERE localId = :localId")
+    suspend fun setSyncStatus(localId: String, status: String)
+
+    @Query("SELECT * FROM memos WHERE accountId = :accountId AND syncStatus = 'CONFLICT'")
+    fun observeConflicts(accountId: Long): Flow<List<MemoEntity>>
+
+    @Transaction
+    @Query("SELECT * FROM memos WHERE accountId = :accountId AND parent = :parentRemoteName AND syncStatus != 'PENDING_DELETE' ORDER BY createTimeEpochMs")
+    fun observeComments(accountId: Long, parentRemoteName: String): Flow<List<MemoWithAttachments>>
+
+    @Transaction
+    @Query("SELECT * FROM memos WHERE accountId = :accountId AND remoteName IN (:remoteNames) AND syncStatus != 'PENDING_DELETE' ORDER BY pinned DESC, createTimeEpochMs DESC")
+    fun observeByRemoteNames(accountId: Long, remoteNames: List<String>): Flow<List<MemoWithAttachments>>
+
+    @Transaction
+    @Query("SELECT * FROM memos WHERE localId IN (:localIds) AND syncStatus != 'PENDING_DELETE' ORDER BY createTimeEpochMs DESC")
+    fun observeByLocalIds(localIds: List<String>): Flow<List<MemoWithAttachments>>
+
+    @Transaction
+    @Query(
+        """
+        SELECT * FROM memos WHERE accountId = :accountId AND parent IS NULL AND syncStatus != 'PENDING_DELETE'
+          AND (content LIKE '%' || :query || '%') ORDER BY updateTimeEpochMs DESC LIMIT 30
+        """,
+    )
+    suspend fun pickerSearch(accountId: Long, query: String): List<MemoWithAttachments>
+
     @Query(
         """
         DELETE FROM memos WHERE accountId = :accountId AND syncStatus = 'SYNCED'
@@ -78,6 +105,9 @@ interface MemoDao {
         """,
     )
     suspend fun deleteSyncedNotIn(accountId: Long, keepRemoteNames: List<String>)
+
+    @Query("DELETE FROM memos WHERE accountId = :accountId AND parent = :parentRemoteName")
+    suspend fun deleteCommentsOf(accountId: Long, parentRemoteName: String)
 
     @Query("DELETE FROM memos WHERE accountId = :accountId")
     suspend fun deleteAllForAccount(accountId: Long)

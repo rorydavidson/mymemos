@@ -33,6 +33,11 @@ Then:
 | `core-data`     | Repositories, DTO/entity/model mappers, encrypted credential store, Hilt wiring. |
 | `app`           | Jetpack Compose UI (Material 3), navigation, view models.            |
 
+## Fonts
+
+Google Sans Flex, bundled under the SIL Open Font License 1.1 (see `app/GOOGLE_SANS_FLEX_OFL.txt`).
+"Google Sans Flex" is a trademark of Google LLC; its use here does not imply affiliation.
+
 ## Status
 
 Phase 1: sign in (password or personal access token), pull and browse memos, offline
