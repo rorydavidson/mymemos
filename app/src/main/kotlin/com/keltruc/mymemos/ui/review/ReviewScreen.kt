@@ -100,7 +100,16 @@ fun ReviewScreen(
                         )
                         IconButton(onClick = viewModel::nextDay, enabled = day.isBefore(LocalDate.now())) { Icon(Icons.Default.ChevronRight, null) }
                     }
-                    MemoList(dayMemos.map { it to null }, account?.serverUrl.orEmpty(), stringResource(R.string.review_empty_day), viewModel, onOpenMemo, onEditMemo)
+                    SwipeReview(
+                        memos = dayMemos,
+                        serverUrl = account?.serverUrl.orEmpty(),
+                        onPin = viewModel::togglePin,
+                        onArchive = viewModel::archive,
+                        onDelete = viewModel::delete,
+                        onAddTag = viewModel::addTag,
+                        onOpen = onOpenMemo,
+                        onEdit = onEditMemo,
+                    )
                 }
                 1 -> MemoList(
                     throwbacks.map { t ->

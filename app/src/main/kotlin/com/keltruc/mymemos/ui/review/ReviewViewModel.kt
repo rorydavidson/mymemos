@@ -86,6 +86,11 @@ class ReviewViewModel @Inject constructor(
     fun archive(memo: Memo) = viewModelScope.launch { memoRepository.setState(memo.localId, MemoState.ARCHIVED) }
     fun delete(memo: Memo) = viewModelScope.launch { memoRepository.delete(memo.localId) }
 
+    fun addTag(memo: Memo, tag: String) = viewModelScope.launch {
+        if (memo.isLocked || tag.isBlank() || tag in memo.tags) return@launch
+        memoRepository.updateContent(memo.localId, memo.content.trimEnd() + " #$tag")
+    }
+
     private fun distanceMetres(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
         val r = 6_371_000.0
         val dLat = Math.toRadians(lat2 - lat1)

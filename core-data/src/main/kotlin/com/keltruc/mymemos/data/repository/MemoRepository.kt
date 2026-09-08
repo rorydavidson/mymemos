@@ -14,6 +14,7 @@ import com.keltruc.mymemos.model.Reaction
 import com.keltruc.mymemos.model.Reference
 import com.keltruc.mymemos.data.prefs.AppPreferences
 import com.keltruc.mymemos.data.text.TaskListSorter
+import com.keltruc.mymemos.data.crypto.MemoCipher
 import com.keltruc.mymemos.data.widget.WidgetRefresher
 import com.keltruc.mymemos.data.sync.FailedOp
 import com.keltruc.mymemos.data.sync.SyncEngine
@@ -416,6 +417,28 @@ class MemoRepository @Inject constructor(
     suspend fun pickReferenceCandidates(accountId: Long, query: String): List<Memo> =
         memoDao.pickerSearch(accountId, query).map { it.toModel() }.filter { it.remoteName != null }
 
+    // ---- end-to-end encryption ---------------------------------------------------------
+
+    /** Replaces the memo text with its encrypted form. The server only ever sees the blob. */
+    suspend fun lock(localId: String, password: CharArray) {
+        val memo = memoDao.getByLocalId(localId) ?: return
+        if (MemoCipher.isEncrypted(memo.content)) return
+        updateContent(localId, MemoCipher.encrypt(memo.content, password))
+    }
+
+    /** Stores the plain text again. Throws [MemoCipher.WrongPassword] if the password is wrong. */
+    suspend fun unlock(localId: String, password: CharArray) {
+        val memo = memoDao.getByLocalId(localId) ?: return
+        if (!MemoCipher.isEncrypted(memo.content)) return
+        updateContent(localId, MemoCipher.decrypt(memo.content, password))
+    }
+
+    /** Edits a locked memo: the new plain text is encrypted before it is stored. */
+    suspend fun updateLockedContent(localId: String, plain: String, password: CharArray) =
+        updateContent(localId, MemoCipher.encrypt(plain, password))
+
+    fun decrypt(memo: Memo, password: CharArray): String = MemoCipher.decrypt(memo.content, password)
+
     /** Local-only tint; never touches the server. */
     suspend fun setColour(localId: String, colour: NoteColour?) {
         memoDao.setColour(localId, colour?.name)
@@ -472,7 +495,7 @@ class MemoRepository @Inject constructor(
 
     /** User-chosen tidy-ups applied to every save, e.g. sinking ticked tasks. */
     private suspend fun applyContentRules(content: String): String =
-        if (preferences.current().sortCompletedTasks) TaskListSorter.sortCompletedToBottom(content) else content
+        if (!MemoCipher.isEncrypted(content) && preferences.current().sortCompletedTasks) TaskListSorter.sortCompletedToBottom(content) else content
 
     private suspend fun simpleFieldOp(localId: String, type: String, change: (MemoEntity) -> MemoEntity) {
         db.withTransaction {

@@ -24,14 +24,16 @@ import androidx.compose.material.icons.filled.FormatBold
 import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.Workspaces
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
@@ -66,6 +68,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.keltruc.mymemos.R
 import com.keltruc.mymemos.model.Visibility
 import com.keltruc.mymemos.ui.components.AttachmentStrip
+import com.keltruc.mymemos.ui.components.MemoPasswordDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,6 +79,7 @@ fun EditorScreen(onDone: () -> Unit, viewModel: EditorViewModel = hiltViewModel(
     var visibilityMenu by remember { mutableStateOf(false) }
     var showTemplates by remember { mutableStateOf(false) }
     val templates by viewModel.templates.collectAsStateWithLifecycle()
+    val askPasswordForSave by viewModel.askPasswordForSave.collectAsStateWithLifecycle()
     val focus = remember { FocusRequester() }
 
     // Seed the field once the memo has loaded; afterwards the field drives the view model.
@@ -121,6 +125,18 @@ fun EditorScreen(onDone: () -> Unit, viewModel: EditorViewModel = hiltViewModel(
         currentTagPrefix?.let { p -> tags.filter { it.startsWith(p, ignoreCase = true) && it != p }.take(8) }.orEmpty()
     }
 
+    if (state.needsPassword || askPasswordForSave) {
+        MemoPasswordDialog(
+            title = stringResource(if (state.needsPassword) R.string.locked_memo else R.string.lock),
+            hint = stringResource(if (state.needsPassword) R.string.memo_password_hint else R.string.lock_confirm),
+            confirmLabel = stringResource(if (state.needsPassword) R.string.unlock_button else R.string.save),
+            error = state.passwordError,
+            initialRemember = viewModel.passwordRemembered,
+            onConfirm = viewModel::submitPassword,
+            onDismiss = { if (state.needsPassword) onDone() else { viewModel.askPasswordForSave.value = false; viewModel.cancelPassword() } },
+        )
+    }
+
     if (showTemplates) {
         ModalBottomSheet(onDismissRequest = { showTemplates = false }) {
             Text(stringResource(R.string.template_insert), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
@@ -143,18 +159,25 @@ fun EditorScreen(onDone: () -> Unit, viewModel: EditorViewModel = hiltViewModel(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(if (state.isNew) R.string.new_memo else R.string.edit_memo)) },
+                title = { Text(stringResource(if (state.isNew) R.string.new_memo else R.string.edit_memo), maxLines = 1, style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = onDone) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
                 },
                 actions = {
+                    IconToggleButton(checked = state.locked, onCheckedChange = viewModel::onLocked) {
+                        Icon(
+                            if (state.locked) Icons.Default.Lock else Icons.Default.LockOpen,
+                            contentDescription = stringResource(R.string.lock),
+                            tint = if (state.locked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     IconToggleButton(checked = state.pinned, onCheckedChange = viewModel::onPinned) {
                         Icon(Icons.Default.PushPin, contentDescription = stringResource(R.string.pin))
                     }
                     IconButton(onClick = { visibilityMenu = true }) {
                         Icon(
                             when (state.visibility) {
-                                Visibility.PRIVATE -> Icons.Default.Lock
+                                Visibility.PRIVATE -> Icons.Default.VisibilityOff
                                 Visibility.PROTECTED -> Icons.Default.Workspaces
                                 Visibility.PUBLIC -> Icons.Default.Public
                             },
@@ -179,14 +202,12 @@ fun EditorScreen(onDone: () -> Unit, viewModel: EditorViewModel = hiltViewModel(
                             )
                         }
                     }
-                    FilledTonalButton(
+                    FilledTonalIconButton(
                         onClick = viewModel::save,
                         enabled = state.content.isNotBlank() || state.attachments.isNotEmpty(),
                         modifier = Modifier.padding(end = 8.dp),
                     ) {
-                        Icon(Icons.Default.Check, contentDescription = null)
-                        Spacer(Modifier.padding(2.dp))
-                        Text(stringResource(R.string.save))
+                        Icon(Icons.Default.Check, contentDescription = stringResource(R.string.save))
                     }
                 },
             )

@@ -2,6 +2,8 @@ package com.keltruc.mymemos.ui.detail
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.keltruc.mymemos.data.crypto.MemoCipher
+import com.keltruc.mymemos.data.crypto.PasswordSession
 import com.keltruc.mymemos.data.repository.AccountRepository
 import com.keltruc.mymemos.data.repository.MemoRepository
 import com.keltruc.mymemos.data.repository.ShareRepository
@@ -50,8 +52,51 @@ class MemoDetailViewModel @AssistedInject constructor(
     private val memoRepository: MemoRepository,
     private val shareRepository: ShareRepository,
     private val locationProvider: LocationProvider,
+    private val passwordSession: PasswordSession,
     accountRepository: AccountRepository,
 ) : ViewModel() {
+    /** Plain text of a locked memo once the password is known; null while locked. */
+    val unlockedText = MutableStateFlow<String?>(null)
+    val passwordError = MutableStateFlow<String?>(null)
+    val askPassword = MutableStateFlow<PasswordPurpose?>(null)
+    enum class PasswordPurpose { UNLOCK_VIEW, LOCK, REMOVE_LOCK }
+    val passwordRemembered: Boolean get() = passwordSession.isRemembered
+
+    /** Try the session password silently whenever the memo (re)loads as locked. */
+    private fun tryAutoUnlock(memo: Memo) {
+        if (!memo.isLocked) { unlockedText.value = null; return }
+        val pw = passwordSession.current() ?: run { if (unlockedText.value == null) askPassword.value = PasswordPurpose.UNLOCK_VIEW; return }
+        unlockedText.value = runCatching { memoRepository.decrypt(memo, pw) }.getOrNull()
+        if (unlockedText.value == null) askPassword.value = PasswordPurpose.UNLOCK_VIEW
+    }
+
+    fun submitPassword(password: CharArray, remember: Boolean) = viewModelScope.launch {
+        val memo = state.value.memo ?: return@launch
+        val purpose = askPassword.value ?: return@launch
+        try {
+            when (purpose) {
+                PasswordPurpose.UNLOCK_VIEW -> unlockedText.value = memoRepository.decrypt(memo, password)
+                PasswordPurpose.LOCK -> memoRepository.lock(memo.localId, password)
+                PasswordPurpose.REMOVE_LOCK -> { memoRepository.unlock(memo.localId, password); unlockedText.value = null }
+            }
+            passwordSession.set(password, remember)
+            passwordError.value = null
+            askPassword.value = null
+        } catch (e: MemoCipher.WrongPassword) {
+            passwordError.value = "Wrong password"
+        }
+    }
+
+    fun requestLock() { askPassword.value = PasswordPurpose.LOCK }
+    fun requestRemoveLock() { askPassword.value = PasswordPurpose.REMOVE_LOCK }
+    fun dismissPassword() { askPassword.value = null; passwordError.value = null }
+
+    /** Lock using the remembered password without asking, when there is one. */
+    fun lockNow() = viewModelScope.launch {
+        val memo = state.value.memo ?: return@launch
+        val pw = passwordSession.current() ?: run { requestLock(); return@launch }
+        memoRepository.lock(memo.localId, pw)
+    }
     @AssistedFactory
     interface Factory {
         fun create(localId: String): MemoDetailViewModel
@@ -106,6 +151,7 @@ class MemoDetailViewModel @AssistedInject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DetailUiState())
 
     init {
+        viewModelScope.launch { memo.filterNotNull().collect { tryAutoUnlock(it) } }
         // Comments are not in the list pull, so fetch them for this memo when opened.
         viewModelScope.launch {
             val acc = account.first()
@@ -118,7 +164,13 @@ class MemoDetailViewModel @AssistedInject constructor(
 
     fun toggleTask(lineIndex: Int, checked: Boolean) = viewModelScope.launch {
         val m = state.value.memo ?: return@launch
-        toggleTaskLine(m.content, lineIndex, checked)?.let { memoRepository.updateContent(m.localId, it) }
+        if (m.isLocked) {
+            val plain = unlockedText.value ?: return@launch
+            val pw = passwordSession.current() ?: return@launch
+            toggleTaskLine(plain, lineIndex, checked)?.let { memoRepository.updateLockedContent(m.localId, it, pw) }
+        } else {
+            toggleTaskLine(m.content, lineIndex, checked)?.let { memoRepository.updateContent(m.localId, it) }
+        }
     }
 
     fun togglePin() = viewModelScope.launch { state.value.memo?.let { memoRepository.setPinned(it.localId, !it.pinned) } }
