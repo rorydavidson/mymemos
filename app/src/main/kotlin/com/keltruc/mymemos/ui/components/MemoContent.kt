@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -22,16 +21,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import com.keltruc.mymemos.model.TagStyle
-import com.keltruc.mymemos.ui.tags.LocalTagStyles
-import com.keltruc.mymemos.ui.tags.label
-import com.keltruc.mymemos.ui.tags.styleFor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.LinkInteractionListener
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -39,9 +37,14 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.keltruc.mymemos.model.TagStyle
+import com.keltruc.mymemos.ui.tags.LocalTagStyles
+import com.keltruc.mymemos.ui.tags.label
+import com.keltruc.mymemos.ui.tags.styleFor
 import org.commonmark.ext.autolink.AutolinkExtension
 import org.commonmark.ext.gfm.strikethrough.Strikethrough
 import org.commonmark.ext.gfm.strikethrough.StrikethroughExtension
@@ -186,20 +189,16 @@ private fun ListItems(list: Node, source: String, onToggleTask: ((Int, Boolean) 
 @Composable
 private fun InlineParagraph(node: Node, onTagClick: ((String) -> Unit)?, strike: Boolean = false) {
     val text = inline(node, onTagClick)
-    val uriHandler = LocalUriHandler.current
     val style = MaterialTheme.typography.bodyLarge.copy(
         color = if (strike) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
         textDecoration = if (strike) TextDecoration.LineThrough else null,
     )
-    ClickableText(
+    Text(
         text = text,
         style = style,
         modifier = Modifier.padding(vertical = 1.dp),
         overflow = TextOverflow.Ellipsis,
-    ) { offset ->
-        text.getStringAnnotations("url", offset, offset).firstOrNull()?.let { if (isOpenable(it.item)) runCatching { uriHandler.openUri(it.item) }; return@ClickableText }
-        text.getStringAnnotations("tag", offset, offset).firstOrNull()?.let { onTagClick?.invoke(it.item) }
-    }
+    )
 }
 
 /**
@@ -214,65 +213,93 @@ private fun isOpenable(uri: String): Boolean {
 
 private val openableSchemes = setOf("http", "https", "mailto", "geo")
 
+private fun linkStyle(primary: Color, underline: Boolean = false) = TextLinkStyles(
+    SpanStyle(color = primary, textDecoration = if (underline) TextDecoration.Underline else null),
+)
+
 private val tagRegex = Regex("(?<![\\w/])#([\\p{L}\\p{N}_/-]+)")
 
 @Composable
 private fun inline(node: Node, onTagClick: ((String) -> Unit)?): AnnotatedString {
+    val uriHandler = LocalUriHandler.current
+    // Links and tags carry their own click handling as LinkAnnotations. A tap handler over the
+    // whole paragraph swallowed every tap on the text, which is most of a memo card, so tapping a
+    // card's body did nothing instead of opening the memo.
+    val openUrl = LinkInteractionListener { link ->
+        val url = (link as? LinkAnnotation.Url)?.url ?: return@LinkInteractionListener
+        if (isOpenable(url)) runCatching { uriHandler.openUri(url) }
+    }
+    val openTag = LinkInteractionListener { link ->
+        (link as? LinkAnnotation.Clickable)?.tag?.let { onTagClick?.invoke(it) }
+    }
     val primary = MaterialTheme.colorScheme.primary
     val codeBg = MaterialTheme.colorScheme.surfaceContainerHighest
     val styles = LocalTagStyles.current
     return buildAnnotatedString {
         var child = node.firstChild
         while (child != null) {
-            appendInline(child, primary, codeBg, styles)
+            appendInline(child, primary, codeBg, styles, openUrl, openTag)
             child = child.next
         }
     }
 }
 
-private fun androidx.compose.ui.text.AnnotatedString.Builder.appendInline(node: Node, primary: Color, codeBg: Color, styles: Map<String, TagStyle>) {
+private fun androidx.compose.ui.text.AnnotatedString.Builder.appendInline(
+    node: Node,
+    primary: Color,
+    codeBg: Color,
+    styles: Map<String, TagStyle>,
+    openUrl: LinkInteractionListener,
+    openTag: LinkInteractionListener,
+) {
     when (node) {
-        is org.commonmark.node.Text -> appendWithTags(node.literal, primary, styles)
-        is Emphasis -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { children(node, primary, codeBg, styles) }
-        is StrongEmphasis -> withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { children(node, primary, codeBg, styles) }
-        is Strikethrough -> withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { children(node, primary, codeBg, styles) }
+        is org.commonmark.node.Text -> appendWithTags(node.literal, primary, styles, openTag)
+        is Emphasis -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { children(node, primary, codeBg, styles, openUrl, openTag) }
+        is StrongEmphasis -> withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { children(node, primary, codeBg, styles, openUrl, openTag) }
+        is Strikethrough -> withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { children(node, primary, codeBg, styles, openUrl, openTag) }
         is Code -> withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = codeBg, fontSize = 14.sp)) { append(node.literal) }
-        is Link -> {
-            pushStringAnnotation("url", node.destination)
-            withStyle(SpanStyle(color = primary, textDecoration = TextDecoration.Underline)) {
-                if (node.firstChild == null) append(node.destination) else children(node, primary, codeBg, styles)
-            }
-            pop()
+        is Link -> withLink(LinkAnnotation.Url(node.destination, linkStyle(primary, underline = true), openUrl)) {
+            if (node.firstChild == null) append(node.destination) else children(node, primary, codeBg, styles, openUrl, openTag)
         }
-        is Image -> {
-            pushStringAnnotation("url", node.destination)
-            withStyle(SpanStyle(color = primary)) { append("🖼 ${node.title ?: node.destination}") }
-            pop()
+        is Image -> withLink(LinkAnnotation.Url(node.destination, linkStyle(primary), openUrl)) {
+            append("🖼 ${node.title ?: node.destination}")
         }
         is SoftLineBreak -> append("\n")
         is HardLineBreak -> append("\n")
-        else -> children(node, primary, codeBg, styles)
+        else -> children(node, primary, codeBg, styles, openUrl, openTag)
     }
 }
 
-private fun androidx.compose.ui.text.AnnotatedString.Builder.children(node: Node, primary: Color, codeBg: Color, styles: Map<String, TagStyle>) {
+private fun androidx.compose.ui.text.AnnotatedString.Builder.children(
+    node: Node,
+    primary: Color,
+    codeBg: Color,
+    styles: Map<String, TagStyle>,
+    openUrl: LinkInteractionListener,
+    openTag: LinkInteractionListener,
+) {
     var child = node.firstChild
     while (child != null) {
-        appendInline(child, primary, codeBg, styles)
+        appendInline(child, primary, codeBg, styles, openUrl, openTag)
         child = child.next
     }
 }
 
-private fun androidx.compose.ui.text.AnnotatedString.Builder.appendWithTags(text: String, primary: Color, styles: Map<String, TagStyle>) {
+private fun androidx.compose.ui.text.AnnotatedString.Builder.appendWithTags(
+    text: String,
+    primary: Color,
+    styles: Map<String, TagStyle>,
+    openTag: LinkInteractionListener,
+) {
     var last = 0
     for (m in tagRegex.findAll(text)) {
         append(text.substring(last, m.range.first))
         val tag = m.groupValues[1]
         val style = styles.styleFor(tag)
         val colour = style?.colour?.let { Color(0xFF000000 or it.hex) }?.let { c -> if (c.luminance() > 0.7f) primary else c } ?: primary
-        pushStringAnnotation("tag", tag)
-        withStyle(SpanStyle(color = colour, fontWeight = FontWeight.Medium)) { append(styles.label(tag)) }
-        pop()
+        withLink(LinkAnnotation.Clickable(tag, TextLinkStyles(SpanStyle(color = colour, fontWeight = FontWeight.Medium)), openTag)) {
+            append(styles.label(tag))
+        }
         last = m.range.last + 1
     }
     append(text.substring(last))

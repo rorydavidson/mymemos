@@ -108,6 +108,9 @@ fun SwipeReview(
         ) {
             Box(Modifier.verticalScroll(rememberScrollState())) {
                 MemoCard(
+                    // Review is about revisiting what you wrote, so it dates memos by when they
+                    // were written whatever the timeline is sorted on.
+                    byModified = false,
                     memo = memo,
                     serverUrl = serverUrl,
                     onClick = { onOpen(memo.localId) },

@@ -51,6 +51,7 @@ private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:m
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MemoCard(
+    byModified: Boolean,
     memo: Memo,
     serverUrl: String,
     onClick: () -> Unit,
@@ -97,7 +98,7 @@ fun MemoCard(
                 memo.location?.let { MapPreview(it, height = 120.dp, zoom = 14) }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        timeFormatter.format(memo.createTime.atZone(ZoneId.systemDefault())),
+                        timeFormatter.format(memo.timelineTime(byModified).atZone(ZoneId.systemDefault())),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

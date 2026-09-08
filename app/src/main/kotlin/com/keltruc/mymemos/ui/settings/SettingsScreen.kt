@@ -181,6 +181,12 @@ fun SettingsScreen(onBack: () -> Unit, nav: SettingsNav, viewModel: SettingsView
             LinkRow(Icons.Default.Description, stringResource(R.string.templates), nav.onTemplates)
             LinkRow(Icons.Default.Tag, stringResource(R.string.tags), nav.onTags)
             ListItem(
+                headlineContent = { Text(stringResource(R.string.setting_sort_by_modified)) },
+                supportingContent = { Text(stringResource(R.string.setting_sort_by_modified_hint)) },
+                trailingContent = { Switch(checked = settings.sortByModified, onCheckedChange = viewModel::setSortByModified) },
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+            )
+            ListItem(
                 headlineContent = { Text(stringResource(R.string.setting_sort_completed)) },
                 supportingContent = { Text(stringResource(R.string.setting_sort_completed_hint)) },
                 trailingContent = { Switch(checked = settings.sortCompletedTasks, onCheckedChange = viewModel::setSortCompleted) },

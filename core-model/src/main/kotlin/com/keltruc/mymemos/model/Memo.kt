@@ -48,6 +48,9 @@ data class Memo(
     /** Content is an end-to-end encrypted blob; see MemoCipher in core-data. */
     val isLocked: Boolean get() = content.trimStart().startsWith(LOCKED_PREFIX)
 
+    /** The date the timeline is currently ordered on, so what is shown matches what is sorted. */
+    fun timelineTime(byModified: Boolean): java.time.Instant = if (byModified) updateTime else createTime
+
     /** Content without the `#colour/x` line, for rendering and editing. */
     val displayContent: String get() = colourLine.replace(content, "").trimEnd('\n')
 

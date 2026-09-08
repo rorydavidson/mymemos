@@ -30,7 +30,7 @@ private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:m
  * something the title cannot. For scanning a long timeline rather than reading it.
  */
 @Composable
-fun CompactMemoRow(memo: Memo, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun CompactMemoRow(memo: Memo, byModified: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     // A locked memo's body is ciphertext, so there is no title to pull out of it.
     val title = if (memo.isLocked) null else MemoTitle.of(memo.displayContent)
     Row(
@@ -63,7 +63,7 @@ fun CompactMemoRow(memo: Memo, onClick: () -> Unit, modifier: Modifier = Modifie
             modifier = Modifier.weight(1f),
         )
         Text(
-            timeFormatter.format(memo.createTime.atZone(ZoneId.systemDefault())),
+            timeFormatter.format(memo.timelineTime(byModified).atZone(ZoneId.systemDefault())),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

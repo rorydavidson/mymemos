@@ -122,10 +122,19 @@ Rory reordered this on 8 September: 4, 5 and 6 come before 3, which is now last.
      that quietly published someone's notes would be a much worse surprise than one that did not.
    - `MemoRepository.create` gained optional `createdAtEpochMs`/`updatedAtEpochMs`; the sync
      engine already sent `createTime` on create, so nothing else needed changing.
-7. **Last modified in the memo detail.** Done on `feature/detail-modified`. A "Last modified"
-   line sits with the visibility and id line at the foot of `MemoDetailScreen`. It is always
-   shown, even when it matches the created date at the top of the screen: for an untouched
-   memo, "never edited" is itself worth knowing.
+7. **Dates and sorting.** Done, on `feature/detail-modified` then `feature/sort-and-dates`.
+   The detail footer lists both created and last modified. "Sort by last modified" in Settings
+   flips the timeline between the two dates, and one accessor, `Memo.timelineTime(byModified)`,
+   decides which date every surface shows, so the order, the group headers, the card and row
+   timestamps and the date at the top of the detail screen cannot disagree. Room cannot
+   parameterise an ORDER BY, so `observeTimeline` chooses inside a CASE expression. The review
+   screens deliberately stay on the created date: they are about revisiting what you wrote.
+
+8. **Tapping a memo card.** Fixed on `feature/sort-and-dates`. Only the margins of a card used
+   to open the memo. `MemoContent` drew each paragraph with `ClickableText`, whose tap handler
+   covers the whole paragraph and swallowed every tap on the text, which is most of a card.
+   Links and tags are now `LinkAnnotation`s inside a plain `Text`, so only the link itself takes
+   the tap and everything else reaches the card. This also retires a deprecated API.
 
 ## Geofenced reminders
 

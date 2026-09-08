@@ -75,8 +75,8 @@ class MemoRepository @Inject constructor(
 ) {
     // ---- reads -----------------------------------------------------------------------
 
-    fun observeTimeline(accountId: Long, state: MemoState = MemoState.NORMAL): Flow<List<Memo>> =
-        memoDao.observeTimeline(accountId, state.name).map { rows -> rows.map { it.toModel() } }
+    fun observeTimeline(accountId: Long, byModified: Boolean, state: MemoState = MemoState.NORMAL): Flow<List<Memo>> =
+        memoDao.observeTimeline(accountId, byModified, state.name).map { rows -> rows.map { it.toModel() } }
 
     fun observeMemo(localId: String): Flow<Memo?> = memoDao.observeByLocalId(localId).map { it?.toModel() }
 

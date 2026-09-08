@@ -24,11 +24,16 @@ object TimelineGrouping {
 
     const val PINNED_KEY = "pinned"
 
+    /**
+     * [byModified] groups on the update time instead of the create time, so the headers agree with
+     * whichever order the timeline is in.
+     */
     fun group(
         memos: List<Memo>,
         today: LocalDate = LocalDate.now(),
         zone: ZoneId = ZoneId.systemDefault(),
         locale: Locale = Locale.getDefault(),
+        byModified: Boolean = false,
     ): List<Group> {
         val dayFormat = DateTimeFormatter.ofPattern("EEEE d MMMM", locale)
         val dayYearFormat = DateTimeFormatter.ofPattern("d MMMM yyyy", locale)
@@ -42,7 +47,7 @@ object TimelineGrouping {
 
         // groupBy keeps the order memos arrive in, which is already newest first.
         val groups = rest.groupBy { memo ->
-            val date = memo.createTime.atZone(zone).toLocalDate()
+            val date = (if (byModified) memo.updateTime else memo.createTime).atZone(zone).toLocalDate()
             val weekStart = startOfWeek(date, firstDayOfWeek)
             when {
                 weekStart == thisWeek -> Bucket.Day(date)
