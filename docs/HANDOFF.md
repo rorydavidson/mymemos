@@ -78,12 +78,13 @@ Rory's list, in the order given. None started.
    title. Decrypt must strip the heading before joining with the plaintext. This is a format
    change: old blobs have no heading and must still decode, so keep the prefix check on
    the encrypted line, not the whole content. Flag in the UI that the title is not encrypted.
-4. **Collapsible timeline groups.** `groupByDay` in `TimelineScreen.kt` groups by day only.
-   Wanted: days collapse into a week header when the week is older than the current one,
-   weeks into a month header when the month is older, and each header toggles its group.
-   Keep collapsed state in `AppPreferences` keyed by header label so it survives restarts.
-   Sticky headers already exist (`DayHeader`), so this is mostly the grouping function plus
-   a chevron.
+4. **Collapsible timeline groups.** Done. `TimelineGrouping.group` in core-data replaces
+   `groupByDay`: days for the current week, a week header for earlier weeks of the current
+   month, a month header before that. Collapsed keys live in `AppPreferences.collapsedGroups`.
+   The keys are derived from the dates (`day:2026-09-08`, `week:2026-08-31`,
+   `month:2026-09-01`) rather than the header label as first sketched, so collapsing "Today"
+   does not come back as a collapsed tomorrow and a translated label does not lose the
+   choice. A collapsed header shows its memo count.
 5. **Compact list view.** A toggle in the timeline top bar between the current cards and a
    one-line list showing only each memo's title (first heading, else first non-blank line,
    else "Untitled") with date and lock or pin badges. Persist the choice in

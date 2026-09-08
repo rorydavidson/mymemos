@@ -1,13 +1,10 @@
 package com.keltruc.mymemos.ui.timeline
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import com.keltruc.mymemos.ui.tags.LocalTagStyles
-import com.keltruc.mymemos.ui.tags.label
-import com.keltruc.mymemos.ui.tags.styleFor
-import com.keltruc.mymemos.ui.components.tint
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,18 +23,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Badge
@@ -66,20 +62,28 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.keltruc.mymemos.R
+import com.keltruc.mymemos.data.timeline.TimelineGrouping
 import com.keltruc.mymemos.model.Memo
 import com.keltruc.mymemos.model.Shortcut
 import com.keltruc.mymemos.ui.components.Avatar
 import com.keltruc.mymemos.ui.components.ColourPickerDialog
 import com.keltruc.mymemos.ui.components.MemoCard
+import com.keltruc.mymemos.ui.components.tint
 import com.keltruc.mymemos.ui.sync.SyncStatusChip
 import com.keltruc.mymemos.ui.sync.SyncStatusSheet
+import com.keltruc.mymemos.ui.tags.LocalTagStyles
+import com.keltruc.mymemos.ui.tags.label
+import com.keltruc.mymemos.ui.tags.styleFor
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -113,7 +117,8 @@ fun TimelineScreen(
         }
     }
 
-    val grouped = remember(state.memos) { groupByDay(state.memos) }
+    val collapsedGroups by viewModel.collapsedGroups.collectAsStateWithLifecycle()
+    val grouped = remember(state.memos) { TimelineGrouping.group(state.memos) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -176,11 +181,17 @@ fun TimelineScreen(
                         }
                     }
                 }
-                grouped.forEach { (label, memos) ->
-                    stickyHeader(key = "day-$label") {
-                        DayHeader(label)
+                grouped.forEach { group ->
+                    val collapsed = group.key in collapsedGroups
+                    stickyHeader(key = "day-${group.key}") {
+                        DayHeader(
+                            label = group.label,
+                            count = group.memos.size,
+                            collapsed = collapsed,
+                            onToggle = { viewModel.toggleGroup(group.key) },
+                        )
                     }
-                    items(memos, key = { it.localId }) { memo ->
+                    items(if (collapsed) emptyList() else group.memos, key = { it.localId }) { memo ->
                         MemoCard(
                             memo = memo,
                             serverUrl = state.account?.serverUrl.orEmpty(),
@@ -410,34 +421,39 @@ private fun SearchPill(query: String, onQuery: (String) -> Unit, modifier: Modif
 }
 
 @Composable
-private fun DayHeader(label: String) {
-    Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(horizontal = 20.dp, vertical = 8.dp)) {
-        Text(
-            label.uppercase(),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+private fun DayHeader(label: String, count: Int, collapsed: Boolean, onToggle: () -> Unit) {
+    val rotation by animateFloatAsState(if (collapsed) -90f else 0f, label = "chevron")
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .clickable(onClick = onToggle)
+            .padding(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
+    ) {
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                label.uppercase(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            // The count is what tells you whether a folded group is worth opening.
+            if (collapsed) {
+                Text(
+                    " · $count",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Icon(
+            Icons.Default.ExpandMore,
+            contentDescription = stringResource(if (collapsed) R.string.group_expand else R.string.group_collapse),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp).rotate(rotation),
         )
     }
-}
-
-private val dayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM")
-private val dayYearFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM yyyy")
-
-private fun groupByDay(memos: List<Memo>): List<Pair<String, List<Memo>>> {
-    val zone = ZoneId.systemDefault()
-    val today = LocalDate.now(zone)
-    val pinned = memos.filter { it.pinned }
-    val rest = memos.filterNot { it.pinned }
-    val groups = rest.groupBy { it.createTime.atZone(zone).toLocalDate() }.map { (date, list) ->
-        val label = when (ChronoUnit.DAYS.between(date, today)) {
-            0L -> "Today"
-            1L -> "Yesterday"
-            in 2L..6L -> dayFormatter.format(date)
-            else -> if (date.year == today.year) dayFormatter.format(date) else dayYearFormatter.format(date)
-        }
-        label to list
-    }
-    return if (pinned.isEmpty()) groups else listOf("Pinned" to pinned) + groups
 }

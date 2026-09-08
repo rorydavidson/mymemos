@@ -2,6 +2,7 @@ package com.keltruc.mymemos.ui.timeline
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.keltruc.mymemos.data.prefs.AppPreferences
 import com.keltruc.mymemos.data.repository.AccountRepository
 import com.keltruc.mymemos.data.repository.AccountSettingsRepository
 import com.keltruc.mymemos.data.repository.MemoRepository
@@ -54,8 +55,18 @@ class TimelineViewModel @Inject constructor(
     private val memoRepository: MemoRepository,
     private val shortcutRepository: ShortcutRepository,
     private val settingsRepository: AccountSettingsRepository,
+    private val preferences: AppPreferences,
 ) : ViewModel() {
     val unreadNotifications: StateFlow<Int> = settingsRepository.unreadNotifications
+
+    /** Timeline headers the user has folded away; survives restarts. */
+    val collapsedGroups: StateFlow<Set<String>> = preferences.settings
+        .map { it.collapsedGroups }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    fun toggleGroup(key: String) = viewModelScope.launch {
+        preferences.setGroupCollapsed(key, key !in collapsedGroups.value)
+    }
 
     private val query = MutableStateFlow("")
     private val selectedTag = MutableStateFlow<String?>(null)

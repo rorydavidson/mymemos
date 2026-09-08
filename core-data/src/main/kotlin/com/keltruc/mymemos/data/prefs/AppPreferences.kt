@@ -6,7 +6,9 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.keltruc.mymemos.data.timeline.TimelineGrouping
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -23,6 +25,8 @@ data class Settings(
     val dynamicColour: Boolean = false,
     /** Fetch OpenStreetMap tiles for memo locations, which tells openstreetmap.org roughly where you are. */
     val mapTiles: Boolean = false,
+    /** Timeline headers the user has folded away, by [TimelineGrouping.Group.key]. */
+    val collapsedGroups: Set<String> = emptySet(),
 )
 
 @Singleton
@@ -30,12 +34,14 @@ class AppPreferences @Inject constructor(@ApplicationContext private val context
     private val sortCompleted = booleanPreferencesKey("sort_completed_tasks")
     private val dynamic = booleanPreferencesKey("dynamic_colour")
     private val tiles = booleanPreferencesKey("map_tiles")
+    private val collapsed = stringSetPreferencesKey("collapsed_groups")
 
     val settings: Flow<Settings> = context.dataStore.data.map { p ->
         Settings(
             sortCompletedTasks = p[sortCompleted] ?: false,
             dynamicColour = p[dynamic] ?: false,
             mapTiles = p[tiles] ?: false,
+            collapsedGroups = p[collapsed].orEmpty(),
         )
     }
 
@@ -51,6 +57,13 @@ class AppPreferences @Inject constructor(@ApplicationContext private val context
 
     suspend fun setMapTiles(enabled: Boolean) {
         context.dataStore.edit { it[tiles] = enabled }
+    }
+
+    suspend fun setGroupCollapsed(key: String, collapsedNow: Boolean) {
+        context.dataStore.edit { p ->
+            val current = p[collapsed].orEmpty()
+            p[collapsed] = if (collapsedNow) current + key else current - key
+        }
     }
 
     /** When the last full reconcile of server memo names ran for this account, or 0. */
