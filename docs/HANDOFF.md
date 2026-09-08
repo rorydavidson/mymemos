@@ -57,8 +57,8 @@ Note for automation users: apps sending `CREATE_MEMO` now need the
 
 ## Requested next
 
-Rory's list, in the order given. Item 1 is done on `feature/markdown-continuation`; the
-rest are not started.
+Rory's list, in the order given. Items 1 and 2 are done, on
+`feature/markdown-continuation` and `feature/date-completion`; the rest are not started.
 
 1. **Better Markdown editing.** Done. `MarkdownContinuation` in core-data decides what a
    return should do; `EditorScreen.update` calls `continueAfterReturn` with the field before
@@ -66,11 +66,14 @@ rest are not started.
    in the same change as the return, and it may recase that text as it does ("1. first"
    arrives as "1. First\n"), so the guard compares the cursor, the length and everything
    after the cursor, never the text before it.
-2. **Completion for `@` dates.** The editor completes `#tags` only (`suggestions` in
-   `EditorScreen.kt`). Add the same popup for `@` with the tokens `DueDateParser.kt` already
-   understands: `@today`, `@tomorrow`, weekday names, and a "pick a date" entry that opens
-   the existing `DateTimePicker` and inserts `@yyyy-MM-dd`. Anything new here must also be
-   taught to the parser so the tasks screen picks it up.
+2. **Completion for `@` dates.** Done. `DueDateParser.suggest` produces the completions, so
+   they cannot drift from what `parse` understands; a test round-trips every suggestion back
+   through `parse` for seven different "todays". Weekday suggestions stop six days out,
+   because the seventh wraps to today's own weekday and `parse` would read it as today.
+   Tokens stay English even under another locale, since that is all `parse` knows; the
+   localised date rides along as a hint on the chip. "Pick a date" opens a new
+   `DueDatePickerDialog`, date only, rather than the existing `DateTimePickerDialog`, whose
+   time step has nowhere to go in a `@yyyy-MM-dd` token.
 3. **Locked notes keep their title visible.** Today the whole body is encrypted, so the
    list shows only a lock badge. Change `MemoRepository.updateLockedContent` so that when the
    first line is a Markdown heading it is written in clear ahead of the `mymemos-enc:v1:`
