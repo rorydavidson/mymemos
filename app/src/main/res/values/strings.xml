@@ -219,4 +219,25 @@
     <string name="tasks_due_hint">Write @today, @fri or @12/9 in a task to give it a date.</string>
     <string name="tasks_overdue">Overdue</string>
     <string name="tasks_undated">No date</string>
+    <string name="channel_reminders">Reminders</string>
+    <string name="channel_digest">Weekly digest</string>
+    <string name="channel_recurring">Recurring memos</string>
+    <string name="remind_me">Remind me</string>
+    <string name="reminder_set">Reminder %1$s</string>
+    <string name="reminder_remove">Remove reminder</string>
+    <string name="reminder_needs_sync">Sync this memo before setting a reminder.</string>
+    <string name="reminder_exact_hint">For reminders at the exact minute, allow \"Alarms and reminders\" for MyMemos in system settings. Otherwise Android may deliver a few minutes late.</string>
+    <string name="reminder_notification_title">Memo reminder</string>
+    <string name="pick_date">Pick a date</string>
+    <string name="pick_time">Pick a time</string>
+    <string name="next">Next</string>
+    <string name="recurring">Create daily</string>
+    <string name="recurring_hint">Creates a memo from this template every day at the chosen time, unless one already exists.</string>
+    <string name="recurring_created">Created from template: %1$s</string>
+    <string name="digest">Weekly digest</string>
+    <string name="digest_hint">A notification on Sunday evening: what you wrote, tasks closed, your streak and a few old memos to revisit.</string>
+    <string name="digest_title">Your week in memos</string>
+    <string name="review_journey">Journey</string>
+    <string name="journey_empty">No located memos on this day.</string>
+    <string name="notifications_denied">Notifications are off for MyMemos. Enable them in system settings to receive this.</string>
 </resources>

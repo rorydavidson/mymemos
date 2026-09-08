@@ -23,7 +23,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -41,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.keltruc.mymemos.R
 import com.keltruc.mymemos.model.Memo
 import com.keltruc.mymemos.ui.components.MemoCard
+import com.keltruc.mymemos.ui.components.RouteMap
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -78,11 +79,12 @@ fun ReviewScreen(
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            TabRow(selectedTabIndex = tab) {
+            ScrollableTabRow(selectedTabIndex = tab, edgePadding = 0.dp) {
                 Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.review_day)) })
                 Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(R.string.review_on_this_day)) })
                 Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text(stringResource(R.string.review_nearby)) })
                 Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text(stringResource(R.string.review_graph)) })
+                Tab(selected = tab == 4, onClick = { tab = 4 }, text = { Text(stringResource(R.string.review_journey)) })
             }
             when (tab) {
                 0 -> {
@@ -125,6 +127,33 @@ fun ReviewScreen(
                     viewModel, onOpenMemo, onEditMemo,
                 )
                 3 -> graph?.let { (nodes, edges) -> GraphView(nodes, edges, onOpenMemo) }
+                4 -> {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = viewModel::previousDay) { Icon(Icons.Default.ChevronLeft, null) }
+                        Text(
+                            when (day) {
+                                LocalDate.now() -> stringResource(R.string.today)
+                                LocalDate.now().minusDays(1) -> stringResource(R.string.yesterday)
+                                else -> dayFmt.format(day)
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
+                        IconButton(onClick = viewModel::nextDay, enabled = day.isBefore(LocalDate.now())) { Icon(Icons.Default.ChevronRight, null) }
+                    }
+                    val located = dayMemos.filter { it.location != null }
+                    if (located.isEmpty()) {
+                        Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                            Text(stringResource(R.string.journey_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    } else {
+                        Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+                            RouteMap(points = located.map { it.location!! })
+                            MemoList(located.mapIndexed { i, m -> m to "${i + 1}" }, account?.serverUrl.orEmpty(), "", viewModel, onOpenMemo, onEditMemo)
+                        }
+                    }
+                }
                 else -> MemoList(
                     nearby.orEmpty().map { n -> n.memo to (if (n.metres < 1000) "%.0f m".format(n.metres) else "%.1f km".format(n.metres / 1000)) },
                     account?.serverUrl.orEmpty(),

@@ -12,6 +12,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -43,7 +48,6 @@ import com.keltruc.mymemos.model.NoteColour
 import com.keltruc.mymemos.ui.components.ColourPickerDialog
 import com.keltruc.mymemos.ui.components.tint
 
-private val quickEmoji = listOf("💼", "🏠", "💡", "📚", "🛒", "💪", "❤️", "✈️", "💰", "🎯", "🍳", "🐾", "🎵", "🧠", "📅", "⭐")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,11 +102,24 @@ fun TagsScreen(onBack: () -> Unit, initialTag: String? = null, viewModel: TagsVi
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        quickEmoji.take(8).forEach { e -> Text(e, Modifier.clickable { emoji = e }.padding(4.dp), style = MaterialTheme.typography.titleLarge) }
-                    }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        quickEmoji.drop(8).forEach { e -> Text(e, Modifier.clickable { emoji = e }.padding(4.dp), style = MaterialTheme.typography.titleLarge) }
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(8),
+                        modifier = Modifier.fillMaxWidth().height(220.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        EmojiCatalogue.categories.forEach { (name, items) ->
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                Text(name, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp))
+                            }
+                            items(items) { e ->
+                                Text(
+                                    e,
+                                    Modifier.clip(CircleShape).background(if (emoji == e) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
+                                        .clickable { emoji = e }.padding(6.dp),
+                                    style = MaterialTheme.typography.titleLarge,
+                                )
+                            }
+                        }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.clickable { showColours = true }) {
                         Box(Modifier.size(32.dp).clip(CircleShape).background(colour?.tint() ?: MaterialTheme.colorScheme.surfaceContainerHigh))

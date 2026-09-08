@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -27,7 +28,10 @@ class SettingsViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val settingsRepository: AccountSettingsRepository,
     private val passwordSession: PasswordSession,
+    private val configRepository: com.keltruc.mymemos.data.config.ConfigRepository,
 ) : ViewModel() {
+    val weeklyDigest: StateFlow<Boolean> = configRepository.config.map { it.weeklyDigest }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    fun setWeeklyDigest(enabled: Boolean) = viewModelScope.launch { configRepository.update { it.copy(weeklyDigest = enabled) } }
     val passwordRemembered = MutableStateFlow(passwordSession.isRemembered)
     fun forgetPassword() { passwordSession.forget(); passwordRemembered.value = false }
     val settings: StateFlow<Settings> = preferences.settings

@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -42,5 +43,13 @@ class AppPreferences @Inject constructor(@ApplicationContext private val context
 
     suspend fun setDynamicColour(enabled: Boolean) {
         context.dataStore.edit { it[dynamic] = enabled }
+    }
+
+    /** When the last full reconcile of server memo names ran for this account, or 0. */
+    suspend fun lastReconcile(accountId: Long): Long =
+        context.dataStore.data.first()[longPreferencesKey("last_reconcile_$accountId")] ?: 0L
+
+    suspend fun setLastReconcile(accountId: Long, epochMs: Long) {
+        context.dataStore.edit { it[longPreferencesKey("last_reconcile_$accountId")] = epochMs }
     }
 }

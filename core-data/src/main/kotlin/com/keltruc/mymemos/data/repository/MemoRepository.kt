@@ -472,6 +472,10 @@ class MemoRepository @Inject constructor(
 
     suspend fun memosWithLocation(accountId: Long): List<Memo> = memoDao.withLocation(accountId).map { it.toModel() }
 
+    /** Every top-level memo, for the weekly digest. */
+    suspend fun allForDigest(accountId: Long): List<Memo> =
+        memoDao.allForExport(accountId).map { it.toModel() }.filter { !it.isComment && !ColourTag.isColourTag("") && !it.tags.contains("mymemos/config") && !it.content.contains("#mymemos/config") }
+
     /** Nodes and reference edges for the graph view. */
     suspend fun referenceGraph(accountId: Long): Pair<List<Memo>, List<Pair<String, String>>> {
         val memos = memoDao.allForExport(accountId).map { it.toModel() }.filter { it.remoteName != null && !it.isComment }

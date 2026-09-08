@@ -11,6 +11,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Alarm
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,7 +46,9 @@ import com.keltruc.mymemos.model.Template
 @Composable
 fun TemplatesScreen(onBack: () -> Unit, viewModel: TemplatesViewModel = hiltViewModel()) {
     val templates by viewModel.templates.collectAsStateWithLifecycle()
+    val recurring by viewModel.recurring.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<Template?>(null) }
+    var timing by remember { mutableStateOf<Template?>(null) }
     var showEditor by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -57,14 +63,38 @@ fun TemplatesScreen(onBack: () -> Unit, viewModel: TemplatesViewModel = hiltView
         LazyColumn(Modifier.padding(padding).fillMaxSize()) {
             item { Text(stringResource(R.string.template_hint), Modifier.padding(20.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             items(templates, key = { it.id }) { t ->
+                val rec = recurring.firstOrNull { it.templateTitle == t.title }
                 ListItem(
                     headlineContent = { Text(t.title) },
-                    supportingContent = { Text(t.body, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-                    trailingContent = { IconButton(onClick = { viewModel.delete(t.id) }) { Icon(Icons.Default.Delete, stringResource(R.string.delete)) } },
+                    supportingContent = {
+                        Text(
+                            (rec?.let { "%s %02d:%02d · ".format(stringResource(R.string.recurring), it.hour, it.minute) } ?: "") + t.body.lineSequence().firstOrNull().orEmpty(),
+                            maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    trailingContent = {
+                        Row {
+                            IconButton(onClick = { if (rec == null) timing = t else viewModel.setRecurring(t.title, null, null) }) {
+                                Icon(Icons.Default.Alarm, stringResource(R.string.recurring), tint = if (rec != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            IconButton(onClick = { viewModel.delete(t.id) }) { Icon(Icons.Default.Delete, stringResource(R.string.delete)) }
+                        }
+                    },
                     modifier = Modifier.clickable { editing = t; showEditor = true },
                 )
             }
         }
+    }
+
+    timing?.let { t ->
+        val time = rememberTimePickerState(initialHour = 21, initialMinute = 0)
+        AlertDialog(
+            onDismissRequest = { timing = null },
+            title = { Text(stringResource(R.string.recurring)) },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { Text(stringResource(R.string.recurring_hint)); TimePicker(state = time) } },
+            confirmButton = { TextButton(onClick = { viewModel.setRecurring(t.title, time.hour, time.minute); timing = null }) { Text(stringResource(R.string.save)) } },
+            dismissButton = { TextButton(onClick = { timing = null }) { Text(stringResource(R.string.cancel)) } },
+        )
     }
 
     if (showEditor) {

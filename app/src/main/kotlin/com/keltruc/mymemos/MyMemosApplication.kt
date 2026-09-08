@@ -24,6 +24,10 @@ class MyMemosApplication : Application(), Configuration.Provider, SingletonImage
     @Inject lateinit var activeSession: ActiveSession
     @Inject lateinit var syncScheduler: SyncScheduler
     @Inject lateinit var templates: TemplateRepository
+    @Inject lateinit var notifier: com.keltruc.mymemos.notify.Notifier
+    @Inject lateinit var alarmScheduler: com.keltruc.mymemos.notify.AlarmScheduler
+    @Inject lateinit var digestScheduler: com.keltruc.mymemos.notify.DigestScheduler
+    @Inject lateinit var configRepository: com.keltruc.mymemos.data.config.ConfigRepository
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
@@ -32,6 +36,11 @@ class MyMemosApplication : Application(), Configuration.Provider, SingletonImage
         super.onCreate()
         syncScheduler.ensurePeriodic()
         CoroutineScope(Dispatchers.IO).launch { templates.seedDefaultsIfEmpty() }
+        notifier.ensureChannels()
+        alarmScheduler.start()
+        CoroutineScope(Dispatchers.IO).launch {
+            configRepository.config.collect { if (it.weeklyDigest) digestScheduler.enable() else digestScheduler.disable() }
+        }
     }
 
     override fun newImageLoader(context: Context): ImageLoader {

@@ -128,7 +128,7 @@ fun TimelineScreen(
     ) { padding ->
         PullToRefreshBox(
             isRefreshing = state.refreshing,
-            onRefresh = { viewModel.refresh() },
+            onRefresh = { viewModel.refresh(full = true) },
             modifier = Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding()),
         ) {
             LazyColumn(
