@@ -2,10 +2,115 @@
 
 An Android client for a self-hosted [Memos](https://usememos.com) server. Offline-first:
 memos live in a local Room database, the UI only ever reads from there, and changes are
-queued and pushed when the network returns.
+queued and pushed when the network returns. Built for Memos v0.30; newer server features
+are gated on the version the server reports.
 
-Targets the Memos v1 REST API (v0.30.x). Newer server features are gated on the reported
-server version.
+## Thanks
+
+None of this would exist without [Memos](https://github.com/usememos/memos), the
+self-hosted, privacy-first note service by [boojack](https://github.com/boojack) and the
+[Memos contributors](https://github.com/usememos/memos/graphs/contributors), released under
+the MIT licence. This app is a client for their
+server and follows the same instincts: your notes stay on infrastructure you control, and
+nothing is collected along the way. Thank you.
+
+## What it does
+
+### Writing
+
+- Markdown editor with a toolbar for tasks, lists, bold, code, tags and images, tag
+  autocompletion from your own tags, and templates with `{{date}}`, `{{time}}`,
+  `{{weekday}}` and similar placeholders.
+- Attachments from the photo picker, staged locally and uploaded when online.
+- Visibility, pinning, archiving, and a location captured from the device with reverse
+  geocoding, no Google Play Services involved.
+- Optional "sink completed tasks" rule that moves ticked tasks below open ones on save.
+- End-to-end encryption per memo: lock a memo with a password and the server only ever
+  stores the scrambled text. One password for all locked memos, remembered on the device
+  if you choose.
+
+### Reading
+
+- Full CommonMark rendering: headings, lists, task lists with live checkboxes that edit
+  the source line, fenced code, quotes, tables, links, strikethrough, autolinks and tags.
+- Tags carry an emoji and a colour of your choosing, shown everywhere; the colour is
+  mirrored to the server's own tag setting so the web UI matches.
+- Note colours from the sixteen basic web colours as a pastel tint, synced across devices.
+- Memos with a location show an OpenStreetMap preview with a marker; tap to open your
+  maps app.
+- Comments, reactions, references with backlinks, and public share links with revoke.
+- Offline full-text search, tag filters, saved server-side shortcuts (CEL filters), an
+  archive view, and a two-pane layout on tablets and landscape phones.
+
+### Sync
+
+- Every write lands in Room and an outbox in one transaction; a debounced sync pushes it
+  at once, and WorkManager catches up in the background.
+- Delta pulls with a clock-skew overlap, plus a full reconcile of server memo names on
+  pull-to-refresh and at least every six hours so deletions made elsewhere propagate.
+- Concurrent edits go through a line-based three-way merge. Text that cannot be merged is
+  kept as a conflict copy rather than lost.
+- If the server has lost a memo you edited, the edit is recreated as a new memo instead
+  of being parked forever.
+- Password sign-in mints a personal access token per device and revokes it on sign out.
+  An expired credential shows a banner rather than failing quietly. Several accounts and
+  servers can be signed in at once.
+
+### Tasks, reminders and routines
+
+- A tasks screen lists every open checkbox across memos, grouped by memo, with due dates
+  parsed from `@today`, `@tomorrow`, `@fri`, `@2026-09-12` or `@12/9`, sorted and flagged
+  when overdue.
+- Reminders on a date and time for any memo, delivered as notifications on every device
+  you are signed in on.
+- Recurring templates: a template that creates itself daily at a set time unless one
+  exists already (a journal at 21:00, say).
+- A weekly digest notification on Sunday evening: memos written, tasks closed, your
+  streak, and a few old memos worth revisiting.
+
+### Review
+
+- Day-by-day review with swipe to archive or keep, plus quick pin, tag, edit and delete.
+- "On this day" resurfaces memos from the same date in earlier months and years.
+- Nearby lists memos by distance from where you are; Journey plots a day's located memos
+  as a numbered route on a map; Graph draws memos and the references between them.
+- A writing streak and a twelve-week activity heatmap.
+
+### Capture from anywhere
+
+- Share-sheet target for text, links and images from any app.
+- Home-screen widgets: open tasks (tick from the widget) and recent memos with a
+  quick-capture button. A Quick Settings tile opens a blank memo.
+- An intent for automation tools:
+
+  ```
+  am start -a com.keltruc.mymemos.action.CREATE_MEMO --es content "text" --es visibility PRIVATE --ez pinned false --ez open false
+  ```
+
+  `open true` opens the editor prefilled instead of saving silently.
+
+### Account and administration
+
+- Profile, password, server-side default visibility, personal access tokens, webhooks,
+  notifications with an unread badge, and statistics.
+- For admins: user management and the instance's general settings and storage figures.
+
+### Your data
+
+- Export everything as a zip of Markdown files with YAML front matter (Obsidian-ready)
+  plus local attachments.
+- Encrypted local backup and restore of the database, attachments and settings, AES-256
+  under a password of your choosing.
+- Settings that need to follow you between devices (tag styles, reminders, recurring
+  templates, the digest switch) live in a hidden memo tagged `#mymemos/config`, so they
+  sync through the server like everything else without any extra service.
+
+### Privacy notes
+
+- Credentials sit in the Android Keystore; the app collects no analytics and talks only
+  to the server you configure.
+- Map previews fetch tiles from openstreetmap.org, which means the coordinates of located
+  memos reach OSM when a card renders. There is no other third-party traffic.
 
 ## Building
 
@@ -29,30 +134,20 @@ Then:
 |-----------------|----------------------------------------------------------------------|
 | `core-model`    | Plain Kotlin domain types, no Android or framework dependencies.     |
 | `core-network`  | Retrofit/OkHttp client for the Memos API, bearer auth, token refresh, persistent cookie jar. Pure JVM, tested with MockWebServer. |
-| `core-database` | Room schema: accounts, memos (with FTS index), attachments.          |
-| `core-data`     | Repositories, DTO/entity/model mappers, encrypted credential store, Hilt wiring. |
-| `app`           | Jetpack Compose UI (Material 3), navigation, view models.            |
+| `core-database` | Room schema: accounts, memos (with FTS index), attachments, outbox, relations, reactions, shortcuts, templates. |
+| `core-data`     | Repositories, sync engine and three-way merge, mappers, encrypted credential store, memo cipher, config memo, Hilt wiring. |
+| `app`           | Jetpack Compose UI (Material 3), navigation, widgets, notifications, view models. |
 
-## Fonts
+## Fonts and licences
 
 Google Sans Flex, bundled under the SIL Open Font License 1.1 (see `app/GOOGLE_SANS_FLEX_OFL.txt`).
 "Google Sans Flex" is a trademark of Google LLC; its use here does not imply affiliation.
+Markdown rendering by commonmark-java (BSD-2), diffing by java-diff-utils (Apache-2.0),
+map tiles © OpenStreetMap contributors.
 
 ## Release builds
 
 Copy `keystore.properties.example` to `keystore.properties` and point it at your keystore;
 `./gradlew :app:assembleRelease` then produces a signed, shrunk APK. CI (`.gitea/workflows/ci.yml`,
 mirrored for GitHub) runs unit tests, lint and both builds, signing when the `STORE_*`/`KEY_*`
-secrets are set.
-
-## Automation
-
-`am start -a com.keltruc.mymemos.action.CREATE_MEMO --es content "text" --es visibility PRIVATE --ez pinned false --ez open false`
-creates a memo without opening the app; `open true` opens the editor prefilled. Sharing text or
-images from any app does the same through the share sheet.
-
-## Status
-
-Feature complete against Memos v0.30: offline-first editing with an outbox and three-way
-merge, attachments, comments, reactions, references, share links, location, shortcuts,
-profile and instance administration, widgets, templates, review, export and encrypted backup.
+secrets are set. See `docs/HANDOFF.md` for Play Store submission notes.
