@@ -55,6 +55,8 @@
     <string name="setting_sort_completed_hint">When you save a memo, ticked tasks move below the unticked ones in each list.</string>
     <string name="setting_dynamic_colour">Wallpaper colours</string>
     <string name="setting_dynamic_colour_hint">Use your device\'s Material You palette instead of the app\'s own.</string>
+    <string name="import_markdown">Import Markdown</string>
+    <string name="import_markdown_hint">Pick one or more .md files, or a zip of them. Dates come from the files, and folders inside a zip become tags.</string>
     <string name="compact_list">Compact list</string>
     <string name="card_list">Cards</string>
     <string name="untitled">Untitled</string>

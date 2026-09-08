@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material3.AlertDialog
@@ -56,6 +57,9 @@ fun DataScreen(onBack: () -> Unit, viewModel: DataViewModel = hiltViewModel()) {
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri -> uri?.let(viewModel::exportMarkdown) }
     val backupLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri -> backupTarget = uri }
     val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> restoreSource = uri }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) viewModel.importMarkdown(uris)
+    }
 
     Scaffold(
         topBar = {
@@ -74,6 +78,17 @@ fun DataScreen(onBack: () -> Unit, viewModel: DataViewModel = hiltViewModel()) {
                 leadingContent = { Icon(Icons.Default.Download, null) },
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
                 modifier = Modifier.clickable(enabled = !busy) { exportLauncher.launch("memos-${LocalDate.now()}.zip") },
+            )
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.import_markdown)) },
+                supportingContent = { Text(stringResource(R.string.import_markdown_hint)) },
+                leadingContent = { Icon(Icons.Default.Upload, null) },
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                // Types are advisory: providers label .md as text/plain, octet-stream or nothing at
+                // all, so the importer sniffs the bytes rather than trusting what comes back.
+                modifier = Modifier.clickable(enabled = !busy) {
+                    importLauncher.launch(arrayOf("text/markdown", "text/plain", "application/zip", "application/octet-stream"))
+                },
             )
             ListItem(
                 headlineContent = { Text(stringResource(R.string.backup)) },

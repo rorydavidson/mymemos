@@ -96,6 +96,32 @@ Rory's list, in the order given. None started.
    With 3 now last, `CompactMemoRow` shows a lock badge and the words "Locked memo" instead.
    When item 3 lands, that is the one place to change: drop the `memo.isLocked` guard around
    `MemoTitle.of` and let the heading through.
+6. **Import Markdown.** Done. "Import Markdown" in Settings > Data takes any number of `.md`
+   files or zips of them, in one pick. `MarkdownImport` in core-data does the parsing (front
+   matter, folder-to-tag, date resolution) and is unit tested, including a round trip through
+   `MarkdownExporter.render`; `MarkdownImporter` reads the URIs and loops through the outbox.
+
+   Settled while building it:
+
+   - **The server does honour a backdated `createTime` on create.** Verified against
+     memos.keltruc.com v0.30.0 by importing dated files on the emulator and then pulling them
+     down on a second device, where they arrived in March 2024 and November 2025 rather than
+     today. The whole feature rests on this, so re-check it if the server is ever upgraded.
+   - Folders become one nested tag: `work/projects/notes.md` gets `#work/projects`, matching
+     how Memos treats `/` as hierarchy. Folder names are made tag-safe (spaces to hyphens) and
+     `..` segments are dropped rather than becoming tags of their own.
+   - Dates: front matter first (`created`/`date`/`created_at`, `updated`/`modified`), then the
+     zip entry or the file's own timestamp, then the clock. ISO instants, `yyyy-MM-dd HH:mm`
+     and bare dates all parse.
+   - Zips are detected by their magic bytes, not the extension or the reported MIME type,
+     because providers label `.md` as text/plain, octet-stream or nothing at all.
+   - Imported memos are PRIVATE unless the file's own front matter says otherwise. An import
+     that quietly published someone's notes would be a much worse surprise than one that did not.
+   - `MemoRepository.create` gained optional `createdAtEpochMs`/`updatedAtEpochMs`; the sync
+     engine already sent `createTime` on create, so nothing else needed changing.
+7. **Last modified in the memo detail.** Asked for on 8 September, not started. Show a memo's
+   update time in small text at the bottom of `MemoDetailScreen`, near the existing
+   "Private · memos/..." line.
 
 ## Geofenced reminders
 
