@@ -30,9 +30,12 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -83,9 +86,11 @@ fun TimelineScreen(
     onEditMemo: (String) -> Unit,
     onSettings: () -> Unit,
     onManageShortcuts: () -> Unit,
+    onNotifications: () -> Unit,
     viewModel: TimelineViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val unread by viewModel.unreadNotifications.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var showSync by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<Memo?>(null) }
@@ -130,6 +135,8 @@ fun TimelineScreen(
                         onToggleArchived = viewModel::toggleArchived,
                         onShortcut = viewModel::onShortcut,
                         onManageShortcuts = onManageShortcuts,
+                        unread = unread,
+                        onNotifications = onNotifications,
                     )
                 }
                 if (state.sync.authExpired) {
@@ -239,6 +246,8 @@ private fun Header(
     onToggleArchived: () -> Unit,
     onShortcut: (Shortcut?) -> Unit,
     onManageShortcuts: () -> Unit,
+    unread: Int,
+    onNotifications: () -> Unit,
 ) {
     Column(Modifier.statusBarsPadding().padding(top = 8.dp)) {
         Row(
@@ -266,6 +275,11 @@ private fun Header(
                 )
             }
             SyncStatusChip(state.sync, onClick = onSync)
+            IconButton(onClick = onNotifications) {
+                BadgedBox(badge = { if (unread > 0) Badge { Text(unread.toString()) } }) {
+                    Icon(Icons.Default.Notifications, contentDescription = stringResource(R.string.notifications), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             IconButton(onClick = onToggleArchived) {
                 Icon(
                     if (state.showArchived) Icons.Default.Inbox else Icons.Default.Archive,

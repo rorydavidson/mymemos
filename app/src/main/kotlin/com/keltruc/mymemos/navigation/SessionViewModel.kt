@@ -3,6 +3,8 @@ package com.keltruc.mymemos.navigation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.keltruc.mymemos.data.repository.AccountRepository
+import com.keltruc.mymemos.data.repository.MemoRepository
+import kotlinx.coroutines.launch
 import com.keltruc.mymemos.model.Account
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -18,7 +20,16 @@ sealed interface SessionState {
 }
 
 @HiltViewModel
-class SessionViewModel @Inject constructor(accountRepository: AccountRepository) : ViewModel() {
+class SessionViewModel @Inject constructor(
+    private val accountRepository: AccountRepository,
+    private val memoRepository: MemoRepository,
+) : ViewModel() {
+    /** Turns a server memo name into a local id (fetching if needed) and hands it on. */
+    fun resolveMemo(remoteName: String, onResolved: (String) -> Unit) = viewModelScope.launch {
+        val acc = accountRepository.activeAccountOrNull() ?: return@launch
+        memoRepository.ensureLocal(acc, remoteName)?.let(onResolved)
+    }
+
     val state: StateFlow<SessionState> = accountRepository.activeAccount
         .map { account -> if (account == null) SessionState.SignedOut else SessionState.SignedIn(account) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SessionState.Loading)

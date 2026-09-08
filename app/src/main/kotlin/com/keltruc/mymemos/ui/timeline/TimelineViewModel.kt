@@ -3,6 +3,7 @@ package com.keltruc.mymemos.ui.timeline
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.keltruc.mymemos.data.repository.AccountRepository
+import com.keltruc.mymemos.data.repository.AccountSettingsRepository
 import com.keltruc.mymemos.data.repository.MemoRepository
 import com.keltruc.mymemos.data.repository.ShortcutRepository
 import com.keltruc.mymemos.model.Shortcut
@@ -50,7 +51,9 @@ class TimelineViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val memoRepository: MemoRepository,
     private val shortcutRepository: ShortcutRepository,
+    private val settingsRepository: AccountSettingsRepository,
 ) : ViewModel() {
+    val unreadNotifications: StateFlow<Int> = settingsRepository.unreadNotifications
 
     private val query = MutableStateFlow("")
     private val selectedTag = MutableStateFlow<String?>(null)
@@ -107,6 +110,7 @@ class TimelineViewModel @Inject constructor(
 
     init {
         refresh()
+        viewModelScope.launch { settingsRepository.refreshUnreadCount(account.first()) }
     }
 
     fun onQuery(value: String) { query.value = value }

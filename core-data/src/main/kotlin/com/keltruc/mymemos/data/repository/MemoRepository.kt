@@ -398,6 +398,15 @@ class MemoRepository @Inject constructor(
     suspend fun pickReferenceCandidates(accountId: Long, query: String): List<Memo> =
         memoDao.pickerSearch(accountId, query).map { it.toModel() }.filter { it.remoteName != null }
 
+    /** Local id for a server memo name, pulling it if we do not hold it yet. */
+    suspend fun ensureLocal(account: Account, remoteName: String): String? {
+        memoDao.getByRemoteName(account.id, remoteName)?.let { return it.localId }
+        val dto = runCatching { registry.api(account.serverUrl, account.userResourceName).getMemo(remoteName) }.getOrNull() ?: return null
+        val entity = dto.toEntity(account.id)
+        memoDao.upsert(entity)
+        return entity.localId
+    }
+
     /** Marks a conflict fork as dealt with: it stays as an ordinary memo. */
     suspend fun resolveConflict(localId: String) {
         memoDao.setSyncStatus(localId, SyncStatus.PENDING_CREATE.name)

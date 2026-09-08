@@ -10,6 +10,13 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.keltruc.mymemos.ui.detail.MemoDetailScreen
 import com.keltruc.mymemos.ui.editor.EditorScreen
+import com.keltruc.mymemos.ui.account.NotificationsScreen
+import com.keltruc.mymemos.ui.account.StatsScreen
+import com.keltruc.mymemos.ui.account.TokensScreen
+import com.keltruc.mymemos.ui.account.WebhooksScreen
+import com.keltruc.mymemos.ui.admin.AdminInstanceScreen
+import com.keltruc.mymemos.ui.admin.AdminUsersScreen
+import com.keltruc.mymemos.ui.settings.SettingsNav
 import com.keltruc.mymemos.ui.settings.SettingsScreen
 import com.keltruc.mymemos.ui.shortcuts.ShortcutsScreen
 import com.keltruc.mymemos.ui.signin.SignInScreen
@@ -22,6 +29,12 @@ import kotlinx.serialization.Serializable
 @Serializable data class EditorRoute(val localId: String? = null)
 @Serializable object SettingsRoute
 @Serializable object ShortcutsRoute
+@Serializable object TokensRoute
+@Serializable object WebhooksRoute
+@Serializable object NotificationsRoute
+@Serializable object StatsRoute
+@Serializable object AdminUsersRoute
+@Serializable object AdminInstanceRoute
 
 @Composable
 fun MyMemosNavHost() {
@@ -45,6 +58,7 @@ fun MyMemosNavHost() {
                         onEditMemo = { navController.navigate(EditorRoute(it)) },
                         onSettings = { navController.navigate(SettingsRoute) },
                         onManageShortcuts = { navController.navigate(ShortcutsRoute) },
+                        onNotifications = { navController.navigate(NotificationsRoute) },
                     )
                 }
                 composable<MemoDetailRoute> { entry ->
@@ -63,8 +77,31 @@ fun MyMemosNavHost() {
                     ShortcutsScreen(onBack = { navController.popBackStack() })
                 }
                 composable<SettingsRoute> {
-                    SettingsScreen(onBack = { navController.popBackStack() })
+                    SettingsScreen(
+                        onBack = { navController.popBackStack() },
+                        nav = SettingsNav(
+                            onTokens = { navController.navigate(TokensRoute) },
+                            onWebhooks = { navController.navigate(WebhooksRoute) },
+                            onNotifications = { navController.navigate(NotificationsRoute) },
+                            onStats = { navController.navigate(StatsRoute) },
+                            onAdminUsers = { navController.navigate(AdminUsersRoute) },
+                            onAdminInstance = { navController.navigate(AdminInstanceRoute) },
+                        ),
+                    )
                 }
+                composable<TokensRoute> { TokensScreen(onBack = { navController.popBackStack() }) }
+                composable<WebhooksRoute> { WebhooksScreen(onBack = { navController.popBackStack() }) }
+                composable<StatsRoute> { StatsScreen(onBack = { navController.popBackStack() }) }
+                composable<NotificationsRoute> {
+                    NotificationsScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenMemo = { remoteName -> sessionViewModel.resolveMemo(remoteName) { navController.navigate(MemoDetailRoute(it)) } },
+                    )
+                }
+                composable<AdminUsersRoute> {
+                    AdminUsersScreen(serverUrl = (session as SessionState.SignedIn).account.serverUrl, onBack = { navController.popBackStack() })
+                }
+                composable<AdminInstanceRoute> { AdminInstanceScreen(onBack = { navController.popBackStack() }) }
             }
         }
     }
