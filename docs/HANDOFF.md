@@ -1,8 +1,8 @@
 # MyMemos handoff
 
-State as of 8 September 2026. Every feature branch, `chore/readme-features` and
-`fix/security-review` are merged to `main`. Open branch: `fix/security-review-low`, which
-closes the low findings and the two lint errors (see below).
+State as of 8 September 2026. Everything up to and including the security review, plus
+feature items 1 and 2 below, is merged to `main`. Open branch: `feature/timeline-grouping`,
+which carries items 4, 5 and 6.
 
 ## Where things stand
 
@@ -57,20 +57,23 @@ Note for automation users: apps sending `CREATE_MEMO` now need the
 
 ## Requested next
 
-Rory's list, in the order given. None started.
+Rory reordered this on 8 September: 4, 5 and 6 come before 3, which is now last. Items 1 and
+2 are merged; 4, 5 and 6 are done on `feature/timeline-grouping`; 3 and 7 are not started.
 
-1. **Better Markdown editing.** Pressing return inside a task or bullet line should start
-   the next line with the same marker (`- [ ] `, `- `, `1. ` incremented), and return on an
-   empty marker line should clear it. Hook the `onValueChange` in `EditorScreen.kt`: compare
-   the previous and new `TextFieldValue`, and when the only change is a newline inserted at
-   the cursor, rewrite the value with the prefix and move the selection past it. Keep it in
-   a pure function (`MarkdownContinuation.kt` or similar) with unit tests; the editor already
-   has that shape for tag autocompletion.
-2. **Completion for `@` dates.** The editor completes `#tags` only (`suggestions` in
-   `EditorScreen.kt`). Add the same popup for `@` with the tokens `DueDateParser.kt` already
-   understands: `@today`, `@tomorrow`, weekday names, and a "pick a date" entry that opens
-   the existing `DateTimePicker` and inserts `@yyyy-MM-dd`. Anything new here must also be
-   taught to the parser so the tasks screen picks it up.
+1. **Better Markdown editing.** Done. `MarkdownContinuation` in core-data decides what a
+   return should do; `EditorScreen.update` calls `continueAfterReturn` with the field before
+   and after the change. One trap worth remembering: the keyboard commits its composing text
+   in the same change as the return, and it may recase that text as it does ("1. first"
+   arrives as "1. First\n"), so the guard compares the cursor, the length and everything
+   after the cursor, never the text before it.
+2. **Completion for `@` dates.** Done. `DueDateParser.suggest` produces the completions, so
+   they cannot drift from what `parse` understands; a test round-trips every suggestion back
+   through `parse` for seven different "todays". Weekday suggestions stop six days out,
+   because the seventh wraps to today's own weekday and `parse` would read it as today.
+   Tokens stay English even under another locale, since that is all `parse` knows; the
+   localised date rides along as a hint on the chip. "Pick a date" opens a new
+   `DueDatePickerDialog`, date only, rather than the existing `DateTimePickerDialog`, whose
+   time step has nowhere to go in a `@yyyy-MM-dd` token.
 3. **Locked notes keep their title visible.** Today the whole body is encrypted, so the
    list shows only a lock badge. Change `MemoRepository.updateLockedContent` so that when the
    first line is a Markdown heading it is written in clear ahead of the `mymemos-enc:v1:`

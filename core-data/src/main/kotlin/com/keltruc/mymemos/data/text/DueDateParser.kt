@@ -2,6 +2,7 @@ package com.keltruc.mymemos.data.text
 
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -17,6 +18,12 @@ object DueDateParser {
     )
 
     data class Match(val date: LocalDate, val token: String)
+
+    /**
+     * A completion the editor can offer after the user types "@". [token] is what gets inserted,
+     * without the "@"; [hint] is a human date for the ones whose name does not give it away.
+     */
+    data class Suggestion(val token: String, val date: LocalDate, val hint: String)
 
     fun parse(line: String, today: LocalDate = LocalDate.now()): Match? {
         for (m in token.findAll(line)) {
@@ -50,6 +57,28 @@ object DueDateParser {
             return if (m.groupValues[3].isEmpty() && date.isBefore(today)) date.plusYears(1) else date
         }
         return null
+    }
+
+    /**
+     * Completions for a partly typed "@" token, in date order. An empty [prefix] offers the lot.
+     *
+     * Tokens are deliberately the English weekday names rather than localised ones, because
+     * [parse] only knows the English forms; the localised date goes in the hint instead.
+     */
+    fun suggest(prefix: String, today: LocalDate = LocalDate.now(), locale: Locale = Locale.getDefault()): List<Suggestion> {
+        val hintFormat = DateTimeFormatter.ofPattern("d MMM", locale)
+        val all = buildList {
+            add(Suggestion("today", today, ""))
+            add(Suggestion("tomorrow", today.plusDays(1), ""))
+            // From two days out a weekday name reads better than a date. It stops at six days
+            // because the seventh wraps back to today's weekday, which [resolve] would then read
+            // as today rather than a week away.
+            for (ahead in 2L..6L) {
+                val date = today.plusDays(ahead)
+                add(Suggestion(date.dayOfWeek.name.lowercase(Locale.ROOT), date, hintFormat.format(date)))
+            }
+        }
+        return all.filter { it.token.startsWith(prefix, ignoreCase = true) }
     }
 
     fun label(date: LocalDate, today: LocalDate = LocalDate.now(), locale: Locale = Locale.getDefault()): String = when {

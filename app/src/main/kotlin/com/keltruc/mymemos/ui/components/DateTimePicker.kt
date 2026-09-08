@@ -53,3 +53,25 @@ fun DateTimePickerDialog(onPicked: (Instant) -> Unit, onDismiss: () -> Unit) {
         )
     }
 }
+
+/**
+ * Date only, for a due date written into a task line. The full [DateTimePickerDialog] asks for a
+ * time as well, which a `@yyyy-MM-dd` token has nowhere to put.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DueDatePickerDialog(onPicked: (LocalDate) -> Unit, onDismiss: () -> Unit) {
+    val state = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis())
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = {
+                // The picker works in UTC, so read the day back the same way rather than shifting
+                // it into the device zone and landing on the day before.
+                val picked = state.selectedDateMillis?.let { Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate() }
+                onPicked(picked ?: LocalDate.now())
+            }) { Text(stringResource(R.string.save)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    ) { DatePicker(state = state) }
+}

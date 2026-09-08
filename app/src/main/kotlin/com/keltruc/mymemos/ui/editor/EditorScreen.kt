@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.FormatBold
 import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Image
@@ -66,8 +68,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.keltruc.mymemos.R
+import com.keltruc.mymemos.data.text.DueDateParser
+import com.keltruc.mymemos.data.text.MarkdownContinuation
 import com.keltruc.mymemos.model.Visibility
 import com.keltruc.mymemos.ui.components.AttachmentStrip
+import com.keltruc.mymemos.ui.components.DueDatePickerDialog
 import com.keltruc.mymemos.ui.components.MemoPasswordDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -78,6 +83,7 @@ fun EditorScreen(onDone: () -> Unit, viewModel: EditorViewModel = hiltViewModel(
     var field by remember { mutableStateOf(TextFieldValue()) }
     var visibilityMenu by remember { mutableStateOf(false) }
     var showTemplates by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
     val templates by viewModel.templates.collectAsStateWithLifecycle()
     val askPasswordForSave by viewModel.askPasswordForSave.collectAsStateWithLifecycle()
     val focus = remember { FocusRequester() }
@@ -96,8 +102,14 @@ fun EditorScreen(onDone: () -> Unit, viewModel: EditorViewModel = hiltViewModel(
     }
 
     fun update(value: TextFieldValue) {
-        field = value
-        viewModel.onContent(value.text)
+        val continued = if (field.selection.collapsed && value.selection.collapsed) {
+            MarkdownContinuation.continueAfterReturn(field.text, field.selection.start, value.text, value.selection.start)
+        } else {
+            null
+        }
+        val next = continued?.let { TextFieldValue(it.text, TextRange(it.cursor)) } ?: value
+        field = next
+        viewModel.onContent(next.text)
     }
 
     fun insertAtCursor(prefix: String, suffix: String = "", lineStart: Boolean = false) {
@@ -125,6 +137,27 @@ fun EditorScreen(onDone: () -> Unit, viewModel: EditorViewModel = hiltViewModel(
         currentTagPrefix?.let { p -> tags.filter { it.startsWith(p, ignoreCase = true) && it != p }.take(8) }.orEmpty()
     }
 
+    // Same idea for '@', except the vocabulary is small and fixed, so a bare '@' already offers
+    // the lot rather than waiting for a character the way tags do.
+    val currentDatePrefix = remember(field) {
+        val upto = field.text.substring(0, field.selection.start.coerceIn(0, field.text.length))
+        val word = upto.takeLastWhile { !it.isWhitespace() }
+        if (word.startsWith("@")) word.drop(1) else null
+    }
+    val dateSuggestions = remember(currentDatePrefix) {
+        currentDatePrefix?.let { DueDateParser.suggest(it) }.orEmpty()
+    }
+
+    /**
+     * Swaps the [tokenLength] characters before the cursor for [replacement] plus a space. Callers
+     * count the leading '#' or '@' in both, so the sigil is replaced rather than typed over.
+     */
+    fun completeToken(tokenLength: Int, replacement: String) {
+        val start = field.selection.start - tokenLength
+        val newText = field.text.substring(0, start) + replacement + " " + field.text.substring(field.selection.start)
+        update(TextFieldValue(newText, TextRange(start + replacement.length + 1)))
+    }
+
     if (state.needsPassword || askPasswordForSave) {
         MemoPasswordDialog(
             title = stringResource(if (state.needsPassword) R.string.locked_memo else R.string.lock),
@@ -134,6 +167,17 @@ fun EditorScreen(onDone: () -> Unit, viewModel: EditorViewModel = hiltViewModel(
             initialRemember = viewModel.passwordRemembered,
             onConfirm = viewModel::submitPassword,
             onDismiss = { if (state.needsPassword) onDone() else { viewModel.askPasswordForSave.value = false; viewModel.cancelPassword() } },
+        )
+    }
+
+    if (showDatePicker) {
+        val dateTokenLength = (currentDatePrefix?.length ?: -1) + 1
+        DueDatePickerDialog(
+            onPicked = { date ->
+                completeToken(dateTokenLength, "@$date")
+                showDatePicker = false
+            },
+            onDismiss = { showDatePicker = false },
         )
     }
 
@@ -234,7 +278,7 @@ fun EditorScreen(onDone: () -> Unit, viewModel: EditorViewModel = hiltViewModel(
                 onRemove = viewModel::removeAttachment,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
-            if (suggestions.isNotEmpty()) {
+            if (suggestions.isNotEmpty() || currentDatePrefix != null) {
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -242,13 +286,23 @@ fun EditorScreen(onDone: () -> Unit, viewModel: EditorViewModel = hiltViewModel(
                     suggestions.forEach { tag ->
                         FilterChip(
                             selected = false,
-                            onClick = {
-                                val prefixLen = currentTagPrefix!!.length
-                                val start = field.selection.start - prefixLen
-                                val newText = field.text.substring(0, start) + tag + " " + field.text.substring(field.selection.start)
-                                update(TextFieldValue(newText, TextRange(start + tag.length + 1)))
-                            },
+                            onClick = { completeToken(currentTagPrefix!!.length + 1, "#$tag") },
                             label = { Text("#$tag") },
+                        )
+                    }
+                    dateSuggestions.forEach { s ->
+                        FilterChip(
+                            selected = false,
+                            onClick = { completeToken(currentDatePrefix!!.length + 1, "@${s.token}") },
+                            label = { Text(if (s.hint.isEmpty()) "@${s.token}" else "@${s.token} · ${s.hint}") },
+                        )
+                    }
+                    if (currentDatePrefix != null) {
+                        FilterChip(
+                            selected = false,
+                            onClick = { showDatePicker = true },
+                            leadingIcon = { Icon(Icons.Default.Event, null, Modifier.size(18.dp)) },
+                            label = { Text(stringResource(R.string.pick_a_date)) },
                         )
                     }
                 }
