@@ -227,17 +227,27 @@ class MemoRepository @Inject constructor(
     suspend fun setState(localId: String, state: MemoState) =
         simpleFieldOp(localId, Type.SET_STATE) { it.copy(state = state.name) }
 
-    suspend fun delete(localId: String) {
+    /**
+     * Returns whether the delete can still be taken back. A memo that reached the server is only
+     * marked for deletion until the outbox flushes, so it can; one that never synced goes for good.
+     *
+     * Attachment files deliberately stay on disk for a memo that is only marked: the sync engine
+     * removes them once the server has confirmed the delete. Removing them here would leave undo
+     * restoring a memo with its images missing.
+     */
+    suspend fun delete(localId: String): Boolean {
+        var undoable = false
         db.withTransaction {
             val memo = memoDao.getByLocalId(localId) ?: return@withTransaction
             pendingOpDao.deleteForMemo(localId)
-            attachmentDao.forMemo(localId).forEach { attachmentStore.delete(it.localId) }
             val remoteName = memo.remoteName
             // The server drops a memo's comments with it; mirror that locally.
             remoteName?.let { memoDao.deleteCommentsOf(memo.accountId, it) }
             if (remoteName == null) {
+                attachmentDao.forMemo(localId).forEach { attachmentStore.delete(it.localId) }
                 memoDao.deleteByLocalId(localId)
             } else {
+                undoable = true
                 memoDao.upsert(memo.copy(syncStatus = SyncStatus.PENDING_DELETE.name))
                 pendingOpDao.insert(
                     PendingOpEntity(
@@ -249,8 +259,36 @@ class MemoRepository @Inject constructor(
                 )
             }
         }
-        scheduler.syncNow()
+        // Held back so the snackbar's Undo has something left to undo.
+        if (undoable) scheduler.syncNow(afterMs = UNDO_WINDOW_MS) else scheduler.syncNow()
         widgets.refresh()
+        return undoable
+    }
+
+    /**
+     * Takes back a [delete] that has not reached the server yet, returning false when the outbox
+     * already flushed it. Any unsent edits made before the delete are not restored: [delete] clears
+     * the memo's queued operations, so what comes back is the memo as the server last had it.
+     */
+    /** The memo this account already holds under a server name, if any. Used to spot re-imports. */
+    suspend fun findByRemoteName(accountId: Long, remoteName: String): Memo? =
+        memoDao.getByRemoteName(accountId, remoteName)?.toModel()
+
+    suspend fun undoDelete(localId: String): Boolean {
+        var restored = false
+        db.withTransaction {
+            val memo = memoDao.getByLocalId(localId) ?: return@withTransaction
+            if (memo.syncStatus != SyncStatus.PENDING_DELETE.name) return@withTransaction
+            if (pendingOpDao.latestOfType(localId, Type.DELETE) == null) return@withTransaction
+            pendingOpDao.deleteForMemoOfType(localId, Type.DELETE)
+            memoDao.upsert(memo.copy(syncStatus = SyncStatus.SYNCED.name))
+            restored = true
+        }
+        if (restored) {
+            scheduler.syncNow()
+            widgets.refresh()
+        }
+        return restored
     }
 
     suspend fun addAttachment(localId: String, uri: Uri) {
@@ -551,6 +589,9 @@ class MemoRepository @Inject constructor(
     }
 
     companion object {
+        /** How long a delete waits before it is sent, which is how long Undo has to work. */
+        const val UNDO_WINDOW_MS = 5_000L
+
         private val tagRegex = Regex("(?<![\\w/])#([\\p{L}\\p{N}_/-]+)")
 
         fun extractTags(content: String): List<String> =

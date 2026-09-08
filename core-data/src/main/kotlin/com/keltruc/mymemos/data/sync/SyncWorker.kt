@@ -67,11 +67,15 @@ class SyncScheduler @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var immediate: Job? = null
 
-    /** Run soon, once, e.g. after the user saves a memo. */
-    fun syncNow(full: Boolean = false) {
+    /**
+     * Run soon, once, e.g. after the user saves a memo. [afterMs] holds it back longer, which a
+     * delete uses so there is time to take it back before it reaches the server. Any later call
+     * replaces this one, so a delayed sync can still be brought forward by the next edit.
+     */
+    fun syncNow(full: Boolean = false, afterMs: Long = DEBOUNCE_MS) {
         immediate?.cancel()
         immediate = scope.launch {
-            delay(DEBOUNCE_MS)
+            delay(afterMs)
             val accountId = accountDao.getActive()?.id ?: return@launch
             when (engine.sync(accountId, fullPull = full)) {
                 SyncEngine.Outcome.Success, is SyncEngine.Outcome.AuthFailed -> Unit

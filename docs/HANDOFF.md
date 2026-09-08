@@ -136,6 +136,23 @@ Rory reordered this on 8 September: 4, 5 and 6 come before 3, which is now last.
    Links and tags are now `LinkAnnotation`s inside a plain `Text`, so only the link itself takes
    the tap and everything else reaches the card. This also retires a deprecated API.
 
+9. **Undo for delete and archive.** Done on `feature/undo-and-dedup`. A snackbar with Undo
+   follows both. Two things had to change for it to mean anything: `delete` no longer removes
+   the memo's attachment files (the sync engine does that once the server confirms, so undo
+   cannot restore a memo with its images missing), and the delete's sync is held back
+   `MemoRepository.UNDO_WINDOW_MS` (5 seconds) instead of the usual 400ms debounce. Undo on a
+   memo that never reached the server is not offered, because that one really is gone; undo
+   after the window says so rather than pretending. Any unsent edits made before a delete are
+   not restored, since `delete` clears the memo's queued operations.
+
+10. **Import de-duplication.** Done on the same branch, closing a gap in item 6. `MarkdownImport`
+    now reads the `memos_id` that `MarkdownExporter` writes, and the importer skips a file whose
+    id this account already holds, or that appeared earlier in the same run. Re-importing an
+    export is therefore a no-op rather than a second copy of everything. A file with no
+    `memos_id` is always imported: there is nothing to match it on. The result line reports how
+    many were "already here". Deliberately skip rather than update: overwriting a memo with an
+    older file would quietly lose whatever was written since the export.
+
 ## Geofenced reminders
 
 The idea: a memo with a location can remind you when you arrive there ("pick up the

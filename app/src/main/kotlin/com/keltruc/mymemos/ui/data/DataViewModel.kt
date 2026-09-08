@@ -46,6 +46,7 @@ class DataViewModel @Inject constructor(
         val result = importer.import(account.id, sources, Visibility.PRIVATE)
         buildString {
             append("Imported ${result.imported} memo${if (result.imported == 1) "" else "s"}")
+            if (result.duplicates > 0) append(", ${result.duplicates} already here")
             if (result.skipped > 0) append(", ${result.skipped} had no Markdown in them")
             if (result.failures.isNotEmpty()) append(". ${result.failures.size} failed: ${result.failures.first()}")
         }

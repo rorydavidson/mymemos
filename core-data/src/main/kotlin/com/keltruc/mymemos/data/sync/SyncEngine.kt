@@ -223,6 +223,8 @@ class SyncEngine @Inject constructor(
                 } catch (e: ApiException) {
                     if (!e.isNotFound) throw e
                 }
+                // The files were left on disk so the delete could be taken back; it cannot now.
+                attachmentDao.forMemo(op.memoLocalId).forEach { attachmentStore.delete(it.localId) }
                 memoDao.deleteByLocalId(op.memoLocalId)
             }
             Type.ADD_ATTACHMENT -> {

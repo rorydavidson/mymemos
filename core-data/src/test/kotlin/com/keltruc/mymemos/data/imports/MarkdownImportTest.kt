@@ -102,6 +102,13 @@ class MarkdownImportTest {
     }
 
     @Test
+    fun `the memos id is read so a re-import can recognise its own export`() {
+        assertEquals("memos/abc", MarkdownImport.parse("---\nmemos_id: memos/abc\n---\nbody").remoteName)
+        assertNull(MarkdownImport.parse("---\ncreated: 2026-09-08\n---\nbody").remoteName)
+        assertNull(MarkdownImport.parse("no front matter").remoteName)
+    }
+
+    @Test
     fun `an exported memo comes back with its dates and tags intact`() {
         val memo = Memo(
             localId = "l", accountId = 1, remoteName = "memos/abc", creator = null,
@@ -117,5 +124,7 @@ class MarkdownImportTest {
         assertEquals(memo.updateTime, parsed.updated)
         assertEquals(listOf("home"), parsed.tags)
         assertTrue(parsed.pinned)
+        // The id is what stops a second import of the same file making a second memo.
+        assertEquals(memo.remoteName, parsed.remoteName)
     }
 }
