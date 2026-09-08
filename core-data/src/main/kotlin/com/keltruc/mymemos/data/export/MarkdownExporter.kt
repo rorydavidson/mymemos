@@ -35,7 +35,7 @@ class MarkdownExporter @Inject constructor(
                 zip.closeEntry()
                 for (a in memo.attachments) {
                     val file = a.localPath?.let(::File)?.takeIf { it.exists() } ?: attachmentStore.file(a.localId).takeIf { it.exists() } ?: continue
-                    zip.putNextEntry(ZipEntry("attachments/${a.localId}-${a.filename}"))
+                    zip.putNextEntry(ZipEntry(attachmentPath(a.localId, a.filename)))
                     file.inputStream().use { it.copyTo(zip) }
                     zip.closeEntry()
                 }
@@ -46,6 +46,16 @@ class MarkdownExporter @Inject constructor(
 
     companion object {
         private val dateFmt: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+
+        /**
+         * Zip entry for an attachment. The filename comes from the server, so it is reduced to a
+         * bare name first: a value like "../../.bashrc" would otherwise write outside the export
+         * when unpacked.
+         */
+        fun attachmentPath(localId: String, filename: String): String {
+            val bare = File(filename.replace('\\', '/')).name.trim().trimStart('.')
+            return "attachments/$localId-${bare.ifEmpty { "file" }}"
+        }
 
         fun fileNameFor(memo: Memo): String {
             val day = dateFmt.format(memo.createTime.atZone(ZoneId.systemDefault()))
@@ -74,7 +84,7 @@ class MarkdownExporter @Inject constructor(
             memo.location?.let { appendLine("location: [${it.latitude}, ${it.longitude}]${if (it.placeholder.isNotEmpty()) " # ${it.placeholder}" else ""}") }
             if (memo.attachments.isNotEmpty()) {
                 appendLine("attachments:")
-                memo.attachments.forEach { appendLine("  - attachments/${it.localId}-${it.filename}") }
+                memo.attachments.forEach { appendLine("  - ${attachmentPath(it.localId, it.filename)}") }
             }
             appendLine("---")
             appendLine()

@@ -9,12 +9,14 @@ import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSiz
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.keltruc.mymemos.data.prefs.AppPreferences
 import com.keltruc.mymemos.data.prefs.Settings
 import com.keltruc.mymemos.navigation.IntentRouter
 import com.keltruc.mymemos.navigation.MyMemosNavHost
+import com.keltruc.mymemos.ui.components.LocalMapTiles
 import com.keltruc.mymemos.ui.theme.MyMemosTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -34,7 +36,9 @@ class MainActivity : ComponentActivity() {
             val settings by preferences.settings.collectAsStateWithLifecycle(Settings())
             val sizeClass = calculateWindowSizeClass(this)
             MyMemosTheme(dynamicColor = settings.dynamicColour) {
-                MyMemosNavHost(twoPane = sizeClass.widthSizeClass == WindowWidthSizeClass.Expanded)
+                CompositionLocalProvider(LocalMapTiles provides settings.mapTiles) {
+                    MyMemosNavHost(twoPane = sizeClass.widthSizeClass == WindowWidthSizeClass.Expanded)
+                }
             }
         }
     }

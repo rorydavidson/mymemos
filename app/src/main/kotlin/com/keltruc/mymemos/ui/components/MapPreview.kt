@@ -44,6 +44,7 @@ import kotlin.math.tan
  */
 @Composable
 fun MapPreview(location: Location, modifier: Modifier = Modifier, height: Dp = 160.dp, zoom: Int = 15) {
+    if (!LocalMapTiles.current) return
     val context = LocalContext.current
     val density = LocalDensity.current
     BoxWithConstraints(

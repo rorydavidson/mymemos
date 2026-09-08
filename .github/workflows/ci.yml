@@ -29,8 +29,11 @@ jobs:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          if [ -n "$STORE_FILE" ]; then echo "$KEYSTORE_BASE64" | base64 -d > "$STORE_FILE"; fi
+          if [ -n "$STORE_FILE" ] && [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$STORE_FILE"
+          fi
           ./gradlew :app:assembleRelease --console=plain
       - uses: actions/upload-artifact@v4
         with:

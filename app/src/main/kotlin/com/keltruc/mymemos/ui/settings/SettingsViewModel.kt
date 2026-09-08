@@ -55,6 +55,8 @@ class SettingsViewModel @Inject constructor(
     fun setSortCompleted(enabled: Boolean) = viewModelScope.launch { preferences.setSortCompletedTasks(enabled) }
     fun setDynamicColour(enabled: Boolean) = viewModelScope.launch { preferences.setDynamicColour(enabled) }
 
+    fun setMapTiles(enabled: Boolean) = viewModelScope.launch { preferences.setMapTiles(enabled) }
+
     fun saveProfile(displayName: String, description: String, email: String) = viewModelScope.launch {
         val acc = account.value ?: return@launch
         runCatching { settingsRepository.updateProfile(acc, displayName, description, email) }

@@ -406,9 +406,15 @@ class SyncEngine @Inject constructor(
                 reconcileSocial(entity.localId, dto)
             }
             if (since == null) {
-                val keep = fetched.map { it.name }.ifEmpty { listOf("") }
-                memoDao.deleteSyncedNotIn(account.id, keep)
-                preferences.setLastReconcile(account.id, startedAt)
+                // An empty result is far more likely to be a server that lost its data, or one
+                // answering for the wrong user, than a genuine "you deleted everything". Keep the
+                // local copies and try again next time rather than wiping them.
+                if (fetched.isEmpty() && memoDao.countSynced(account.id) > 0) {
+                    android.util.Log.w(TAG, "Skipping reconcile: server returned no memos but local has some")
+                } else {
+                    memoDao.deleteSyncedNotIn(account.id, fetched.map { it.name }.ifEmpty { listOf("") })
+                    preferences.setLastReconcile(account.id, startedAt)
+                }
             }
             accountDao.setLastSync(account.id, startedAt)
         }

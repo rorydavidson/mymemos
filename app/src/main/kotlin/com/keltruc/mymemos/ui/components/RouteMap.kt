@@ -47,7 +47,7 @@ import kotlin.math.tan
  */
 @Composable
 fun RouteMap(points: List<Location>, modifier: Modifier = Modifier, height: Dp = 320.dp) {
-    if (points.isEmpty()) return
+    if (points.isEmpty() || !LocalMapTiles.current) return
     val context = LocalContext.current
     val density = LocalDensity.current
     val measurer = rememberTextMeasurer()

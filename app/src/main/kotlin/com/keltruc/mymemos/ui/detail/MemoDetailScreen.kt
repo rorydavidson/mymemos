@@ -121,9 +121,10 @@ fun MemoDetailScreen(
     var showReminder by remember { mutableStateOf(false) }
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
     val exactHint by viewModel.exactAlarmHint.collectAsStateWithLifecycle()
+    val exactHintText = stringResource(R.string.reminder_exact_hint)
     LaunchedEffect(exactHint) {
         if (exactHint) {
-            val result = snackbar.showSnackbar(context.getString(R.string.reminder_exact_hint), actionLabel = "Settings", duration = androidx.compose.material3.SnackbarDuration.Long)
+            val result = snackbar.showSnackbar(exactHintText, actionLabel = "Settings", duration = androidx.compose.material3.SnackbarDuration.Long)
             if (result == androidx.compose.material3.SnackbarResult.ActionPerformed && android.os.Build.VERSION.SDK_INT >= 31) {
                 runCatching { context.startActivity(Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + context.packageName))) }
             }

@@ -55,6 +55,8 @@
     <string name="setting_sort_completed_hint">When you save a memo, ticked tasks move below the unticked ones in each list.</string>
     <string name="setting_dynamic_colour">Wallpaper colours</string>
     <string name="setting_dynamic_colour_hint">Use your device\'s Material You palette instead of the app\'s own.</string>
+    <string name="setting_map_tiles">Map previews</string>
+    <string name="setting_map_tiles_hint">Show a map under memos that have a location. This asks openstreetmap.org for tiles, which tells them roughly where your memos are. Left off, no map is drawn and nothing leaves the device.</string>
     <string name="today">Today</string>
     <string name="yesterday">Yesterday</string>
     <string name="greeting_memos">%1$d memos</string>

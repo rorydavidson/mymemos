@@ -34,7 +34,18 @@ class MemosApiFactory(
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .apply {
-                if (logBodies) addInterceptor(HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BODY))
+                // Headers only, and never the credential itself: BODY would put the sign-in
+                // password and every memo into logcat on a debug build.
+                if (logBodies) {
+                    addInterceptor(
+                        HttpLoggingInterceptor().apply {
+                            setLevel(HttpLoggingInterceptor.Level.HEADERS)
+                            redactHeader("Authorization")
+                            redactHeader("Cookie")
+                            redactHeader("Set-Cookie")
+                        },
+                    )
+                }
             }
             .build()
         val authed = plain.newBuilder()

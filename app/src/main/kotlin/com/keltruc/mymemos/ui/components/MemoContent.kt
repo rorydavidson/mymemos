@@ -197,10 +197,22 @@ private fun InlineParagraph(node: Node, onTagClick: ((String) -> Unit)?, strike:
         modifier = Modifier.padding(vertical = 1.dp),
         overflow = TextOverflow.Ellipsis,
     ) { offset ->
-        text.getStringAnnotations("url", offset, offset).firstOrNull()?.let { runCatching { uriHandler.openUri(it.item) }; return@ClickableText }
+        text.getStringAnnotations("url", offset, offset).firstOrNull()?.let { if (isOpenable(it.item)) runCatching { uriHandler.openUri(it.item) }; return@ClickableText }
         text.getStringAnnotations("tag", offset, offset).firstOrNull()?.let { onTagClick?.invoke(it.item) }
     }
 }
+
+/**
+ * Memo text can come from any server or shared note, so a link only opens if its scheme is one
+ * we are willing to hand to the system. Anything else (intent:, file:, javascript:, a custom
+ * app scheme) is ignored rather than launched.
+ */
+private fun isOpenable(uri: String): Boolean {
+    val scheme = uri.substringBefore(':', missingDelimiterValue = "").lowercase()
+    return scheme in openableSchemes
+}
+
+private val openableSchemes = setOf("http", "https", "mailto", "geo")
 
 private val tagRegex = Regex("(?<![\\w/])#([\\p{L}\\p{N}_/-]+)")
 

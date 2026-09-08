@@ -40,6 +40,9 @@ interface AccountDao {
     @Query("DELETE FROM accounts WHERE id = :id")
     suspend fun delete(id: Long)
 
+    @Query("SELECT COUNT(*) FROM accounts")
+    suspend fun count(): Int
+
     @Transaction
     suspend fun upsertAndActivate(account: AccountEntity): Long {
         val existing = find(account.serverUrl, account.userResourceName)

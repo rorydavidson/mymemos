@@ -21,17 +21,21 @@ data class Settings(
     val sortCompletedTasks: Boolean = false,
     /** Use Android 12+ wallpaper colours instead of the app palette. */
     val dynamicColour: Boolean = false,
+    /** Fetch OpenStreetMap tiles for memo locations, which tells openstreetmap.org roughly where you are. */
+    val mapTiles: Boolean = false,
 )
 
 @Singleton
 class AppPreferences @Inject constructor(@ApplicationContext private val context: Context) {
     private val sortCompleted = booleanPreferencesKey("sort_completed_tasks")
     private val dynamic = booleanPreferencesKey("dynamic_colour")
+    private val tiles = booleanPreferencesKey("map_tiles")
 
     val settings: Flow<Settings> = context.dataStore.data.map { p ->
         Settings(
             sortCompletedTasks = p[sortCompleted] ?: false,
             dynamicColour = p[dynamic] ?: false,
+            mapTiles = p[tiles] ?: false,
         )
     }
 
@@ -43,6 +47,10 @@ class AppPreferences @Inject constructor(@ApplicationContext private val context
 
     suspend fun setDynamicColour(enabled: Boolean) {
         context.dataStore.edit { it[dynamic] = enabled }
+    }
+
+    suspend fun setMapTiles(enabled: Boolean) {
+        context.dataStore.edit { it[tiles] = enabled }
     }
 
     /** When the last full reconcile of server memo names ran for this account, or 0. */

@@ -194,6 +194,12 @@ fun SettingsScreen(onBack: () -> Unit, nav: SettingsNav, viewModel: SettingsView
                 trailingContent = { Switch(checked = settings.dynamicColour, onCheckedChange = viewModel::setDynamicColour) },
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
             )
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.setting_map_tiles)) },
+                supportingContent = { Text(stringResource(R.string.setting_map_tiles_hint)) },
+                trailingContent = { Switch(checked = settings.mapTiles, onCheckedChange = viewModel::setMapTiles) },
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+            )
 
             Section(stringResource(R.string.data))
             LinkRow(Icons.Default.Storage, stringResource(R.string.data), nav.onData)
