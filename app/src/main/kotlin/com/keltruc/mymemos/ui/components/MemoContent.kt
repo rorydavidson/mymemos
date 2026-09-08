@@ -21,6 +21,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import com.keltruc.mymemos.model.TagStyle
+import com.keltruc.mymemos.ui.tags.LocalTagStyles
+import com.keltruc.mymemos.ui.tags.label
+import com.keltruc.mymemos.ui.tags.styleFor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.contentDescription
@@ -203,26 +208,27 @@ private val tagRegex = Regex("(?<![\\w/])#([\\p{L}\\p{N}_/-]+)")
 private fun inline(node: Node, onTagClick: ((String) -> Unit)?): AnnotatedString {
     val primary = MaterialTheme.colorScheme.primary
     val codeBg = MaterialTheme.colorScheme.surfaceContainerHighest
+    val styles = LocalTagStyles.current
     return buildAnnotatedString {
         var child = node.firstChild
         while (child != null) {
-            appendInline(child, primary, codeBg)
+            appendInline(child, primary, codeBg, styles)
             child = child.next
         }
     }
 }
 
-private fun androidx.compose.ui.text.AnnotatedString.Builder.appendInline(node: Node, primary: Color, codeBg: Color) {
+private fun androidx.compose.ui.text.AnnotatedString.Builder.appendInline(node: Node, primary: Color, codeBg: Color, styles: Map<String, TagStyle>) {
     when (node) {
-        is org.commonmark.node.Text -> appendWithTags(node.literal, primary)
-        is Emphasis -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { children(node, primary, codeBg) }
-        is StrongEmphasis -> withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { children(node, primary, codeBg) }
-        is Strikethrough -> withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { children(node, primary, codeBg) }
+        is org.commonmark.node.Text -> appendWithTags(node.literal, primary, styles)
+        is Emphasis -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { children(node, primary, codeBg, styles) }
+        is StrongEmphasis -> withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { children(node, primary, codeBg, styles) }
+        is Strikethrough -> withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { children(node, primary, codeBg, styles) }
         is Code -> withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = codeBg, fontSize = 14.sp)) { append(node.literal) }
         is Link -> {
             pushStringAnnotation("url", node.destination)
             withStyle(SpanStyle(color = primary, textDecoration = TextDecoration.Underline)) {
-                if (node.firstChild == null) append(node.destination) else children(node, primary, codeBg)
+                if (node.firstChild == null) append(node.destination) else children(node, primary, codeBg, styles)
             }
             pop()
         }
@@ -233,24 +239,27 @@ private fun androidx.compose.ui.text.AnnotatedString.Builder.appendInline(node: 
         }
         is SoftLineBreak -> append("\n")
         is HardLineBreak -> append("\n")
-        else -> children(node, primary, codeBg)
+        else -> children(node, primary, codeBg, styles)
     }
 }
 
-private fun androidx.compose.ui.text.AnnotatedString.Builder.children(node: Node, primary: Color, codeBg: Color) {
+private fun androidx.compose.ui.text.AnnotatedString.Builder.children(node: Node, primary: Color, codeBg: Color, styles: Map<String, TagStyle>) {
     var child = node.firstChild
     while (child != null) {
-        appendInline(child, primary, codeBg)
+        appendInline(child, primary, codeBg, styles)
         child = child.next
     }
 }
 
-private fun androidx.compose.ui.text.AnnotatedString.Builder.appendWithTags(text: String, primary: Color) {
+private fun androidx.compose.ui.text.AnnotatedString.Builder.appendWithTags(text: String, primary: Color, styles: Map<String, TagStyle>) {
     var last = 0
     for (m in tagRegex.findAll(text)) {
         append(text.substring(last, m.range.first))
-        pushStringAnnotation("tag", m.groupValues[1])
-        withStyle(SpanStyle(color = primary, fontWeight = FontWeight.Medium)) { append(m.value) }
+        val tag = m.groupValues[1]
+        val style = styles.styleFor(tag)
+        val colour = style?.colour?.let { Color(0xFF000000 or it.hex) }?.let { c -> if (c.luminance() > 0.7f) primary else c } ?: primary
+        pushStringAnnotation("tag", tag)
+        withStyle(SpanStyle(color = colour, fontWeight = FontWeight.Medium)) { append(styles.label(tag)) }
         pop()
         last = m.range.last + 1
     }

@@ -19,6 +19,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.getValue
 import com.keltruc.mymemos.R
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,6 +41,22 @@ import com.keltruc.mymemos.ui.admin.AdminUsersScreen
 import com.keltruc.mymemos.ui.settings.SettingsNav
 import com.keltruc.mymemos.ui.settings.SettingsScreen
 import com.keltruc.mymemos.ui.review.ReviewScreen
+import com.keltruc.mymemos.ui.tasks.TasksScreen
+import com.keltruc.mymemos.ui.tags.TagsScreen
+import com.keltruc.mymemos.ui.tags.LocalTagStyles
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Notes
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.foundation.layout.padding
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.keltruc.mymemos.ui.templates.TemplatesScreen
 import com.keltruc.mymemos.ui.data.DataScreen
 import com.keltruc.mymemos.ui.shortcuts.ShortcutsScreen
@@ -59,6 +77,8 @@ import kotlinx.serialization.Serializable
 @Serializable object AdminUsersRoute
 @Serializable object AdminInstanceRoute
 @Serializable object ReviewRoute
+@Serializable object TasksRoute
+@Serializable data class TagsRoute(val tag: String? = null)
 @Serializable object TemplatesRoute
 @Serializable object DataRoute
 
@@ -89,9 +109,31 @@ fun MyMemosNavHost(twoPane: Boolean = false) {
             }
         }
         is SessionState.SignedIn -> {
+            val tagStyles by sessionViewModel.tagStyles.collectAsStateWithLifecycle()
+            val backStack by navController.currentBackStackEntryAsState()
+            val destination = backStack?.destination
+            val topLevel = destination?.let { d -> d.hasRoute(TimelineRoute::class) || d.hasRoute(TasksRoute::class) || d.hasRoute(ReviewRoute::class) } == true
+            fun go(route: Any) = navController.navigate(route) {
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+            CompositionLocalProvider(LocalTagStyles provides tagStyles) {
+            Scaffold(
+                bottomBar = {
+                    if (topLevel) {
+                        NavigationBar {
+                            NavigationBarItem(selected = destination?.hasRoute(TimelineRoute::class) == true, onClick = { go(TimelineRoute) }, icon = { Icon(Icons.Default.Notes, null) }, label = { Text(stringResource(R.string.nav_memos)) })
+                            NavigationBarItem(selected = destination?.hasRoute(TasksRoute::class) == true, onClick = { go(TasksRoute) }, icon = { Icon(Icons.Default.CheckCircle, null) }, label = { Text(stringResource(R.string.nav_tasks)) })
+                            NavigationBarItem(selected = destination?.hasRoute(ReviewRoute::class) == true, onClick = { go(ReviewRoute) }, icon = { Icon(Icons.Default.CalendarMonth, null) }, label = { Text(stringResource(R.string.nav_review)) })
+                        }
+                    }
+                },
+            ) { padding ->
             NavHost(
                 navController,
                 startDestination = TimelineRoute,
+                modifier = Modifier.padding(bottom = if (topLevel) padding.calculateBottomPadding() else 0.dp),
                 enterTransition = { fadeIn(tween(220)) + slideInHorizontally(tween(260)) { it / 8 } },
                 exitTransition = { fadeOut(tween(160)) },
                 popEnterTransition = { fadeIn(tween(220)) },
@@ -108,7 +150,8 @@ fun MyMemosNavHost(twoPane: Boolean = false) {
                                     onSettings = { navController.navigate(SettingsRoute) },
                                     onManageShortcuts = { navController.navigate(ShortcutsRoute) },
                                     onNotifications = { navController.navigate(NotificationsRoute) },
-                                    onReview = { navController.navigate(ReviewRoute) },
+                                    onReview = { go(ReviewRoute) },
+                                    onTagSettings = { navController.navigate(TagsRoute(it)) },
                                 )
                             }
                             VerticalDivider()
@@ -138,7 +181,8 @@ fun MyMemosNavHost(twoPane: Boolean = false) {
                         onSettings = { navController.navigate(SettingsRoute) },
                         onManageShortcuts = { navController.navigate(ShortcutsRoute) },
                         onNotifications = { navController.navigate(NotificationsRoute) },
-                        onReview = { navController.navigate(ReviewRoute) },
+                        onReview = { go(ReviewRoute) },
+                        onTagSettings = { navController.navigate(TagsRoute(it)) },
                     )
                 }
                 composable<MemoDetailRoute> { entry ->
@@ -168,6 +212,7 @@ fun MyMemosNavHost(twoPane: Boolean = false) {
                             onAdminInstance = { navController.navigate(AdminInstanceRoute) },
                             onTemplates = { navController.navigate(TemplatesRoute) },
                             onData = { navController.navigate(DataRoute) },
+                            onTags = { navController.navigate(TagsRoute()) },
                         ),
                     )
                 }
@@ -193,6 +238,10 @@ fun MyMemosNavHost(twoPane: Boolean = false) {
                 composable<TemplatesRoute> { TemplatesScreen(onBack = { navController.popBackStack() }) }
                 composable<DataRoute> { DataScreen(onBack = { navController.popBackStack() }) }
                 composable<AdminInstanceRoute> { AdminInstanceScreen(onBack = { navController.popBackStack() }) }
+                composable<TasksRoute> { TasksScreen(onOpenMemo = { navController.navigate(MemoDetailRoute(it)) }) }
+                composable<TagsRoute> { entry -> TagsScreen(onBack = { navController.popBackStack() }, initialTag = entry.toRoute<TagsRoute>().tag) }
+            }
+            }
             }
         }
     }

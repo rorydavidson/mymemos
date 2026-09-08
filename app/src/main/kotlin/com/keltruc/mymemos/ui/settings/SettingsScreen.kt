@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.Webhook
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -70,6 +71,7 @@ data class SettingsNav(
     val onAdminInstance: () -> Unit,
     val onTemplates: () -> Unit,
     val onData: () -> Unit,
+    val onTags: () -> Unit,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -162,6 +164,7 @@ fun SettingsScreen(onBack: () -> Unit, nav: SettingsNav, viewModel: SettingsView
 
             Section(stringResource(R.string.settings_editor))
             LinkRow(Icons.Default.Description, stringResource(R.string.templates), nav.onTemplates)
+            LinkRow(Icons.Default.Tag, stringResource(R.string.tags), nav.onTags)
             ListItem(
                 headlineContent = { Text(stringResource(R.string.setting_sort_completed)) },
                 supportingContent = { Text(stringResource(R.string.setting_sort_completed_hint)) },

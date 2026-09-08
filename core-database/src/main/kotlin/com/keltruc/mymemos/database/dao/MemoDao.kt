@@ -26,7 +26,7 @@ interface MemoDao {
     @Query(
         """
         SELECT * FROM memos
-        WHERE accountId = :accountId AND state = :state AND syncStatus != 'PENDING_DELETE' AND parent IS NULL
+        WHERE accountId = :accountId AND state = :state AND syncStatus != 'PENDING_DELETE' AND parent IS NULL AND tagsJoined NOT LIKE '%mymemos/config%'
         ORDER BY pinned DESC, createTimeEpochMs DESC
         """,
     )
@@ -38,7 +38,7 @@ interface MemoDao {
         SELECT memos.* FROM memos
         JOIN memos_fts ON memos.rowid = memos_fts.rowid
         WHERE memos.accountId = :accountId AND memos.syncStatus != 'PENDING_DELETE' AND memos.parent IS NULL
-          AND memos_fts MATCH :query
+          AND memos.tagsJoined NOT LIKE '%mymemos/config%' AND memos_fts MATCH :query
         ORDER BY memos.createTimeEpochMs DESC
         """,
     )
@@ -57,7 +57,7 @@ interface MemoDao {
     @Query("SELECT * FROM memos WHERE accountId = :accountId AND syncStatus != 'SYNCED' ORDER BY updateTimeEpochMs")
     suspend fun pendingForAccount(accountId: Long): List<MemoEntity>
 
-    @Query("SELECT tagsJoined FROM memos WHERE accountId = :accountId AND tagsJoined != ''")
+    @Query("SELECT tagsJoined FROM memos WHERE accountId = :accountId AND tagsJoined != '' AND tagsJoined NOT LIKE '%mymemos/config%'")
     fun observeTagStrings(accountId: Long): Flow<List<String>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -83,10 +83,10 @@ interface MemoDao {
     suspend fun setColour(localId: String, colour: String?)
 
     @Transaction
-    @Query("SELECT * FROM memos WHERE accountId = :accountId AND parent IS NULL AND syncStatus != 'PENDING_DELETE' AND createTimeEpochMs >= :fromEpochMs AND createTimeEpochMs < :toEpochMs ORDER BY createTimeEpochMs")
+    @Query("SELECT * FROM memos WHERE accountId = :accountId AND parent IS NULL AND syncStatus != 'PENDING_DELETE' AND tagsJoined NOT LIKE '%mymemos/config%' AND createTimeEpochMs >= :fromEpochMs AND createTimeEpochMs < :toEpochMs ORDER BY createTimeEpochMs")
     fun observeCreatedBetween(accountId: Long, fromEpochMs: Long, toEpochMs: Long): Flow<List<MemoWithAttachments>>
 
-    @Query("SELECT createTimeEpochMs FROM memos WHERE accountId = :accountId AND parent IS NULL AND syncStatus != 'PENDING_DELETE'")
+    @Query("SELECT createTimeEpochMs FROM memos WHERE accountId = :accountId AND parent IS NULL AND syncStatus != 'PENDING_DELETE' AND tagsJoined NOT LIKE '%mymemos/config%'")
     fun observeCreateTimes(accountId: Long): Flow<List<Long>>
 
     @Transaction
@@ -133,7 +133,14 @@ interface MemoDao {
     suspend fun withOpenTasks(accountId: Long): List<MemoWithAttachments>
 
     @Transaction
-    @Query("SELECT * FROM memos WHERE accountId = :accountId AND state = 'NORMAL' AND parent IS NULL AND syncStatus != 'PENDING_DELETE' ORDER BY pinned DESC, createTimeEpochMs DESC LIMIT :limit")
+    @Query("SELECT * FROM memos WHERE accountId = :accountId AND state = 'NORMAL' AND parent IS NULL AND hasIncompleteTasks = 1 AND syncStatus != 'PENDING_DELETE' ORDER BY pinned DESC, updateTimeEpochMs DESC")
+    fun observeWithOpenTasks(accountId: Long): Flow<List<MemoWithAttachments>>
+
+    @Query("SELECT * FROM memos WHERE accountId = :accountId AND tagsJoined LIKE '%mymemos/config%' AND syncStatus != 'PENDING_DELETE' ORDER BY createTimeEpochMs LIMIT 1")
+    fun observeConfigMemo(accountId: Long): Flow<MemoEntity?>
+
+    @Transaction
+    @Query("SELECT * FROM memos WHERE accountId = :accountId AND state = 'NORMAL' AND parent IS NULL AND syncStatus != 'PENDING_DELETE' AND tagsJoined NOT LIKE '%mymemos/config%' ORDER BY pinned DESC, createTimeEpochMs DESC LIMIT :limit")
     suspend fun recent(accountId: Long, limit: Int): List<MemoWithAttachments>
 
     @Query("DELETE FROM memos WHERE accountId = :accountId AND parent = :parentRemoteName")
