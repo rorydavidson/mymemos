@@ -9,6 +9,8 @@ data class SyncState(
     val conflictCount: Int = 0,
     val lastSuccess: Instant? = null,
     val lastError: String? = null,
+    /** The server rejected our credential; the user has to sign in again. */
+    val authExpired: Boolean = false,
 )
 
 data class FailedOp(val id: Long, val memoLocalId: String, val type: String, val error: String?, val attempts: Int)

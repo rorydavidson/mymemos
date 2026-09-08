@@ -8,6 +8,9 @@ import com.keltruc.mymemos.database.dao.AccountDao
 import com.keltruc.mymemos.database.dao.AttachmentDao
 import com.keltruc.mymemos.database.dao.MemoDao
 import com.keltruc.mymemos.database.dao.PendingOpDao
+import com.keltruc.mymemos.database.dao.ReactionDao
+import com.keltruc.mymemos.database.dao.RelationDao
+import com.keltruc.mymemos.database.dao.ShortcutDao
 import com.keltruc.mymemos.network.MemosApiFactory
 import dagger.Module
 import dagger.Provides
@@ -30,6 +33,9 @@ object DataModule {
     @Provides fun memoDao(db: MyMemosDatabase): MemoDao = db.memoDao()
     @Provides fun attachmentDao(db: MyMemosDatabase): AttachmentDao = db.attachmentDao()
     @Provides fun pendingOpDao(db: MyMemosDatabase): PendingOpDao = db.pendingOpDao()
+    @Provides fun relationDao(db: MyMemosDatabase): RelationDao = db.relationDao()
+    @Provides fun reactionDao(db: MyMemosDatabase): ReactionDao = db.reactionDao()
+    @Provides fun shortcutDao(db: MyMemosDatabase): ShortcutDao = db.shortcutDao()
 
     @Provides
     @Singleton

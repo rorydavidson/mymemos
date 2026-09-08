@@ -39,6 +39,9 @@ data class Memo(
     val location: Location?,
     val attachments: List<Attachment>,
     val syncStatus: SyncStatus,
+    /** Server name of the memo this comments on, or null. */
+    val parent: String? = null,
 ) {
+    val isComment: Boolean get() = parent != null
     val isPendingLocalChange: Boolean get() = syncStatus != SyncStatus.SYNCED
 }

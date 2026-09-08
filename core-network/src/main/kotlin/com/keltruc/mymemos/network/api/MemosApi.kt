@@ -1,6 +1,6 @@
 package com.keltruc.mymemos.network.api
 
-import com.keltruc.mymemos.network.dto.AttachmentCreateDto
+import com.keltruc.mymemos.network.dto.*
 import com.keltruc.mymemos.network.dto.AttachmentDto
 import com.keltruc.mymemos.network.dto.GetCurrentUserResponseDto
 import com.keltruc.mymemos.network.dto.InstanceProfileDto
@@ -93,4 +93,131 @@ interface MemosApi {
 
     @DELETE("api/v1/{name}")
     suspend fun deleteAttachment(@Path("name", encoded = true) name: String)
+
+    // Comments, reactions, relations, shares
+    @GET("api/v1/{name}/comments")
+    suspend fun listMemoComments(@Path("name", encoded = true) memoName: String, @Query("pageSize") pageSize: Int = 200): ListMemoCommentsResponseDto
+
+    @POST("api/v1/{name}/comments")
+    suspend fun createMemoComment(@Path("name", encoded = true) memoName: String, @Body comment: MemoWriteDto): MemoDto
+
+    @GET("api/v1/{name}/reactions")
+    suspend fun listMemoReactions(@Path("name", encoded = true) memoName: String): ListReactionsResponseDto
+
+    @POST("api/v1/{name}/reactions")
+    suspend fun upsertMemoReaction(@Path("name", encoded = true) memoName: String, @Body body: UpsertReactionRequestDto): ReactionDto
+
+    @DELETE("api/v1/{name}")
+    suspend fun deleteMemoReaction(@Path("name", encoded = true) reactionName: String)
+
+    @PATCH("api/v1/{name}/relations")
+    suspend fun setMemoRelations(@Path("name", encoded = true) memoName: String, @Body body: SetMemoRelationsRequestDto)
+
+    @POST("api/v1/{parent}/shares")
+    suspend fun createMemoShare(@Path("parent", encoded = true) memoName: String, @Body share: MemoShareDto): MemoShareDto
+
+    @GET("api/v1/{parent}/shares")
+    suspend fun listMemoShares(@Path("parent", encoded = true) memoName: String): ListMemoSharesResponseDto
+
+    @DELETE("api/v1/{name}")
+    suspend fun deleteMemoShare(@Path("name", encoded = true) shareName: String)
+
+    // Shortcuts
+    @GET("api/v1/{parent}/shortcuts")
+    suspend fun listShortcuts(@Path("parent", encoded = true) userName: String): ListShortcutsResponseDto
+
+    @POST("api/v1/{parent}/shortcuts")
+    suspend fun createShortcut(@Path("parent", encoded = true) userName: String, @Body shortcut: ShortcutDto): ShortcutDto
+
+    @PATCH("api/v1/{name}")
+    suspend fun updateShortcut(
+        @Path("name", encoded = true) name: String,
+        @Body shortcut: ShortcutDto,
+        @Query("updateMask") updateMask: String = "title,filter",
+    ): ShortcutDto
+
+    @DELETE("api/v1/{name}")
+    suspend fun deleteShortcut(@Path("name", encoded = true) name: String)
+
+    // User profile, stats, settings, tokens, webhooks, notifications
+    @PATCH("api/v1/{name}")
+    suspend fun updateUser(
+        @Path("name", encoded = true) name: String,
+        @Body user: UserWriteDto,
+        @Query("updateMask") updateMask: String,
+    ): UserDto
+
+    @GET("api/v1/{name}:getStats")
+    suspend fun getUserStats(@Path("name", encoded = true) userName: String): UserStatsDto
+
+    @GET("api/v1/{name}")
+    suspend fun getUserSetting(@Path("name", encoded = true) settingName: String): UserSettingDto
+
+    @PATCH("api/v1/{name}")
+    suspend fun updateUserSetting(
+        @Path("name", encoded = true) settingName: String,
+        @Body setting: UserSettingDto,
+        @Query("updateMask") updateMask: String,
+    ): UserSettingDto
+
+    @GET("api/v1/{parent}/personalAccessTokens")
+    suspend fun listPersonalAccessTokens(@Path("parent", encoded = true) userName: String): ListPersonalAccessTokensResponseDto
+
+    @POST("api/v1/{parent}/personalAccessTokens")
+    suspend fun createPersonalAccessToken(
+        @Path("parent", encoded = true) userName: String,
+        @Body body: CreatePersonalAccessTokenRequestDto,
+    ): CreatePersonalAccessTokenResponseDto
+
+    @DELETE("api/v1/{name}")
+    suspend fun deletePersonalAccessToken(@Path("name", encoded = true) name: String)
+
+    @GET("api/v1/{parent}/webhooks")
+    suspend fun listUserWebhooks(@Path("parent", encoded = true) userName: String): ListUserWebhooksResponseDto
+
+    @POST("api/v1/{parent}/webhooks")
+    suspend fun createUserWebhook(@Path("parent", encoded = true) userName: String, @Body webhook: UserWebhookDto): UserWebhookDto
+
+    @DELETE("api/v1/{name}")
+    suspend fun deleteUserWebhook(@Path("name", encoded = true) name: String)
+
+    @GET("api/v1/{parent}/notifications")
+    suspend fun listUserNotifications(
+        @Path("parent", encoded = true) userName: String,
+        @Query("pageSize") pageSize: Int = 100,
+        @Query("filter") filter: String? = null,
+    ): ListNotificationsResponseDto
+
+    @PATCH("api/v1/{name}")
+    suspend fun updateUserNotification(
+        @Path("name", encoded = true) name: String,
+        @Body body: NotificationWriteDto,
+        @Query("updateMask") updateMask: String = "status",
+    ): UserNotificationDto
+
+    @DELETE("api/v1/{name}")
+    suspend fun deleteUserNotification(@Path("name", encoded = true) name: String)
+
+    // Admin
+    @GET("api/v1/users")
+    suspend fun listUsers(@Query("pageSize") pageSize: Int = 200, @Query("showDeleted") showDeleted: Boolean = false): ListUsersResponseDto
+
+    @POST("api/v1/users")
+    suspend fun createUser(@Body user: UserWriteDto): UserDto
+
+    @DELETE("api/v1/{name}")
+    suspend fun deleteUser(@Path("name", encoded = true) name: String, @Query("force") force: Boolean = false)
+
+    @GET("api/v1/{name}")
+    suspend fun getInstanceSetting(@Path("name", encoded = true) settingName: String): InstanceSettingDto
+
+    @PATCH("api/v1/{name}")
+    suspend fun updateInstanceSetting(
+        @Path("name", encoded = true) settingName: String,
+        @Body setting: InstanceSettingDto,
+        @Query("updateMask") updateMask: String,
+    ): InstanceSettingDto
+
+    @GET("api/v1/instance/stats")
+    suspend fun getInstanceStats(): InstanceStatsDto
 }

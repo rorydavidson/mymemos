@@ -21,6 +21,7 @@ import com.keltruc.mymemos.data.sync.SyncState
 fun SyncStatusChip(state: SyncState, onClick: () -> Unit) {
     val (label, icon) = when {
         state.running -> stringResource(R.string.sync_running) to null
+        state.authExpired -> stringResource(R.string.sign_in_again) to Icons.Default.ErrorOutline
         state.failedCount > 0 -> stringResource(R.string.sync_failed, state.failedCount) to Icons.Default.ErrorOutline
         state.pendingCount > 0 -> stringResource(R.string.sync_pending, state.pendingCount) to Icons.Default.CloudUpload
         state.lastError != null -> "Offline" to Icons.Default.CloudOff

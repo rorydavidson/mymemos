@@ -1,5 +1,6 @@
 package com.keltruc.mymemos.database.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -20,6 +21,7 @@ import androidx.room.PrimaryKey
         Index(value = ["accountId", "remoteName"], unique = true),
         Index(value = ["accountId", "state", "pinned", "createTimeEpochMs"]),
         Index("syncStatus"),
+        Index("parent"),
     ],
 )
 data class MemoEntity(
@@ -49,6 +51,8 @@ data class MemoEntity(
      * moved past this, the change needs a merge rather than a blind overwrite.
      */
     val baseUpdateTimeEpochMs: Long?,
+    /** Server name of the memo this one comments on; null for top-level memos. */
+    @ColumnInfo(defaultValue = "NULL") val parent: String? = null,
 ) {
     companion object {
         /** ASCII unit separator (0x1F): cannot appear in a tag, unlike commas or spaces. */

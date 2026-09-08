@@ -44,5 +44,10 @@ data class PendingOpEntity(
         const val DELETE = "DELETE"
         const val ADD_ATTACHMENT = "ADD_ATTACHMENT"
         const val REMOVE_ATTACHMENT = "REMOVE_ATTACHMENT"
+        const val CREATE_COMMENT = "CREATE_COMMENT"
+        const val UPSERT_REACTION = "UPSERT_REACTION"
+        const val DELETE_REACTION = "DELETE_REACTION"
+        const val SET_RELATIONS = "SET_RELATIONS"
+        const val SET_LOCATION = "SET_LOCATION"
     }
 }

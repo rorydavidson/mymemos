@@ -3,7 +3,15 @@ package com.keltruc.mymemos.data.repository
 import android.net.Uri
 import androidx.room.withTransaction
 import com.keltruc.mymemos.data.attachments.AttachmentStore
+import com.keltruc.mymemos.data.mapper.toEntity
 import com.keltruc.mymemos.data.mapper.toModel
+import com.keltruc.mymemos.data.mapper.toReference
+import com.keltruc.mymemos.data.mapper.relationEntities
+import com.keltruc.mymemos.data.auth.ApiClientRegistry
+import com.keltruc.mymemos.model.Account
+import com.keltruc.mymemos.model.Location
+import com.keltruc.mymemos.model.Reaction
+import com.keltruc.mymemos.model.Reference
 import com.keltruc.mymemos.data.prefs.AppPreferences
 import com.keltruc.mymemos.data.text.TaskListSorter
 import com.keltruc.mymemos.data.sync.FailedOp
@@ -14,8 +22,12 @@ import com.keltruc.mymemos.database.MyMemosDatabase
 import com.keltruc.mymemos.database.dao.AttachmentDao
 import com.keltruc.mymemos.database.dao.MemoDao
 import com.keltruc.mymemos.database.dao.PendingOpDao
+import com.keltruc.mymemos.database.dao.ReactionDao
+import com.keltruc.mymemos.database.dao.RelationDao
 import com.keltruc.mymemos.database.entity.AttachmentEntity
 import com.keltruc.mymemos.database.entity.MemoEntity
+import com.keltruc.mymemos.database.entity.MemoRelationEntity
+import com.keltruc.mymemos.database.entity.ReactionEntity
 import com.keltruc.mymemos.database.entity.PendingOpEntity
 import com.keltruc.mymemos.database.entity.PendingOpEntity.Type
 import com.keltruc.mymemos.model.Memo
@@ -23,7 +35,10 @@ import com.keltruc.mymemos.model.MemoState
 import com.keltruc.mymemos.model.SyncStatus
 import com.keltruc.mymemos.model.Visibility
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
 import java.util.UUID
@@ -34,12 +49,16 @@ import javax.inject.Singleton
  * Every write lands in Room and the outbox in one transaction, then a sync is scheduled.
  * Reads only ever observe Room.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
 class MemoRepository @Inject constructor(
     private val db: MyMemosDatabase,
     private val memoDao: MemoDao,
     private val attachmentDao: AttachmentDao,
     private val pendingOpDao: PendingOpDao,
+    private val relationDao: RelationDao,
+    private val reactionDao: ReactionDao,
+    private val registry: ApiClientRegistry,
     private val attachmentStore: AttachmentStore,
     private val engine: SyncEngine,
     private val scheduler: SyncScheduler,
@@ -182,6 +201,8 @@ class MemoRepository @Inject constructor(
             pendingOpDao.deleteForMemo(localId)
             attachmentDao.forMemo(localId).forEach { attachmentStore.delete(it.localId) }
             val remoteName = memo.remoteName
+            // The server drops a memo's comments with it; mirror that locally.
+            remoteName?.let { memoDao.deleteCommentsOf(memo.accountId, it) }
             if (remoteName == null) {
                 memoDao.deleteByLocalId(localId)
             } else {
@@ -258,6 +279,124 @@ class MemoRepository @Inject constructor(
         }
         scheduler.syncNow()
     }
+
+    // ---- comments, reactions, references, location -----------------------------------
+
+    fun observeComments(accountId: Long, parentRemoteName: String): Flow<List<Memo>> =
+        memoDao.observeComments(accountId, parentRemoteName).map { rows -> rows.map { it.toModel() } }
+
+    /** Comments are not part of the memo list, so fetch them when a memo is opened. */
+    suspend fun refreshComments(account: Account, parentRemoteName: String) {
+        val api = registry.api(account.serverUrl, account.userResourceName)
+        val comments = api.listMemoComments(parentRemoteName).memos
+        db.withTransaction {
+            for (dto in comments) {
+                val existing = memoDao.getByRemoteName(account.id, dto.name)
+                if (existing != null && existing.syncStatus != SyncStatus.SYNCED.name) continue
+                memoDao.upsert(dto.toEntity(account.id, existing?.localId).copy(parent = parentRemoteName))
+            }
+        }
+    }
+
+    suspend fun addComment(accountId: Long, parentRemoteName: String, content: String, visibility: Visibility) {
+        val now = System.currentTimeMillis()
+        val localId = UUID.randomUUID().toString()
+        db.withTransaction {
+            memoDao.upsert(
+                MemoEntity(
+                    localId = localId, accountId = accountId, remoteName = null, creator = null, content = content,
+                    visibility = visibility.name, state = MemoState.NORMAL.name, pinned = false,
+                    tagsJoined = extractTags(content).joinToString(MemoEntity.TAG_SEPARATOR),
+                    createTimeEpochMs = now, updateTimeEpochMs = now, snippet = content.take(120),
+                    hasTaskList = false, hasIncompleteTasks = false, hasLink = false, hasCode = false,
+                    locationPlaceholder = null, latitude = null, longitude = null,
+                    syncStatus = SyncStatus.PENDING_CREATE.name, baseUpdateTimeEpochMs = null, parent = parentRemoteName,
+                ),
+            )
+            pendingOpDao.insert(PendingOpEntity(accountId = accountId, memoLocalId = localId, type = Type.CREATE_COMMENT))
+        }
+        scheduler.syncNow()
+    }
+
+    fun observeReactions(memoLocalId: String): Flow<List<Reaction>> =
+        reactionDao.observeForMemo(memoLocalId).map { list -> list.map { it.toModel() } }
+
+    /** Adds the reaction, or removes it if the current user already reacted with it. */
+    suspend fun toggleReaction(memoLocalId: String, userResourceName: String, reactionType: String) {
+        db.withTransaction {
+            val memo = memoDao.getByLocalId(memoLocalId) ?: return@withTransaction
+            val mine = reactionDao.forMemo(memoLocalId).firstOrNull { it.creator == userResourceName && it.reactionType == reactionType }
+            if (mine != null) {
+                reactionDao.deleteByLocalId(mine.localId)
+                pendingOpDao.deleteForMemoOfType(memoLocalId, Type.UPSERT_REACTION)
+                if (mine.remoteName != null) {
+                    pendingOpDao.insert(
+                        PendingOpEntity(
+                            accountId = memo.accountId, memoLocalId = memoLocalId, type = Type.DELETE_REACTION,
+                            payloadJson = json.encodeToString(SyncEngine.ReactionPayload(mine.localId, mine.remoteName)),
+                        ),
+                    )
+                }
+            } else {
+                val localId = UUID.randomUUID().toString()
+                reactionDao.upsertAll(
+                    listOf(ReactionEntity(localId, memoLocalId, null, userResourceName, reactionType, System.currentTimeMillis())),
+                )
+                pendingOpDao.insert(
+                    PendingOpEntity(
+                        accountId = memo.accountId, memoLocalId = memoLocalId, type = Type.UPSERT_REACTION,
+                        payloadJson = json.encodeToString(SyncEngine.ReactionPayload(localId)),
+                    ),
+                )
+            }
+        }
+        scheduler.syncNow()
+    }
+
+    fun observeReferences(memoLocalId: String): Flow<List<Reference>> =
+        relationDao.observeReferences(memoLocalId).map { list -> list.map { it.toReference() } }
+
+    fun observeByRemoteNames(accountId: Long, remoteNames: List<String>): Flow<List<Memo>> =
+        memoDao.observeByRemoteNames(accountId, remoteNames).map { rows -> rows.map { it.toModel() } }
+
+    /** Memos that reference [remoteName]. */
+    fun observeBacklinks(accountId: Long, remoteName: String): Flow<List<Memo>> =
+        relationDao.observeBacklinks(remoteName).flatMapLatest { ids ->
+            if (ids.isEmpty()) flowOf(emptyList()) else memoDao.observeByLocalIds(ids).map { rows -> rows.map { it.toModel() } }
+        }
+
+    suspend fun addReference(memoLocalId: String, target: Memo) {
+        val targetName = target.remoteName ?: return
+        db.withTransaction {
+            val memo = memoDao.getByLocalId(memoLocalId) ?: return@withTransaction
+            relationDao.upsertAll(listOf(MemoRelationEntity(memoLocalId, targetName, target.snippet.ifEmpty { target.content.take(120) }, "REFERENCE")))
+            queueRelations(memo)
+        }
+        scheduler.syncNow()
+    }
+
+    suspend fun removeReference(memoLocalId: String, relatedRemoteName: String) {
+        db.withTransaction {
+            val memo = memoDao.getByLocalId(memoLocalId) ?: return@withTransaction
+            relationDao.deleteReference(memoLocalId, relatedRemoteName)
+            queueRelations(memo)
+        }
+        scheduler.syncNow()
+    }
+
+    private suspend fun queueRelations(memo: MemoEntity) {
+        if (memo.remoteName == null) return // pushed with the memo once it exists
+        pendingOpDao.deleteForMemoOfType(memo.localId, Type.SET_RELATIONS)
+        pendingOpDao.insert(PendingOpEntity(accountId = memo.accountId, memoLocalId = memo.localId, type = Type.SET_RELATIONS))
+    }
+
+    suspend fun setLocation(memoLocalId: String, location: Location?) = simpleFieldOp(memoLocalId, Type.SET_LOCATION) {
+        it.copy(locationPlaceholder = location?.placeholder, latitude = location?.latitude, longitude = location?.longitude)
+    }
+
+    /** Candidates for the reference picker: synced, top-level memos matching [query]. */
+    suspend fun pickReferenceCandidates(accountId: Long, query: String): List<Memo> =
+        memoDao.pickerSearch(accountId, query).map { it.toModel() }.filter { it.remoteName != null }
 
     /** Marks a conflict fork as dealt with: it stays as an ordinary memo. */
     suspend fun resolveConflict(localId: String) {

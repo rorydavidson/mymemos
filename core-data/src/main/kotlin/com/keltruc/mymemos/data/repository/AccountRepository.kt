@@ -10,6 +10,7 @@ import com.keltruc.mymemos.model.AuthMethod
 import com.keltruc.mymemos.model.ServerProfile
 import com.keltruc.mymemos.network.ApiException
 import com.keltruc.mymemos.network.MemosApiFactory
+import com.keltruc.mymemos.network.dto.CreatePersonalAccessTokenRequestDto
 import com.keltruc.mymemos.network.dto.PasswordCredentialsDto
 import com.keltruc.mymemos.network.dto.SignInRequestDto
 import com.keltruc.mymemos.network.dto.UserDto
@@ -37,26 +38,43 @@ class AccountRepository @Inject constructor(
         ServerProfile(dto.version, dto.instanceUrl, dto.demo, dto.needsSetup)
     }
 
+    /**
+     * Password sign-in yields a short-lived access token plus a refresh cookie meant for
+     * browsers. A phone is better served by its own long-lived personal access token, so
+     * we mint one straight away and use that; the session is only a fallback if minting
+     * is refused.
+     */
     suspend fun signInWithPassword(serverUrl: String, username: String, password: String): Account = wrap {
         val url = MemosApiFactory.normaliseBaseUrl(serverUrl)
-        // Sign in through a throwaway client keyed by username so the refresh cookie lands
-        // in the right jar once we know the server's resource name for the user.
         val pending = "users/$username"
         val api = registry.api(url, pending)
         val response = api.signIn(SignInRequestDto(PasswordCredentialsDto(username, password)))
         val user = response.user
         val store = registry.tokenStore(url, pending)
         store.setPasswordSession(response.accessToken, response.accessTokenExpiresAt)
-        if (user.name != pending) {
-            // Move the credential under the canonical key and drop the temporary client.
-            val canonical = registry.tokenStore(url, user.name)
+
+        val minted = runCatching {
+            api.createPersonalAccessToken(user.name, CreatePersonalAccessTokenRequestDto(description = "MyMemos on $deviceName"))
+        }.getOrNull()?.takeIf { it.token.isNotEmpty() }
+
+        val canonical = registry.tokenStore(url, user.name)
+        if (minted != null) {
+            canonical.setPersonalAccessToken(minted.token, minted.personalAccessToken?.name)
+        } else {
             canonical.setPasswordSession(response.accessToken, response.accessTokenExpiresAt)
             store.cookies()?.let { canonical.saveCookies(it) }
-            store.clear()
-            registry.evict(url, pending)
         }
-        saveAccount(url, user, AuthMethod.PASSWORD)
+        if (user.name != pending) {
+            store.clear()
+        }
+        registry.evict(url, pending)
+        registry.evict(url, user.name)
+        saveAccount(url, user, if (minted != null) AuthMethod.PASSWORD else AuthMethod.PASSWORD)
     }
+
+    /** Same as [signInWithPassword], for an account whose credential stopped working. */
+    suspend fun reauthenticate(account: Account, password: String): Account =
+        signInWithPassword(account.serverUrl, account.username, password)
 
     suspend fun signInWithToken(serverUrl: String, token: String): Account = wrap {
         val url = MemosApiFactory.normaliseBaseUrl(serverUrl)
@@ -76,12 +94,19 @@ class AccountRepository @Inject constructor(
 
     suspend fun signOut(account: Account) {
         val api = registry.api(account.serverUrl, account.userResourceName)
-        if (account.authMethod == AuthMethod.PASSWORD) runCatching { api.signOut() }
-        registry.tokenStore(account.serverUrl, account.userResourceName).clear()
+        val store = registry.tokenStore(account.serverUrl, account.userResourceName)
+        // Revoke what we minted; a user-pasted token is theirs to keep.
+        store.mintedTokenName()?.let { runCatching { api.deletePersonalAccessToken(it) } }
+        if (account.authMethod == AuthMethod.PASSWORD && store.mintedTokenName() == null) runCatching { api.signOut() }
+        store.clear()
         registry.evict(account.serverUrl, account.userResourceName)
         memoDao.deleteAllForAccount(account.id)
         accountDao.delete(account.id)
     }
+
+    private val deviceName: String
+        get() = listOf(android.os.Build.MANUFACTURER, android.os.Build.MODEL).filter { it.isNotBlank() }
+            .joinToString(" ").replaceFirstChar { it.uppercase() }
 
     private suspend fun saveAccount(serverUrl: String, user: UserDto, method: AuthMethod): Account {
         val version = runCatching { registry.anonymousApi(serverUrl).getInstanceProfile().version }.getOrDefault("")

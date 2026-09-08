@@ -20,13 +20,19 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -35,6 +41,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -58,6 +65,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.keltruc.mymemos.R
 import com.keltruc.mymemos.model.Memo
+import com.keltruc.mymemos.model.Shortcut
 import com.keltruc.mymemos.ui.components.Avatar
 import com.keltruc.mymemos.ui.components.MemoCard
 import com.keltruc.mymemos.ui.sync.SyncStatusChip
@@ -74,12 +82,14 @@ fun TimelineScreen(
     onNewMemo: () -> Unit,
     onEditMemo: (String) -> Unit,
     onSettings: () -> Unit,
+    onManageShortcuts: () -> Unit,
     viewModel: TimelineViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var showSync by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<Memo?>(null) }
+    var showReauth by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -118,7 +128,23 @@ fun TimelineScreen(
                         onQuery = viewModel::onQuery,
                         onTag = viewModel::onTag,
                         onToggleArchived = viewModel::toggleArchived,
+                        onShortcut = viewModel::onShortcut,
+                        onManageShortcuts = onManageShortcuts,
                     )
+                }
+                if (state.sync.authExpired) {
+                    item(key = "reauth") {
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                        ) {
+                            Column(Modifier.padding(16.dp)) {
+                                Text(stringResource(R.string.session_expired), color = MaterialTheme.colorScheme.onErrorContainer)
+                                TextButton(onClick = { showReauth = true }) { Text(stringResource(R.string.sign_in_again)) }
+                            }
+                        }
+                    }
                 }
                 if (state.memos.isEmpty()) {
                     item(key = "empty") {
@@ -163,6 +189,33 @@ fun TimelineScreen(
         )
     }
 
+    if (showReauth) {
+        var password by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showReauth = false },
+            title = { Text(stringResource(R.string.reauth_title)) },
+            text = {
+                Column {
+                    state.account?.let { Text("${it.username} · ${it.serverUrl.removePrefix("https://").trimEnd('/')}", style = MaterialTheme.typography.bodyMedium) }
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text(stringResource(R.string.signin_password)) },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = password.isNotBlank(), onClick = { viewModel.reauthenticate(password); showReauth = false }) { Text(stringResource(R.string.signin_button)) }
+            },
+            dismissButton = { TextButton(onClick = { showReauth = false }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+
     pendingDelete?.let { memo ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
@@ -184,6 +237,8 @@ private fun Header(
     onQuery: (String) -> Unit,
     onTag: (String?) -> Unit,
     onToggleArchived: () -> Unit,
+    onShortcut: (Shortcut?) -> Unit,
+    onManageShortcuts: () -> Unit,
 ) {
     Column(Modifier.statusBarsPadding().padding(top = 8.dp)) {
         Row(
@@ -238,6 +293,31 @@ private fun Header(
                         ),
                     )
                 }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(state.shortcuts, key = { it.name }) { shortcut ->
+                FilterChip(
+                    selected = state.selectedShortcut?.name == shortcut.name,
+                    onClick = { onShortcut(shortcut) },
+                    label = { Text(shortcut.title) },
+                    leadingIcon = { Icon(Icons.Default.Bookmark, null, Modifier.size(16.dp)) },
+                    shape = CircleShape,
+                    border = null,
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                        selectedContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    ),
+                )
+            }
+            item(key = "manage") {
+                AssistChip(
+                    onClick = onManageShortcuts,
+                    label = { Text(stringResource(if (state.shortcuts.isEmpty()) R.string.shortcut_new else R.string.shortcuts_manage)) },
+                    leadingIcon = { Icon(Icons.Default.Tune, null, Modifier.size(16.dp)) },
+                    shape = CircleShape,
+                )
             }
         }
         Spacer(Modifier.height(6.dp))

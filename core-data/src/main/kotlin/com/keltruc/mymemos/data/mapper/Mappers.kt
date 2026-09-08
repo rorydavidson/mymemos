@@ -4,18 +4,28 @@ import com.keltruc.mymemos.database.dao.MemoWithAttachments
 import com.keltruc.mymemos.database.entity.AccountEntity
 import com.keltruc.mymemos.database.entity.AttachmentEntity
 import com.keltruc.mymemos.database.entity.MemoEntity
+import com.keltruc.mymemos.database.entity.MemoRelationEntity
+import com.keltruc.mymemos.database.entity.ReactionEntity
+import com.keltruc.mymemos.database.entity.ShortcutEntity
 import com.keltruc.mymemos.model.Account
 import com.keltruc.mymemos.model.Attachment
 import com.keltruc.mymemos.model.AuthMethod
 import com.keltruc.mymemos.model.Location
 import com.keltruc.mymemos.model.Memo
+import com.keltruc.mymemos.model.MemoShare
 import com.keltruc.mymemos.model.MemoState
+import com.keltruc.mymemos.model.Reaction
+import com.keltruc.mymemos.model.Reference
+import com.keltruc.mymemos.model.Shortcut
 import com.keltruc.mymemos.model.SyncStatus
 import com.keltruc.mymemos.model.User
 import com.keltruc.mymemos.model.UserRole
 import com.keltruc.mymemos.model.Visibility
 import com.keltruc.mymemos.network.dto.AttachmentDto
 import com.keltruc.mymemos.network.dto.MemoDto
+import com.keltruc.mymemos.network.dto.MemoShareDto
+import com.keltruc.mymemos.network.dto.ReactionDto
+import com.keltruc.mymemos.network.dto.ShortcutDto
 import com.keltruc.mymemos.network.dto.UserDto
 import java.time.Instant
 import java.util.UUID
@@ -72,8 +82,34 @@ fun MemoDto.toEntity(accountId: Long, existingLocalId: String? = null): MemoEnti
         longitude = location?.longitude,
         syncStatus = SyncStatus.SYNCED.name,
         baseUpdateTimeEpochMs = update.toEpochMilli(),
+        parent = parent,
     )
 }
+
+fun MemoDto.relationEntities(memoLocalId: String): List<MemoRelationEntity> = relations
+    .filter { it.memo.name == name }
+    .map { MemoRelationEntity(memoLocalId, it.relatedMemo.name, it.relatedMemo.snippet, it.type) }
+
+fun ReactionDto.toEntity(memoLocalId: String, existingLocalId: String? = null) = ReactionEntity(
+    localId = existingLocalId ?: UUID.randomUUID().toString(),
+    memoLocalId = memoLocalId,
+    remoteName = name,
+    creator = creator,
+    reactionType = reactionType,
+    createTimeEpochMs = parseInstant(createTime).toEpochMilli(),
+)
+
+fun ReactionEntity.toModel() = Reaction(localId, remoteName, creator, reactionType, Instant.ofEpochMilli(createTimeEpochMs))
+fun MemoRelationEntity.toReference() = Reference(relatedRemoteName, relatedSnippet)
+fun ShortcutEntity.toModel() = Shortcut(name, title, filter)
+fun ShortcutDto.toEntity(accountId: Long) = ShortcutEntity(accountId, name, title, filter)
+
+fun MemoShareDto.toModel(serverUrl: String) = MemoShare(
+    name = name,
+    url = "${serverUrl.trimEnd('/')}/memos/shares/${name.substringAfterLast('/')}",
+    createTime = parseInstant(createTime),
+    expireTime = expireTime?.let { parseInstant(it) },
+)
 
 fun AttachmentDto.toEntity(memoLocalId: String, existingLocalId: String? = null) = AttachmentEntity(
     localId = existingLocalId ?: UUID.randomUUID().toString(),
@@ -121,6 +157,7 @@ fun MemoEntity.toModel(attachments: List<Attachment> = emptyList()) = Memo(
     location = latitude?.let { lat -> longitude?.let { lon -> Location(locationPlaceholder.orEmpty(), lat, lon) } },
     attachments = attachments,
     syncStatus = runCatching { SyncStatus.valueOf(syncStatus) }.getOrDefault(SyncStatus.SYNCED),
+    parent = parent,
 )
 
 /** Server URL for an uploaded attachment; null while it is still local-only. */

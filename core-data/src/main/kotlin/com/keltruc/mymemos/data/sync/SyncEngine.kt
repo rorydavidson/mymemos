@@ -4,6 +4,7 @@ import android.util.Base64
 import androidx.room.withTransaction
 import com.keltruc.mymemos.data.attachments.AttachmentStore
 import com.keltruc.mymemos.data.auth.ApiClientRegistry
+import com.keltruc.mymemos.data.mapper.relationEntities
 import com.keltruc.mymemos.data.mapper.toEntity
 import com.keltruc.mymemos.data.mapper.toRfc3339
 import com.keltruc.mymemos.database.MyMemosDatabase
@@ -11,6 +12,9 @@ import com.keltruc.mymemos.database.dao.AccountDao
 import com.keltruc.mymemos.database.dao.AttachmentDao
 import com.keltruc.mymemos.database.dao.MemoDao
 import com.keltruc.mymemos.database.dao.PendingOpDao
+import com.keltruc.mymemos.database.dao.ReactionDao
+import com.keltruc.mymemos.database.dao.RelationDao
+import com.keltruc.mymemos.database.dao.ShortcutDao
 import com.keltruc.mymemos.database.entity.AccountEntity
 import com.keltruc.mymemos.database.entity.MemoEntity
 import com.keltruc.mymemos.database.entity.PendingOpEntity
@@ -20,6 +24,12 @@ import com.keltruc.mymemos.network.ApiException
 import com.keltruc.mymemos.network.api.MemosApi
 import com.keltruc.mymemos.network.dto.AttachmentCreateDto
 import com.keltruc.mymemos.network.dto.AttachmentRefDto
+import com.keltruc.mymemos.network.dto.LocationDto
+import com.keltruc.mymemos.network.dto.MemoRefDto
+import com.keltruc.mymemos.network.dto.MemoRelationWriteDto
+import com.keltruc.mymemos.network.dto.ReactionWriteDto
+import com.keltruc.mymemos.network.dto.SetMemoRelationsRequestDto
+import com.keltruc.mymemos.network.dto.UpsertReactionRequestDto
 import com.keltruc.mymemos.network.dto.MemoDto
 import com.keltruc.mymemos.network.dto.MemoWriteDto
 import com.keltruc.mymemos.network.dto.SetMemoAttachmentsRequestDto
@@ -49,6 +59,9 @@ class SyncEngine @Inject constructor(
     private val memoDao: MemoDao,
     private val attachmentDao: AttachmentDao,
     private val pendingOpDao: PendingOpDao,
+    private val relationDao: RelationDao,
+    private val reactionDao: ReactionDao,
+    private val shortcutDao: ShortcutDao,
     private val registry: ApiClientRegistry,
     private val attachmentStore: AttachmentStore,
     private val json: Json,
@@ -66,17 +79,19 @@ class SyncEngine @Inject constructor(
     suspend fun sync(accountId: Long, fullPull: Boolean = false): Outcome = withContext(Dispatchers.IO) { mutex.withLock {
         val account = accountDao.getById(accountId) ?: return@withLock Outcome.Success
         val api = registry.api(account.serverUrl, account.userResourceName)
-        _state.update { it.copy(running = true, lastError = null) }
+        _state.update { it.copy(running = true, lastError = null, authExpired = false) }
         try {
             push(account, api)
             pull(account, api, fullPull)
+            runCatching { pullShortcuts(account, api) }
             _state.update { it.copy(running = false, lastSuccess = Instant.now()) }
             Outcome.Success
         } catch (e: Exception) {
             val message = e.message ?: e.javaClass.simpleName
             android.util.Log.w(TAG, "sync failed for account $accountId", e)
-            _state.update { it.copy(running = false, lastError = message) }
-            if (e is ApiException && e.isUnauthenticated) Outcome.AuthFailed(e) else Outcome.Retry(e)
+            val authFailed = e is ApiException && e.isUnauthenticated
+            _state.update { it.copy(running = false, lastError = message, authExpired = authFailed) }
+            if (authFailed) Outcome.AuthFailed(e) else Outcome.Retry(e)
         }
     } }
 
@@ -193,6 +208,57 @@ class SyncEngine @Inject constructor(
                 }
                 attachmentStore.delete(payload.attachmentLocalId)
             }
+            Type.CREATE_COMMENT -> {
+                memo ?: return
+                if (memo.remoteName != null) return
+                val parentName = memo.parent ?: return
+                val created = call {
+                    api.createMemoComment(
+                        parentName,
+                        MemoWriteDto(
+                            content = memo.content,
+                            visibility = memo.visibility,
+                            createTime = Instant.ofEpochMilli(memo.createTimeEpochMs).toRfc3339(),
+                        ),
+                    )
+                }
+                absorbServerMemo(memo, created, keepPending = false)
+            }
+            Type.UPSERT_REACTION -> {
+                val name = memo?.remoteName ?: return
+                val payload = json.decodeFromString<ReactionPayload>(op.payloadJson)
+                val local = reactionDao.byLocalId(payload.reactionLocalId) ?: return
+                if (local.remoteName != null) return
+                val created = call {
+                    api.upsertMemoReaction(name, UpsertReactionRequestDto(ReactionWriteDto(contentId = name, reactionType = local.reactionType)))
+                }
+                reactionDao.upsertAll(listOf(created.toEntity(memo.localId, local.localId)))
+            }
+            Type.DELETE_REACTION -> {
+                val payload = json.decodeFromString<ReactionPayload>(op.payloadJson)
+                payload.remoteName?.let { remote ->
+                    try {
+                        call { api.deleteMemoReaction(remote) }
+                    } catch (e: ApiException) {
+                        if (!e.isNotFound) throw e
+                    }
+                }
+            }
+            Type.SET_RELATIONS -> {
+                val name = memo?.remoteName ?: return
+                val refs = relationDao.references(memo.localId).map {
+                    MemoRelationWriteDto(memo = MemoRefDto(name), relatedMemo = MemoRefDto(it.relatedRemoteName), type = "REFERENCE")
+                }
+                call { api.setMemoRelations(name, SetMemoRelationsRequestDto(refs)) }
+            }
+            Type.SET_LOCATION -> {
+                val name = memo?.remoteName ?: return
+                val location = memo.latitude?.let { lat ->
+                    memo.longitude?.let { lon -> LocationDto(memo.locationPlaceholder.orEmpty(), lat, lon) }
+                }
+                val updated = call { api.updateMemo(name, MemoWriteDto(location = location), "location,update_time") }
+                absorbServerMemo(memo, updated, keepPending = pendingOpDao.countForMemo(memo.localId) > 1)
+            }
         }
     }
 
@@ -229,7 +295,8 @@ class SyncEngine @Inject constructor(
 
     private suspend fun absorbServerMemo(local: MemoEntity, server: MemoDto, keepPending: Boolean) {
         db.withTransaction {
-            val entity = server.toEntity(local.accountId, local.localId).let {
+            // CreateMemoComment's response does not echo `parent`; keep what we know locally.
+            val entity = server.toEntity(local.accountId, local.localId).copy(parent = server.parent ?: local.parent).let {
                 if (keepPending) {
                     // Later ops still queued: keep local content so they push the right thing.
                     it.copy(
@@ -245,6 +312,7 @@ class SyncEngine @Inject constructor(
             }
             memoDao.upsert(entity)
             reconcileAttachments(entity.localId, server)
+            reconcileSocial(entity.localId, server)
         }
     }
 
@@ -275,10 +343,12 @@ class SyncEngine @Inject constructor(
         db.withTransaction {
             for (dto in fetched) {
                 val existing = memoDao.getByRemoteName(account.id, dto.name)
-                if (existing != null && existing.syncStatus != SyncStatus.SYNCED.name) continue
+                // A row with queued ops is ahead of the server; leave it for the next push.
+                if (existing != null && (existing.syncStatus != SyncStatus.SYNCED.name || pendingOpDao.countForMemo(existing.localId) > 0)) continue
                 val entity = dto.toEntity(account.id, existing?.localId)
                 memoDao.upsert(entity)
                 reconcileAttachments(entity.localId, dto)
+                reconcileSocial(entity.localId, dto)
             }
             if (since == null) {
                 val keep = fetched.map { it.name }.ifEmpty { listOf("") }
@@ -286,6 +356,20 @@ class SyncEngine @Inject constructor(
             }
             accountDao.setLastSync(account.id, startedAt)
         }
+    }
+
+    /** Replaces synced relations and reactions with the server's list; queued local ones stay. */
+    suspend fun reconcileSocial(memoLocalId: String, dto: MemoDto) {
+        relationDao.deleteForMemo(memoLocalId)
+        relationDao.upsertAll(dto.relationEntities(memoLocalId))
+        val existing = reactionDao.forMemo(memoLocalId).filter { it.remoteName != null }.associateBy { it.remoteName }
+        reactionDao.deleteSyncedForMemo(memoLocalId)
+        reactionDao.upsertAll(dto.reactions.map { it.toEntity(memoLocalId, existing[it.name]?.localId) })
+    }
+
+    private suspend fun pullShortcuts(account: AccountEntity, api: MemosApi) {
+        val shortcuts = call { api.listShortcuts(account.userResourceName) }.shortcuts
+        shortcutDao.replaceAll(account.id, shortcuts.map { it.toEntity(account.id) })
     }
 
     private suspend fun reconcileAttachments(memoLocalId: String, dto: MemoDto) {
@@ -321,4 +405,7 @@ class SyncEngine @Inject constructor(
 
     @kotlinx.serialization.Serializable
     data class AttachmentPayload(val attachmentLocalId: String, val remoteName: String? = null)
+
+    @kotlinx.serialization.Serializable
+    data class ReactionPayload(val reactionLocalId: String, val remoteName: String? = null)
 }
