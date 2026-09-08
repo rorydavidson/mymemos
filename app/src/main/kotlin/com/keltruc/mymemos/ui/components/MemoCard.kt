@@ -1,5 +1,6 @@
 package com.keltruc.mymemos.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -70,12 +71,13 @@ fun MemoCard(
                 else -> MaterialTheme.colorScheme.surfaceContainer
             },
             tonalElevation = 0.dp,
-            shadowElevation = if (memo.pinned) 0.dp else 1.dp,
+            shadowElevation = 3.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
             modifier = Modifier
                 .fillMaxWidth()
                 .combinedClickable(onClick = onClick, onLongClick = { menu = true }),
         ) {
-            Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 MemoContent(content = memo.content, onToggleTask = onToggleTask, maxLines = 12)
                 AttachmentStrip(attachments = memo.attachments, serverUrl = serverUrl, thumbSize = 88)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {

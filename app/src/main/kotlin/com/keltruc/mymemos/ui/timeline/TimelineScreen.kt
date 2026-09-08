@@ -145,7 +145,7 @@ fun TimelineScreen(
                             onPin = { viewModel.togglePin(memo) },
                             onArchive = { viewModel.toggleArchive(memo) },
                             onDelete = { pendingDelete = memo },
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp),
                         )
                     }
                 }
@@ -248,7 +248,7 @@ private fun Header(
 private fun SearchPill(query: String, onQuery: (String) -> Unit, modifier: Modifier = Modifier) {
     Surface(
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
         modifier = modifier.fillMaxWidth().height(50.dp),
     ) {
         Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
