@@ -23,7 +23,11 @@ sealed interface SessionState {
 class SessionViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val memoRepository: MemoRepository,
+    private val intentRouter: IntentRouter,
 ) : ViewModel() {
+    val pendingDestination: StateFlow<Destination?> = intentRouter.pending
+    fun consumeDestination() = intentRouter.consume()
+
     /** Turns a server memo name into a local id (fetching if needed) and hands it on. */
     fun resolveMemo(remoteName: String, onResolved: (String) -> Unit) = viewModelScope.launch {
         val acc = accountRepository.activeAccountOrNull() ?: return@launch

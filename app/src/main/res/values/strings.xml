@@ -144,4 +144,10 @@
     <string name="instance_storage">Storage</string>
     <string name="loading">Loading…</string>
     <string name="retry">Retry</string>
+    <string name="widget_tasks_title">Open tasks</string>
+    <string name="widget_tasks_empty">All done.</string>
+    <string name="widget_tasks_description">Tick off tasks from any memo.</string>
+    <string name="widget_recent_description">Pinned and recent memos, plus quick capture.</string>
+    <string name="widget_sign_in">Open MyMemos and sign in.</string>
+    <string name="tile_new_memo">New memo</string>
 </resources>

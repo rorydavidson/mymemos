@@ -106,6 +106,14 @@ interface MemoDao {
     )
     suspend fun deleteSyncedNotIn(accountId: Long, keepRemoteNames: List<String>)
 
+    @Transaction
+    @Query("SELECT * FROM memos WHERE accountId = :accountId AND state = 'NORMAL' AND parent IS NULL AND hasIncompleteTasks = 1 AND syncStatus != 'PENDING_DELETE' ORDER BY pinned DESC, updateTimeEpochMs DESC LIMIT 20")
+    suspend fun withOpenTasks(accountId: Long): List<MemoWithAttachments>
+
+    @Transaction
+    @Query("SELECT * FROM memos WHERE accountId = :accountId AND state = 'NORMAL' AND parent IS NULL AND syncStatus != 'PENDING_DELETE' ORDER BY pinned DESC, createTimeEpochMs DESC LIMIT :limit")
+    suspend fun recent(accountId: Long, limit: Int): List<MemoWithAttachments>
+
     @Query("DELETE FROM memos WHERE accountId = :accountId AND parent = :parentRemoteName")
     suspend fun deleteCommentsOf(accountId: Long, parentRemoteName: String)
 

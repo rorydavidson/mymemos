@@ -59,7 +59,9 @@ class EditorViewModel @Inject constructor(
             val account = accountRepository.activeAccount.filterNotNull().first()
             val id = localId
             if (id == null) {
-                _state.update { it.copy(loaded = true, serverUrl = account.serverUrl) }
+                _state.update { it.copy(loaded = true, serverUrl = account.serverUrl, content = route.initialText.orEmpty()) }
+                // Shared images: the memo has to exist before a file can hang off it.
+                route.initialImages.map(Uri::parse).forEach { uri -> attach(uri) }
             } else {
                 val memo = memoRepository.observeMemo(id).first()
                 _state.update {

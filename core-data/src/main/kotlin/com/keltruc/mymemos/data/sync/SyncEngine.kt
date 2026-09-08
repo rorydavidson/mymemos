@@ -4,6 +4,7 @@ import android.util.Base64
 import androidx.room.withTransaction
 import com.keltruc.mymemos.data.attachments.AttachmentStore
 import com.keltruc.mymemos.data.auth.ApiClientRegistry
+import com.keltruc.mymemos.data.widget.WidgetRefresher
 import com.keltruc.mymemos.data.mapper.relationEntities
 import com.keltruc.mymemos.data.mapper.toEntity
 import com.keltruc.mymemos.data.mapper.toRfc3339
@@ -64,6 +65,7 @@ class SyncEngine @Inject constructor(
     private val shortcutDao: ShortcutDao,
     private val registry: ApiClientRegistry,
     private val attachmentStore: AttachmentStore,
+    private val widgets: WidgetRefresher,
     private val json: Json,
 ) {
     private val mutex = Mutex()
@@ -85,6 +87,7 @@ class SyncEngine @Inject constructor(
             pull(account, api, fullPull)
             runCatching { pullShortcuts(account, api) }
             _state.update { it.copy(running = false, lastSuccess = Instant.now()) }
+            widgets.refresh()
             Outcome.Success
         } catch (e: Exception) {
             val message = e.message ?: e.javaClass.simpleName

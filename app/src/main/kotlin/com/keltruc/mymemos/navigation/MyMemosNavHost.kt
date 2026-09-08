@@ -1,6 +1,7 @@
 package com.keltruc.mymemos.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -26,7 +27,7 @@ import kotlinx.serialization.Serializable
 @Serializable object SignInRoute
 @Serializable object TimelineRoute
 @Serializable data class MemoDetailRoute(val localId: String)
-@Serializable data class EditorRoute(val localId: String? = null)
+@Serializable data class EditorRoute(val localId: String? = null, val initialText: String? = null, val initialImages: List<String> = emptyList())
 @Serializable object SettingsRoute
 @Serializable object ShortcutsRoute
 @Serializable object TokensRoute
@@ -41,6 +42,18 @@ fun MyMemosNavHost() {
     val navController = rememberNavController()
     val sessionViewModel: SessionViewModel = hiltViewModel()
     val session by sessionViewModel.state.collectAsStateWithLifecycle()
+    val pending by sessionViewModel.pendingDestination.collectAsStateWithLifecycle()
+
+    // Intents (share sheet, widgets, tile) land here once the user is signed in.
+    LaunchedEffect(pending, session) {
+        val dest = pending ?: return@LaunchedEffect
+        if (session !is SessionState.SignedIn) return@LaunchedEffect
+        when (dest) {
+            is Destination.NewMemo -> navController.navigate(EditorRoute(initialText = dest.text, initialImages = dest.imageUris.map { it.toString() }))
+            is Destination.OpenMemo -> navController.navigate(MemoDetailRoute(dest.localId))
+        }
+        sessionViewModel.consumeDestination()
+    }
 
     when (session) {
         SessionState.Loading -> return

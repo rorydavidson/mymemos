@@ -14,6 +14,7 @@ import com.keltruc.mymemos.model.Reaction
 import com.keltruc.mymemos.model.Reference
 import com.keltruc.mymemos.data.prefs.AppPreferences
 import com.keltruc.mymemos.data.text.TaskListSorter
+import com.keltruc.mymemos.data.widget.WidgetRefresher
 import com.keltruc.mymemos.data.sync.FailedOp
 import com.keltruc.mymemos.data.sync.SyncEngine
 import com.keltruc.mymemos.data.sync.SyncScheduler
@@ -63,6 +64,7 @@ class MemoRepository @Inject constructor(
     private val engine: SyncEngine,
     private val scheduler: SyncScheduler,
     private val preferences: AppPreferences,
+    private val widgets: WidgetRefresher,
     private val json: Json,
 ) {
     // ---- reads -----------------------------------------------------------------------
@@ -71,6 +73,8 @@ class MemoRepository @Inject constructor(
         memoDao.observeTimeline(accountId, state.name).map { rows -> rows.map { it.toModel() } }
 
     fun observeMemo(localId: String): Flow<Memo?> = memoDao.observeByLocalId(localId).map { it?.toModel() }
+
+    suspend fun observeMemoOnce(localId: String): Memo? = memoDao.getByLocalId(localId)?.toModel()
 
     fun search(accountId: Long, query: String): Flow<List<Memo>> {
         val ftsQuery = query.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
@@ -111,6 +115,7 @@ class MemoRepository @Inject constructor(
     suspend fun retryFailed(accountId: Long) {
         pendingOpDao.retryFailed(accountId)
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     // ---- writes ----------------------------------------------------------------------
@@ -147,6 +152,7 @@ class MemoRepository @Inject constructor(
             pendingOpDao.insert(PendingOpEntity(accountId = accountId, memoLocalId = localId, type = Type.CREATE))
         }
         scheduler.syncNow()
+        widgets.refresh()
         return localId
     }
 
@@ -185,6 +191,7 @@ class MemoRepository @Inject constructor(
             }
         }
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     suspend fun setPinned(localId: String, pinned: Boolean) = simpleFieldOp(localId, Type.SET_PINNED) { it.copy(pinned = pinned) }
@@ -218,6 +225,7 @@ class MemoRepository @Inject constructor(
             }
         }
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     suspend fun addAttachment(localId: String, uri: Uri) {
@@ -252,6 +260,7 @@ class MemoRepository @Inject constructor(
             )
         }
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     suspend fun removeAttachment(attachmentLocalId: String) {
@@ -278,6 +287,7 @@ class MemoRepository @Inject constructor(
             }
         }
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     // ---- comments, reactions, references, location -----------------------------------
@@ -316,6 +326,7 @@ class MemoRepository @Inject constructor(
             pendingOpDao.insert(PendingOpEntity(accountId = accountId, memoLocalId = localId, type = Type.CREATE_COMMENT))
         }
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     fun observeReactions(memoLocalId: String): Flow<List<Reaction>> =
@@ -351,6 +362,7 @@ class MemoRepository @Inject constructor(
             }
         }
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     fun observeReferences(memoLocalId: String): Flow<List<Reference>> =
@@ -373,6 +385,7 @@ class MemoRepository @Inject constructor(
             queueRelations(memo)
         }
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     suspend fun removeReference(memoLocalId: String, relatedRemoteName: String) {
@@ -382,6 +395,7 @@ class MemoRepository @Inject constructor(
             queueRelations(memo)
         }
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     private suspend fun queueRelations(memo: MemoEntity) {
@@ -397,6 +411,14 @@ class MemoRepository @Inject constructor(
     /** Candidates for the reference picker: synced, top-level memos matching [query]. */
     suspend fun pickReferenceCandidates(accountId: Long, query: String): List<Memo> =
         memoDao.pickerSearch(accountId, query).map { it.toModel() }.filter { it.remoteName != null }
+
+    /** Memos with unticked tasks, newest first, for the tasks widget. */
+    suspend fun memosWithOpenTasks(accountId: Long): List<Memo> =
+        memoDao.withOpenTasks(accountId).map { it.toModel() }
+
+    /** Pinned then most recent memos, for the recents widget. */
+    suspend fun recentForWidget(accountId: Long, limit: Int): List<Memo> =
+        memoDao.recent(accountId, limit).map { it.toModel() }
 
     /** Local id for a server memo name, pulling it if we do not hold it yet. */
     suspend fun ensureLocal(account: Account, remoteName: String): String? {
@@ -430,6 +452,7 @@ class MemoRepository @Inject constructor(
             }
         }
         scheduler.syncNow()
+        widgets.refresh()
     }
 
     companion object {
