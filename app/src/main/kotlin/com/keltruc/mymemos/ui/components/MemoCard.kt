@@ -61,6 +61,7 @@ fun MemoCard(
     onDelete: () -> Unit,
     onColour: () -> Unit,
     modifier: Modifier = Modifier,
+    onTagClick: ((String) -> Unit)? = null,
 ) {
     var menu by remember { mutableStateOf(false) }
     val conflict = memo.syncStatus == SyncStatus.CONFLICT
@@ -81,7 +82,7 @@ fun MemoCard(
                 .combinedClickable(onClick = onClick, onLongClick = { menu = true }),
         ) {
             Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                MemoContent(content = memo.content, onToggleTask = onToggleTask, maxLines = 12)
+                MemoContent(content = memo.content, onToggleTask = onToggleTask, onTagClick = onTagClick, maxLines = 12)
                 AttachmentStrip(attachments = memo.attachments, serverUrl = serverUrl, thumbSize = 88)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
