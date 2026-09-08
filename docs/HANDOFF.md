@@ -1,18 +1,82 @@
 # MyMemos handoff
 
-State as of 8 September 2026. Everything lives on `feature/polish`, which contains all
-earlier branches (`feature/scaffold`, `feature/sync-engine`, `feature/extras`). Nothing is
-merged to `main` yet.
+State as of 8 September 2026. Feature branches up to `feature/config-memo` are merged to
+`main`. Open branches: `chore/readme-features` (README rewrite) and `fix/security-review`
+(closes the high and medium findings from the security review, see below).
 
 ## Where things stand
 
-- Feature complete against Memos v0.30 (see README for the list). 25 unit tests pass, lint
-  is clean, and a shrunk release build has been smoke-tested on an emulator.
+- Feature complete against Memos v0.30 (see README for the list). 47 unit tests pass and a
+  shrunk release build has been smoke-tested on an emulator. Lint has two errors, listed
+  under the security review below.
 - Two known gaps that were deliberately left: geofenced reminders (below) and Wear OS.
-- Note colours are stored per device only. The server has no field for them.
+- Note colours sync as a trailing `#colour/<name>` line, hidden in the app.
 - Password sign-in mints a personal access token per device and revokes it on sign out. If
   a device ever loses that token, the app shows a "Sign in again" banner rather than failing
   quietly.
+
+## Security review, 8 September 2026
+
+A full review was run over the app. Fixed on `fix/security-review`: image bearer token
+sent to look-alike hosts, permissionless `CREATE_MEMO` activity, `file://` URIs accepted from
+the share sheet, unvalidated config memo from any creator, off-by-a-separator zip-slip
+check in restore. Still open, all low:
+
+- Export zip uses server-supplied attachment filenames verbatim (`MarkdownExporter.kt`).
+  Pass them through `File(name).name`.
+- Markdown links open any URI scheme (`MemoContent.kt`). Allow `http`, `https`, `mailto`,
+  `geo` only.
+- A full reconcile that gets an empty memo list from the server deletes every synced local
+  memo (`SyncEngine.kt`, `deleteSyncedNotIn`). Skip the delete pass when the server returned
+  nothing but local has memos.
+- Sign-out leaves attachment files and the remembered lock password on disk.
+- Debug builds log request bodies including the sign-in password. Add
+  `redactHeader("Authorization")` and drop to `HEADERS`.
+- Minted PAT has no expiry. Consider 90 days with re-mint on refresh.
+- `AccountRepository.kt` records `AuthMethod.PASSWORD` on both sides of a ternary.
+- Coordinates logged in `MemoDetailViewModel.kt`.
+- Map tiles reach openstreetmap.org for every located memo with no opt-in.
+- GitHub CI never defines `KEYSTORE_BASE64`; `.kotlin/errors/*.log` are committed.
+- Two lint errors pre-date the review: `Notifier.kt` needs a `POST_NOTIFICATIONS` check
+  before `notify`, and `MemoDetailScreen.kt` reads a resource through `LocalContext`.
+
+Note for automation users: apps sending `CREATE_MEMO` now need the
+`com.keltruc.mymemos.permission.CREATE_MEMO` permission granted once.
+
+## Requested next
+
+Rory's list, in the order given. None started.
+
+1. **Better Markdown editing.** Pressing return inside a task or bullet line should start
+   the next line with the same marker (`- [ ] `, `- `, `1. ` incremented), and return on an
+   empty marker line should clear it. Hook the `onValueChange` in `EditorScreen.kt`: compare
+   the previous and new `TextFieldValue`, and when the only change is a newline inserted at
+   the cursor, rewrite the value with the prefix and move the selection past it. Keep it in
+   a pure function (`MarkdownContinuation.kt` or similar) with unit tests; the editor already
+   has that shape for tag autocompletion.
+2. **Completion for `@` dates.** The editor completes `#tags` only (`suggestions` in
+   `EditorScreen.kt`). Add the same popup for `@` with the tokens `DueDateParser.kt` already
+   understands: `@today`, `@tomorrow`, weekday names, and a "pick a date" entry that opens
+   the existing `DateTimePicker` and inserts `@yyyy-MM-dd`. Anything new here must also be
+   taught to the parser so the tasks screen picks it up.
+3. **Locked notes keep their title visible.** Today the whole body is encrypted, so the
+   list shows only a lock badge. Change `MemoRepository.updateLockedContent` so that when the
+   first line is a Markdown heading it is written in clear ahead of the `mymemos-enc:v1:`
+   blob, and `Memo.isLocked` / `displayContent` treat "heading plus blob" as locked with a
+   title. Decrypt must strip the heading before joining with the plaintext. This is a format
+   change: old blobs have no heading and must still decode, so keep the prefix check on
+   the encrypted line, not the whole content. Flag in the UI that the title is not encrypted.
+4. **Collapsible timeline groups.** `groupByDay` in `TimelineScreen.kt` groups by day only.
+   Wanted: days collapse into a week header when the week is older than the current one,
+   weeks into a month header when the month is older, and each header toggles its group.
+   Keep collapsed state in `AppPreferences` keyed by header label so it survives restarts.
+   Sticky headers already exist (`DayHeader`), so this is mostly the grouping function plus
+   a chevron.
+5. **Compact list view.** A toggle in the timeline top bar between the current cards and a
+   one-line list showing only each memo's title (first heading, else first non-blank line,
+   else "Untitled") with date and lock or pin badges. Persist the choice in
+   `AppPreferences`. Tapping a row opens the detail screen as now. Locked memos show the
+   clear title from item 3 once that lands, so do 3 before 5.
 
 ## Geofenced reminders
 
