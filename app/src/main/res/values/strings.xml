@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MyMemos</string>
+    <string name="signin_title">Connect to your Memos server</string>
+    <string name="signin_server_url">Server URL</string>
+    <string name="signin_username">Username</string>
+    <string name="signin_password">Password</string>
+    <string name="signin_token">Access token</string>
+    <string name="signin_button">Sign in</string>
+    <string name="signin_mode_password">Password</string>
+    <string name="signin_mode_token">Access token</string>
+    <string name="signin_probe_hint">Checking server…</string>
+    <string name="timeline_title">Memos</string>
+    <string name="timeline_empty">No memos yet. Pull to refresh or add one.</string>
+    <string name="timeline_search">Search memos</string>
+    <string name="timeline_refresh">Refresh</string>
+    <string name="timeline_pinned">Pinned</string>
+    <string name="detail_title">Memo</string>
+    <string name="back">Back</string>
+    <string name="sign_out">Sign out</string>
+    <string name="error_generic">Something went wrong</string>
+</resources>
