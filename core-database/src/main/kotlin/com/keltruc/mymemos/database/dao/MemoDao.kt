@@ -71,6 +71,20 @@ interface MemoDao {
     @Query("DELETE FROM memos WHERE localId = :localId")
     suspend fun deleteByLocalId(localId: String)
 
+    @Query("UPDATE memos SET colour = :colour WHERE localId = :localId")
+    suspend fun setColour(localId: String, colour: String?)
+
+    @Transaction
+    @Query("SELECT * FROM memos WHERE accountId = :accountId AND parent IS NULL AND syncStatus != 'PENDING_DELETE' AND createTimeEpochMs >= :fromEpochMs AND createTimeEpochMs < :toEpochMs ORDER BY createTimeEpochMs")
+    fun observeCreatedBetween(accountId: Long, fromEpochMs: Long, toEpochMs: Long): Flow<List<MemoWithAttachments>>
+
+    @Query("SELECT createTimeEpochMs FROM memos WHERE accountId = :accountId AND parent IS NULL AND syncStatus != 'PENDING_DELETE'")
+    fun observeCreateTimes(accountId: Long): Flow<List<Long>>
+
+    @Transaction
+    @Query("SELECT * FROM memos WHERE accountId = :accountId AND parent IS NULL AND syncStatus != 'PENDING_DELETE' AND latitude IS NOT NULL ORDER BY createTimeEpochMs DESC")
+    suspend fun withLocation(accountId: Long): List<MemoWithAttachments>
+
     @Query("UPDATE memos SET syncStatus = :status WHERE localId = :localId")
     suspend fun setSyncStatus(localId: String, status: String)
 

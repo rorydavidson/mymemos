@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FormatBold
 import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Image
@@ -33,6 +34,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconToggleButton
@@ -70,6 +74,8 @@ fun EditorScreen(onDone: () -> Unit, viewModel: EditorViewModel = hiltViewModel(
     val tags by viewModel.tags.collectAsStateWithLifecycle()
     var field by remember { mutableStateOf(TextFieldValue()) }
     var visibilityMenu by remember { mutableStateOf(false) }
+    var showTemplates by remember { mutableStateOf(false) }
+    val templates by viewModel.templates.collectAsStateWithLifecycle()
     val focus = remember { FocusRequester() }
 
     // Seed the field once the memo has loaded; afterwards the field drives the view model.
@@ -113,6 +119,25 @@ fun EditorScreen(onDone: () -> Unit, viewModel: EditorViewModel = hiltViewModel(
     }
     val suggestions = remember(currentTagPrefix, tags) {
         currentTagPrefix?.let { p -> tags.filter { it.startsWith(p, ignoreCase = true) && it != p }.take(8) }.orEmpty()
+    }
+
+    if (showTemplates) {
+        ModalBottomSheet(onDismissRequest = { showTemplates = false }) {
+            Text(stringResource(R.string.template_insert), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+            templates.forEach { t ->
+                ListItem(
+                    headlineContent = { Text(t.title) },
+                    supportingContent = { Text(t.body.lineSequence().firstOrNull().orEmpty()) },
+                    modifier = Modifier.clickable {
+                        val expanded = viewModel.expand(t)
+                        val insert = if (field.text.isBlank()) expanded else field.text.trimEnd() + "\n\n" + expanded
+                        update(TextFieldValue(insert, TextRange(insert.length)))
+                        showTemplates = false
+                    },
+                )
+            }
+            Spacer(Modifier.padding(16.dp))
+        }
     }
 
     Scaffold(
@@ -220,6 +245,7 @@ fun EditorScreen(onDone: () -> Unit, viewModel: EditorViewModel = hiltViewModel(
                 IconButton(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
                     Icon(Icons.Default.Image, stringResource(R.string.attach_image))
                 }
+                IconButton(onClick = { showTemplates = true }) { Icon(Icons.Default.Description, stringResource(R.string.template_insert)) }
             }
         }
     }

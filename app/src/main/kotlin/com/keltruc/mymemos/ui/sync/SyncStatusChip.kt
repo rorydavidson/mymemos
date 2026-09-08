@@ -6,9 +6,12 @@ import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -17,25 +20,24 @@ import androidx.compose.ui.unit.dp
 import com.keltruc.mymemos.R
 import com.keltruc.mymemos.data.sync.SyncState
 
+/** Compact sync indicator: a cloud icon whose colour and badge say what is going on. */
 @Composable
 fun SyncStatusChip(state: SyncState, onClick: () -> Unit) {
-    val (label, icon) = when {
-        state.running -> stringResource(R.string.sync_running) to null
-        state.authExpired -> stringResource(R.string.sign_in_again) to Icons.Default.ErrorOutline
-        state.failedCount > 0 -> stringResource(R.string.sync_failed, state.failedCount) to Icons.Default.ErrorOutline
-        state.pendingCount > 0 -> stringResource(R.string.sync_pending, state.pendingCount) to Icons.Default.CloudUpload
-        state.lastError != null -> "Offline" to Icons.Default.CloudOff
-        else -> stringResource(R.string.sync_idle) to Icons.Default.CloudDone
+    val (icon, tint, badge) = when {
+        state.running -> Triple(null, MaterialTheme.colorScheme.primary, null)
+        state.authExpired -> Triple(Icons.Default.ErrorOutline, MaterialTheme.colorScheme.error, null)
+        state.failedCount > 0 -> Triple(Icons.Default.ErrorOutline, MaterialTheme.colorScheme.error, state.failedCount)
+        state.pendingCount > 0 -> Triple(Icons.Default.CloudUpload, MaterialTheme.colorScheme.tertiary, state.pendingCount)
+        state.lastError != null -> Triple(Icons.Default.CloudOff, MaterialTheme.colorScheme.onSurfaceVariant, null)
+        else -> Triple(Icons.Default.CloudDone, MaterialTheme.colorScheme.primary, null)
     }
-    AssistChip(
-        onClick = onClick,
-        label = { Text(label) },
-        leadingIcon = {
+    IconButton(onClick = onClick) {
+        BadgedBox(badge = { if (badge != null) Badge { Text(badge.toString()) } }) {
             if (icon == null) {
-                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
             } else {
-                Icon(icon, contentDescription = stringResource(R.string.sync_status), Modifier.size(16.dp))
+                Icon(icon, contentDescription = stringResource(R.string.sync_status), tint = tint)
             }
-        },
-    )
+        }
+    }
 }

@@ -19,6 +19,8 @@ import com.keltruc.mymemos.ui.admin.AdminInstanceScreen
 import com.keltruc.mymemos.ui.admin.AdminUsersScreen
 import com.keltruc.mymemos.ui.settings.SettingsNav
 import com.keltruc.mymemos.ui.settings.SettingsScreen
+import com.keltruc.mymemos.ui.review.ReviewScreen
+import com.keltruc.mymemos.ui.templates.TemplatesScreen
 import com.keltruc.mymemos.ui.shortcuts.ShortcutsScreen
 import com.keltruc.mymemos.ui.signin.SignInScreen
 import com.keltruc.mymemos.ui.timeline.TimelineScreen
@@ -36,6 +38,8 @@ import kotlinx.serialization.Serializable
 @Serializable object StatsRoute
 @Serializable object AdminUsersRoute
 @Serializable object AdminInstanceRoute
+@Serializable object ReviewRoute
+@Serializable object TemplatesRoute
 
 @Composable
 fun MyMemosNavHost() {
@@ -72,6 +76,7 @@ fun MyMemosNavHost() {
                         onSettings = { navController.navigate(SettingsRoute) },
                         onManageShortcuts = { navController.navigate(ShortcutsRoute) },
                         onNotifications = { navController.navigate(NotificationsRoute) },
+                        onReview = { navController.navigate(ReviewRoute) },
                     )
                 }
                 composable<MemoDetailRoute> { entry ->
@@ -99,6 +104,7 @@ fun MyMemosNavHost() {
                             onStats = { navController.navigate(StatsRoute) },
                             onAdminUsers = { navController.navigate(AdminUsersRoute) },
                             onAdminInstance = { navController.navigate(AdminInstanceRoute) },
+                            onTemplates = { navController.navigate(TemplatesRoute) },
                         ),
                     )
                 }
@@ -114,6 +120,14 @@ fun MyMemosNavHost() {
                 composable<AdminUsersRoute> {
                     AdminUsersScreen(serverUrl = (session as SessionState.SignedIn).account.serverUrl, onBack = { navController.popBackStack() })
                 }
+                composable<ReviewRoute> {
+                    ReviewScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenMemo = { navController.navigate(MemoDetailRoute(it)) },
+                        onEditMemo = { navController.navigate(EditorRoute(it)) },
+                    )
+                }
+                composable<TemplatesRoute> { TemplatesScreen(onBack = { navController.popBackStack() }) }
                 composable<AdminInstanceRoute> { AdminInstanceScreen(onBack = { navController.popBackStack() }) }
             }
         }

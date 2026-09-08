@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.keltruc.mymemos.data.repository.AccountRepository
 import com.keltruc.mymemos.data.repository.MemoRepository
+import com.keltruc.mymemos.data.repository.TemplateRepository
+import com.keltruc.mymemos.model.Template
 import com.keltruc.mymemos.model.Attachment
 import com.keltruc.mymemos.model.Visibility
 import com.keltruc.mymemos.navigation.EditorRoute
@@ -42,7 +44,13 @@ class EditorViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val memoRepository: MemoRepository,
     private val accountRepository: AccountRepository,
+    templateRepository: TemplateRepository,
 ) : ViewModel() {
+    val templates: StateFlow<List<Template>> = templateRepository.templates
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun expand(template: Template): String = TemplateRepository.expand(template.body)
+
     private val route = savedStateHandle.toRoute<EditorRoute>()
     private var localId: String? = route.localId
 

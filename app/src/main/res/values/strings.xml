@@ -150,4 +150,25 @@
     <string name="widget_recent_description">Pinned and recent memos, plus quick capture.</string>
     <string name="widget_sign_in">Open MyMemos and sign in.</string>
     <string name="tile_new_memo">New memo</string>
+    <string name="colour">Colour</string>
+    <string name="colour_none">No colour</string>
+    <string name="templates">Templates</string>
+    <string name="template_insert">Insert template</string>
+    <string name="template_new">New template</string>
+    <string name="template_title">Title</string>
+    <string name="template_body">Body</string>
+    <string name="template_hint">Placeholders: {{date}}, {{isodate}}, {{time}}, {{weekday}}, {{month}}, {{year}}</string>
+    <string name="review">Review</string>
+    <string name="review_day">Day</string>
+    <string name="review_on_this_day">On this day</string>
+    <string name="review_nearby">Nearby</string>
+    <string name="review_empty_day">Nothing written that day.</string>
+    <string name="review_empty_history">No memos from this date in earlier months or years.</string>
+    <string name="review_nearby_empty">No memos carry a location yet, or no fix is available.</string>
+    <string name="review_nearby_permission">Allow location to see memos near you.</string>
+    <string name="streak">%1$d-day streak</string>
+    <string name="years_ago">%1$d years ago</string>
+    <string name="one_year_ago">A year ago</string>
+    <string name="months_ago">%1$d months ago</string>
+    <string name="one_month_ago">A month ago</string>
 </resources>

@@ -42,7 +42,11 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.UUID
+import com.keltruc.mymemos.model.NoteColour
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -303,7 +307,7 @@ class MemoRepository @Inject constructor(
             for (dto in comments) {
                 val existing = memoDao.getByRemoteName(account.id, dto.name)
                 if (existing != null && existing.syncStatus != SyncStatus.SYNCED.name) continue
-                memoDao.upsert(dto.toEntity(account.id, existing?.localId).copy(parent = parentRemoteName))
+                memoDao.upsert(dto.toEntity(account.id, existing?.localId, existing?.colour).copy(parent = parentRemoteName))
             }
         }
     }
@@ -411,6 +415,24 @@ class MemoRepository @Inject constructor(
     /** Candidates for the reference picker: synced, top-level memos matching [query]. */
     suspend fun pickReferenceCandidates(accountId: Long, query: String): List<Memo> =
         memoDao.pickerSearch(accountId, query).map { it.toModel() }.filter { it.remoteName != null }
+
+    /** Local-only tint; never touches the server. */
+    suspend fun setColour(localId: String, colour: NoteColour?) {
+        memoDao.setColour(localId, colour?.name)
+        widgets.refresh()
+    }
+
+    fun observeCreatedOn(accountId: Long, day: LocalDate, zone: ZoneId = ZoneId.systemDefault()): Flow<List<Memo>> {
+        val from = day.atStartOfDay(zone).toInstant().toEpochMilli()
+        val to = day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        return memoDao.observeCreatedBetween(accountId, from, to).map { rows -> rows.map { it.toModel() } }
+    }
+
+    /** Days with at least one memo, for streaks and "on this day". */
+    fun observeActiveDays(accountId: Long, zone: ZoneId = ZoneId.systemDefault()): Flow<Set<LocalDate>> =
+        memoDao.observeCreateTimes(accountId).map { times -> times.map { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }.toSet() }
+
+    suspend fun memosWithLocation(accountId: Long): List<Memo> = memoDao.withLocation(accountId).map { it.toModel() }
 
     /** Memos with unticked tasks, newest first, for the tasks widget. */
     suspend fun memosWithOpenTasks(accountId: Long): List<Memo> =

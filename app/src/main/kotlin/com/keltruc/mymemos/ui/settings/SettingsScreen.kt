@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Notifications
@@ -66,6 +67,7 @@ data class SettingsNav(
     val onStats: () -> Unit,
     val onAdminUsers: () -> Unit,
     val onAdminInstance: () -> Unit,
+    val onTemplates: () -> Unit,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -156,6 +158,7 @@ fun SettingsScreen(onBack: () -> Unit, nav: SettingsNav, viewModel: SettingsView
             LinkRow(Icons.Default.Key, stringResource(R.string.change_password)) { editPassword = true }
 
             Section(stringResource(R.string.settings_editor))
+            LinkRow(Icons.Default.Description, stringResource(R.string.templates), nav.onTemplates)
             ListItem(
                 headlineContent = { Text(stringResource(R.string.setting_sort_completed)) },
                 supportingContent = { Text(stringResource(R.string.setting_sort_completed_hint)) },

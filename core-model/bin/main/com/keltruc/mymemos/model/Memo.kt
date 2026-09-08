@@ -41,6 +41,7 @@ data class Memo(
     val syncStatus: SyncStatus,
     /** Server name of the memo this comments on, or null. */
     val parent: String? = null,
+    val colour: NoteColour? = null,
 ) {
     val isComment: Boolean get() = parent != null
     val isPendingLocalChange: Boolean get() = syncStatus != SyncStatus.SYNCED

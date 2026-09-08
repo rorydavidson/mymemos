@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Unarchive
@@ -58,6 +59,7 @@ fun MemoCard(
     onPin: () -> Unit,
     onArchive: () -> Unit,
     onDelete: () -> Unit,
+    onColour: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var menu by remember { mutableStateOf(false) }
@@ -67,6 +69,7 @@ fun MemoCard(
             shape = MaterialTheme.shapes.medium,
             color = when {
                 conflict -> MaterialTheme.colorScheme.errorContainer
+                memo.colour != null -> memo.colour!!.tint()
                 memo.pinned -> MaterialTheme.colorScheme.secondaryContainer
                 else -> MaterialTheme.colorScheme.surfaceContainer
             },
@@ -113,6 +116,11 @@ fun MemoCard(
                 text = { Text(stringResource(if (memo.state == MemoState.ARCHIVED) R.string.unarchive else R.string.archive)) },
                 leadingIcon = { Icon(if (memo.state == MemoState.ARCHIVED) Icons.Default.Unarchive else Icons.Default.Archive, null) },
                 onClick = { menu = false; onArchive() },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.colour)) },
+                leadingIcon = { Icon(Icons.Default.Palette, null) },
+                onClick = { menu = false; onColour() },
             )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.delete)) },

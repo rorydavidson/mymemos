@@ -47,7 +47,7 @@ class ShortcutRepository @Inject constructor(
                 for (dto in page.memos) {
                     val existing = memoDao.getByRemoteName(account.id, dto.name)
                     if (existing != null && existing.syncStatus != SyncStatus.SYNCED.name) continue
-                    val entity = dto.toEntity(account.id, existing?.localId)
+                    val entity = dto.toEntity(account.id, existing?.localId, existing?.colour)
                     memoDao.upsert(entity)
                     engine.reconcileSocial(entity.localId, dto)
                 }

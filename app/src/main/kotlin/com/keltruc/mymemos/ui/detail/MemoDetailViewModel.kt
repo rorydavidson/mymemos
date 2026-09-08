@@ -126,6 +126,8 @@ class MemoDetailViewModel @Inject constructor(
 
     fun delete() = viewModelScope.launch { state.value.memo?.let { memoRepository.delete(it.localId) } }
 
+    fun setColour(colour: com.keltruc.mymemos.model.NoteColour?) = viewModelScope.launch { memoRepository.setColour(route.localId, colour) }
+
     fun keepConflictCopy() = viewModelScope.launch { state.value.memo?.let { memoRepository.resolveConflict(it.localId) } }
 
     fun addComment(text: String) = viewModelScope.launch {

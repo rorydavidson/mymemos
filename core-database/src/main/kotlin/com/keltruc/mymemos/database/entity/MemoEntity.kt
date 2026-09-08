@@ -53,6 +53,8 @@ data class MemoEntity(
     val baseUpdateTimeEpochMs: Long?,
     /** Server name of the memo this one comments on; null for top-level memos. */
     @ColumnInfo(defaultValue = "NULL") val parent: String? = null,
+    /** Local-only tint, a [com.keltruc.mymemos.model.NoteColour] name. The server has no such field. */
+    @ColumnInfo(defaultValue = "NULL") val colour: String? = null,
 ) {
     companion object {
         /** ASCII unit separator (0x1F): cannot appear in a tag, unlike commas or spaces. */
