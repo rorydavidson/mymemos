@@ -42,8 +42,9 @@ Fixed on `fix/security-review-low`, the remaining low findings and the two lint 
   is only read by `signOut`, so stored accounts need no migration.
 - Coordinates are no longer logged in `MemoDetailViewModel`.
 - Map tiles are behind a "Map previews" setting (`Settings.mapTiles`, off by default, provided
-  through `LocalMapTiles`). With it off both `MapPreview` and `RouteMap` still draw markers
-  and the route, but fetch nothing from openstreetmap.org.
+  through `LocalMapTiles`). With it off `MapPreview` and `RouteMap` return early and render
+  nothing, so openstreetmap.org is never called. A located memo still shows its place-name
+  chip on the detail screen, and the journey tab still lists the day's memos in order.
 - CI now passes `KEYSTORE_BASE64` to the release step and only decodes it when both it and
   `STORE_FILE` are set. `.kotlin/` is git-ignored and the committed error logs are gone.
 - The two lint errors are fixed: `Notifier.post` checks `POST_NOTIFICATIONS` inline so lint

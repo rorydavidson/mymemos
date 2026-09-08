@@ -44,9 +44,9 @@ import kotlin.math.tan
  */
 @Composable
 fun MapPreview(location: Location, modifier: Modifier = Modifier, height: Dp = 160.dp, zoom: Int = 15) {
+    if (!LocalMapTiles.current) return
     val context = LocalContext.current
     val density = LocalDensity.current
-    val tilesEnabled = LocalMapTiles.current
     BoxWithConstraints(
         modifier
             .fillMaxWidth()
@@ -75,7 +75,7 @@ fun MapPreview(location: Location, modifier: Modifier = Modifier, height: Dp = 1
         val top = -((originY / tilePx).toInt() + 1)
         val right = ((widthPx - originX) / tilePx).toInt() + 1
         val bottom = ((heightPx - originY) / tilePx).toInt() + 1
-        if (tilesEnabled) for (dy in top..bottom) for (dx in left..right) {
+        for (dy in top..bottom) for (dx in left..right) {
             val tx = Math.floorMod(tx0 + dx, n)
             val ty = ty0 + dy
             if (ty !in 0 until n) continue
