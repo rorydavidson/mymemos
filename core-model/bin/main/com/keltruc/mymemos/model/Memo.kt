@@ -44,5 +44,16 @@ data class Memo(
     val colour: NoteColour? = null,
 ) {
     val isComment: Boolean get() = parent != null
+
+    /** Content is an end-to-end encrypted blob; see MemoCipher in core-data. */
+    val isLocked: Boolean get() = content.trimStart().startsWith(LOCKED_PREFIX)
+
+    /** Content without the `#colour/x` line, for rendering and editing. */
+    val displayContent: String get() = colourLine.replace(content, "").trimEnd('\n')
+
+    companion object {
+        const val LOCKED_PREFIX = "mymemos-enc:v1:"
+        private val colourLine = Regex("(?m)^[ \\t]*#colour/[a-z]+[ \\t]*$\\n?")
+    }
     val isPendingLocalChange: Boolean get() = syncStatus != SyncStatus.SYNCED
 }

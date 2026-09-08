@@ -45,7 +45,7 @@ fun GraphView(memos: List<Memo>, edges: List<Pair<String, String>>, onOpen: (Str
     val pinnedColour = MaterialTheme.colorScheme.secondary
     val edgeColour = MaterialTheme.colorScheme.outlineVariant
     val labelColour = MaterialTheme.colorScheme.onSurface
-    val labels = memos.associate { it.localId to it.content.lineSequence().firstOrNull { l -> l.isNotBlank() }.orEmpty().take(28) }
+    val labels = memos.associate { it.localId to it.displayContent.lineSequence().firstOrNull { l -> l.isNotBlank() }.orEmpty().take(28) }
     val degree = edges.flatMap { listOf(it.first, it.second) }.groupingBy { it }.eachCount()
 
     Canvas(

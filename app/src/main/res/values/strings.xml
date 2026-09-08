@@ -186,4 +186,23 @@
     <string name="about">About</string>
     <string name="about_licences">Google Sans Flex is used under the SIL Open Font License 1.1. \"Google Sans Flex\" is a trademark of Google LLC. Markdown rendering by commonmark-java (BSD-2). Diffing by java-diff-utils (Apache-2.0).</string>
     <string name="version">Version %1$s</string>
+    <string name="lock">Lock with password</string>
+    <string name="unlock">Remove lock</string>
+    <string name="locked_memo">Locked memo</string>
+    <string name="locked_hint">Encrypted on this device. The server only stores the scrambled text.</string>
+    <string name="memo_password">Memo password</string>
+    <string name="memo_password_hint">One password unlocks all your locked memos. It is never sent to the server and cannot be recovered.</string>
+    <string name="remember_on_device">Remember on this device</string>
+    <string name="unlock_button">Unlock</string>
+    <string name="wrong_password">Wrong password</string>
+    <string name="lock_confirm">Lock this memo? Tags, search and task ticking stop working while it is locked.</string>
+    <string name="forget_password">Forget memo password</string>
+    <string name="forget_password_hint">Locked memos will ask for the password again.</string>
+    <string name="password_remembered">Remembered on this device</string>
+    <string name="password_not_remembered">Asked for each session</string>
+    <string name="review_progress">%1$d of %2$d</string>
+    <string name="review_keep">Keep</string>
+    <string name="review_add_tag">Add tag</string>
+    <string name="review_done">That is everything for this day.</string>
+    <string name="review_swipe_hint">Swipe left to archive, right to keep.</string>
 </resources>

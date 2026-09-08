@@ -6,6 +6,7 @@ import com.keltruc.mymemos.data.prefs.AppPreferences
 import com.keltruc.mymemos.data.prefs.Settings
 import com.keltruc.mymemos.data.repository.AccountRepository
 import com.keltruc.mymemos.data.repository.AccountSettingsRepository
+import com.keltruc.mymemos.data.crypto.PasswordSession
 import com.keltruc.mymemos.model.Account
 import com.keltruc.mymemos.model.User
 import com.keltruc.mymemos.model.UserPreferences
@@ -25,7 +26,10 @@ class SettingsViewModel @Inject constructor(
     private val preferences: AppPreferences,
     private val accountRepository: AccountRepository,
     private val settingsRepository: AccountSettingsRepository,
+    private val passwordSession: PasswordSession,
 ) : ViewModel() {
+    val passwordRemembered = MutableStateFlow(passwordSession.isRemembered)
+    fun forgetPassword() { passwordSession.forget(); passwordRemembered.value = false }
     val settings: StateFlow<Settings> = preferences.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Settings())
     val account: StateFlow<Account?> = accountRepository.activeAccount

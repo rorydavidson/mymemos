@@ -82,8 +82,19 @@ fun MemoCard(
                 .combinedClickable(onClick = onClick, onLongClick = { menu = true }),
         ) {
             Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                MemoContent(content = memo.content, onToggleTask = onToggleTask, onTagClick = onTagClick, maxLines = 12)
+                if (memo.isLocked) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Column {
+                            Text(stringResource(R.string.locked_memo), style = MaterialTheme.typography.titleSmall)
+                            Text(stringResource(R.string.locked_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                } else {
+                    MemoContent(content = memo.displayContent, onToggleTask = onToggleTask, onTagClick = onTagClick, maxLines = 12)
+                }
                 AttachmentStrip(attachments = memo.attachments, serverUrl = serverUrl, thumbSize = 88)
+                memo.location?.let { MapPreview(it, height = 120.dp, zoom = 14) }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         timeFormatter.format(memo.createTime.atZone(ZoneId.systemDefault())),

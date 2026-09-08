@@ -80,6 +80,7 @@ fun SettingsScreen(onBack: () -> Unit, nav: SettingsNav, viewModel: SettingsView
     val profile by viewModel.profile.collectAsStateWithLifecycle()
     val serverPrefs by viewModel.serverPrefs.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
+    val passwordRemembered by viewModel.passwordRemembered.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var editProfile by remember { mutableStateOf(false) }
     var editPassword by remember { mutableStateOf(false) }
@@ -178,6 +179,13 @@ fun SettingsScreen(onBack: () -> Unit, nav: SettingsNav, viewModel: SettingsView
 
             Section(stringResource(R.string.data))
             LinkRow(Icons.Default.Storage, stringResource(R.string.data), nav.onData)
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.forget_password)) },
+                supportingContent = { Text(stringResource(if (passwordRemembered) R.string.password_remembered else R.string.password_not_remembered) + ". " + stringResource(R.string.forget_password_hint)) },
+                leadingContent = { Icon(Icons.Default.Key, null) },
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.clickable(onClick = viewModel::forgetPassword),
+            )
 
             if (account?.role == UserRole.ADMIN) {
                 Section(stringResource(R.string.admin))

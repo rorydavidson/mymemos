@@ -29,6 +29,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Place
@@ -82,7 +84,9 @@ import com.keltruc.mymemos.ui.components.AttachmentStrip
 import com.keltruc.mymemos.ui.components.Avatar
 import com.keltruc.mymemos.ui.components.ColourPickerDialog
 import com.keltruc.mymemos.ui.components.tint
+import com.keltruc.mymemos.ui.components.MapPreview
 import com.keltruc.mymemos.ui.components.MemoContent
+import com.keltruc.mymemos.ui.components.MemoPasswordDialog
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -101,6 +105,9 @@ fun MemoDetailScreen(
     viewModel: MemoDetailViewModel = hiltViewModel<MemoDetailViewModel, MemoDetailViewModel.Factory>(key = localId) { it.create(localId) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val unlockedText by viewModel.unlockedText.collectAsStateWithLifecycle()
+    val askPassword by viewModel.askPassword.collectAsStateWithLifecycle()
+    val passwordError by viewModel.passwordError.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
     var confirmDelete by remember { mutableStateOf(false) }
@@ -155,6 +162,11 @@ fun MemoDetailScreen(
                             },
                         )
                         DropdownMenuItem(
+                            text = { Text(stringResource(if (m.isLocked) R.string.unlock else R.string.lock)) },
+                            leadingIcon = { Icon(if (m.isLocked) Icons.Default.LockOpen else Icons.Default.Lock, null) },
+                            onClick = { overflow = false; if (m.isLocked) viewModel.requestRemoveLock() else viewModel.lockNow() },
+                        )
+                        DropdownMenuItem(
                             text = { Text(stringResource(R.string.colour)) },
                             leadingIcon = { Icon(Icons.Default.Palette, null) },
                             onClick = { overflow = false; showColour = true },
@@ -193,10 +205,30 @@ fun MemoDetailScreen(
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            MemoContent(content = m.content, onToggleTask = viewModel::toggleTask, modifier = Modifier.fillMaxWidth())
+            when {
+                !m.isLocked -> MemoContent(content = m.displayContent, onToggleTask = viewModel::toggleTask, modifier = Modifier.fillMaxWidth())
+                unlockedText != null -> {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon(Icons.Default.LockOpen, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                        Text(stringResource(R.string.locked_memo), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    }
+                    MemoContent(content = unlockedText!!, onToggleTask = viewModel::toggleTask, modifier = Modifier.fillMaxWidth())
+                }
+                else -> Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(Icons.Default.Lock, null, tint = MaterialTheme.colorScheme.primary)
+                            Text(stringResource(R.string.locked_memo), style = MaterialTheme.typography.titleMedium)
+                        }
+                        Text(stringResource(R.string.locked_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
+                        TextButton(onClick = { viewModel.askPassword.value = MemoDetailViewModel.PasswordPurpose.UNLOCK_VIEW }) { Text(stringResource(R.string.unlock_button)) }
+                    }
+                }
+            }
             if (m.attachments.isNotEmpty()) {
                 AttachmentStrip(attachments = m.attachments, serverUrl = state.account?.serverUrl.orEmpty(), thumbSize = 140)
             }
+            m.location?.let { loc -> MapPreview(loc) }
             m.location?.let { loc ->
                 AssistChip(
                     onClick = {
@@ -306,6 +338,24 @@ fun MemoDetailScreen(
                 context.startActivity(Intent.createChooser(send, null))
             },
             onDismiss = viewModel::closeShares,
+        )
+    }
+
+    askPassword?.let { purpose ->
+        MemoPasswordDialog(
+            title = stringResource(
+                when (purpose) {
+                    MemoDetailViewModel.PasswordPurpose.LOCK -> R.string.lock
+                    MemoDetailViewModel.PasswordPurpose.REMOVE_LOCK -> R.string.unlock
+                    MemoDetailViewModel.PasswordPurpose.UNLOCK_VIEW -> R.string.locked_memo
+                },
+            ),
+            hint = stringResource(if (purpose == MemoDetailViewModel.PasswordPurpose.LOCK) R.string.lock_confirm else R.string.memo_password_hint),
+            confirmLabel = stringResource(if (purpose == MemoDetailViewModel.PasswordPurpose.LOCK) R.string.lock else R.string.unlock_button),
+            error = passwordError,
+            initialRemember = viewModel.passwordRemembered,
+            onConfirm = viewModel::submitPassword,
+            onDismiss = viewModel::dismissPassword,
         )
     }
 
