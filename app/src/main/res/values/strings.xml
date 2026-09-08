@@ -55,6 +55,9 @@
     <string name="setting_sort_completed_hint">When you save a memo, ticked tasks move below the unticked ones in each list.</string>
     <string name="setting_dynamic_colour">Wallpaper colours</string>
     <string name="setting_dynamic_colour_hint">Use your device\'s Material You palette instead of the app\'s own.</string>
+    <string name="compact_list">Compact list</string>
+    <string name="card_list">Cards</string>
+    <string name="untitled">Untitled</string>
     <string name="group_collapse">Collapse</string>
     <string name="group_expand">Expand</string>
     <string name="setting_map_tiles">Map previews</string>

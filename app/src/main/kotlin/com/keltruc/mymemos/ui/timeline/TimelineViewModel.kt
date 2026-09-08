@@ -64,6 +64,15 @@ class TimelineViewModel @Inject constructor(
         .map { it.collapsedGroups }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
+    /** Whether the timeline draws one-line rows rather than cards. */
+    val compactList: StateFlow<Boolean> = preferences.settings
+        .map { it.compactList }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun toggleCompactList() = viewModelScope.launch {
+        preferences.setCompactList(!compactList.value)
+    }
+
     fun toggleGroup(key: String) = viewModelScope.launch {
         preferences.setGroupCollapsed(key, key !in collapsedGroups.value)
     }

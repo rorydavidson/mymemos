@@ -27,6 +27,8 @@ data class Settings(
     val mapTiles: Boolean = false,
     /** Timeline headers the user has folded away, by [TimelineGrouping.Group.key]. */
     val collapsedGroups: Set<String> = emptySet(),
+    /** Show the timeline as one-line rows instead of cards. */
+    val compactList: Boolean = false,
 )
 
 @Singleton
@@ -35,6 +37,7 @@ class AppPreferences @Inject constructor(@ApplicationContext private val context
     private val dynamic = booleanPreferencesKey("dynamic_colour")
     private val tiles = booleanPreferencesKey("map_tiles")
     private val collapsed = stringSetPreferencesKey("collapsed_groups")
+    private val compact = booleanPreferencesKey("compact_list")
 
     val settings: Flow<Settings> = context.dataStore.data.map { p ->
         Settings(
@@ -42,6 +45,7 @@ class AppPreferences @Inject constructor(@ApplicationContext private val context
             dynamicColour = p[dynamic] ?: false,
             mapTiles = p[tiles] ?: false,
             collapsedGroups = p[collapsed].orEmpty(),
+            compactList = p[compact] ?: false,
         )
     }
 
@@ -57,6 +61,10 @@ class AppPreferences @Inject constructor(@ApplicationContext private val context
 
     suspend fun setMapTiles(enabled: Boolean) {
         context.dataStore.edit { it[tiles] = enabled }
+    }
+
+    suspend fun setCompactList(enabled: Boolean) {
+        context.dataStore.edit { it[compact] = enabled }
     }
 
     suspend fun setGroupCollapsed(key: String, collapsedNow: Boolean) {

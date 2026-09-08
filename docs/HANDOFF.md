@@ -85,11 +85,17 @@ Rory's list, in the order given. None started.
    `month:2026-09-01`) rather than the header label as first sketched, so collapsing "Today"
    does not come back as a collapsed tomorrow and a translated label does not lose the
    choice. A collapsed header shows its memo count.
-5. **Compact list view.** A toggle in the timeline top bar between the current cards and a
-   one-line list showing only each memo's title (first heading, else first non-blank line,
-   else "Untitled") with date and lock or pin badges. Persist the choice in
-   `AppPreferences`. Tapping a row opens the detail screen as now. Locked memos show the
-   clear title from item 3 once that lands, so do 3 before 5.
+5. **Compact list view.** Done, except for one thread left hanging by the reordering. The
+   toggle sits in the timeline top bar, next to archive; `AppPreferences.compactList` holds
+   the choice. `MemoTitle.of` in core-data works out the title (first heading, else first
+   non-blank line, with Markdown decoration and the hidden colour line taken off) and returns
+   null when there is nothing to show, so the wording of the fallback stays in the UI where it
+   can be translated. `CompactMemoRow` draws it with the time and lock or pin badges.
+
+   Left hanging: item 5 was meant to follow item 3, so locked memos would show a clear title.
+   With 3 now last, `CompactMemoRow` shows a lock badge and the words "Locked memo" instead.
+   When item 3 lands, that is the one place to change: drop the `memo.isLocked` guard around
+   `MemoTitle.of` and let the heading through.
 
 ## Geofenced reminders
 

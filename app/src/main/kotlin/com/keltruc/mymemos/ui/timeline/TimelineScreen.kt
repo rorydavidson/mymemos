@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Bookmark
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Badge
@@ -77,6 +79,7 @@ import com.keltruc.mymemos.model.Memo
 import com.keltruc.mymemos.model.Shortcut
 import com.keltruc.mymemos.ui.components.Avatar
 import com.keltruc.mymemos.ui.components.ColourPickerDialog
+import com.keltruc.mymemos.ui.components.CompactMemoRow
 import com.keltruc.mymemos.ui.components.MemoCard
 import com.keltruc.mymemos.ui.components.tint
 import com.keltruc.mymemos.ui.sync.SyncStatusChip
@@ -118,6 +121,7 @@ fun TimelineScreen(
     }
 
     val collapsedGroups by viewModel.collapsedGroups.collectAsStateWithLifecycle()
+    val compactList by viewModel.compactList.collectAsStateWithLifecycle()
     val grouped = remember(state.memos) { TimelineGrouping.group(state.memos) }
 
     Scaffold(
@@ -148,6 +152,8 @@ fun TimelineScreen(
                         onQuery = viewModel::onQuery,
                         onTag = viewModel::onTag,
                         onToggleArchived = viewModel::toggleArchived,
+                        compactList = compactList,
+                        onToggleCompact = viewModel::toggleCompactList,
                         onShortcut = viewModel::onShortcut,
                         onManageShortcuts = onManageShortcuts,
                         unread = unread,
@@ -192,19 +198,27 @@ fun TimelineScreen(
                         )
                     }
                     items(if (collapsed) emptyList() else group.memos, key = { it.localId }) { memo ->
-                        MemoCard(
-                            memo = memo,
-                            serverUrl = state.account?.serverUrl.orEmpty(),
-                            onClick = { onOpenMemo(memo.localId) },
-                            onToggleTask = { line, checked -> viewModel.toggleTask(memo, line, checked) },
-                            onEdit = { onEditMemo(memo.localId) },
-                            onPin = { viewModel.togglePin(memo) },
-                            onArchive = { viewModel.toggleArchive(memo) },
-                            onDelete = { pendingDelete = memo },
-                            onColour = { colouring = memo },
-                            onTagClick = { viewModel.onTag(it) },
-                            modifier = Modifier.animateItem().padding(horizontal = 16.dp, vertical = 7.dp),
-                        )
+                        if (compactList) {
+                            CompactMemoRow(
+                                memo = memo,
+                                onClick = { onOpenMemo(memo.localId) },
+                                modifier = Modifier.animateItem(),
+                            )
+                        } else {
+                            MemoCard(
+                                memo = memo,
+                                serverUrl = state.account?.serverUrl.orEmpty(),
+                                onClick = { onOpenMemo(memo.localId) },
+                                onToggleTask = { line, checked -> viewModel.toggleTask(memo, line, checked) },
+                                onEdit = { onEditMemo(memo.localId) },
+                                onPin = { viewModel.togglePin(memo) },
+                                onArchive = { viewModel.toggleArchive(memo) },
+                                onDelete = { pendingDelete = memo },
+                                onColour = { colouring = memo },
+                                onTagClick = { viewModel.onTag(it) },
+                                modifier = Modifier.animateItem().padding(horizontal = 16.dp, vertical = 7.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -277,6 +291,8 @@ private fun Header(
     onQuery: (String) -> Unit,
     onTag: (String?) -> Unit,
     onToggleArchived: () -> Unit,
+    compactList: Boolean,
+    onToggleCompact: () -> Unit,
     onShortcut: (Shortcut?) -> Unit,
     onManageShortcuts: () -> Unit,
     unread: Int,
@@ -319,6 +335,13 @@ private fun Header(
                 BadgedBox(badge = { if (unread > 0) Badge { Text(unread.toString()) } }) {
                     Icon(Icons.Default.Notifications, contentDescription = stringResource(R.string.notifications), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            }
+            IconButton(onClick = onToggleCompact) {
+                Icon(
+                    if (compactList) Icons.Default.ViewAgenda else Icons.AutoMirrored.Filled.ViewList,
+                    contentDescription = stringResource(if (compactList) R.string.card_list else R.string.compact_list),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             IconButton(onClick = onToggleArchived) {
                 Icon(
