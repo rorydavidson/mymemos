@@ -1,8 +1,8 @@
 # MyMemos handoff
 
-State as of 8 September 2026. Every feature branch, `chore/readme-features` and
-`fix/security-review` are merged to `main`. Open branch: `fix/security-review-low`, which
-closes the low findings and the two lint errors (see below).
+State as of 8 September 2026. Everything up to and including the security review, plus
+feature items 1 and 2 below, is merged to `main`. Open branch: `feature/timeline-grouping`,
+which carries items 4, 5 and 6.
 
 ## Where things stand
 
@@ -57,8 +57,8 @@ Note for automation users: apps sending `CREATE_MEMO` now need the
 
 ## Requested next
 
-Rory's list, in the order given. Items 1 and 2 are done, on
-`feature/markdown-continuation` and `feature/date-completion`; the rest are not started.
+Rory reordered this on 8 September: 4, 5 and 6 come before 3, which is now last. Items 1 and
+2 are merged; 4, 5 and 6 are done on `feature/timeline-grouping`; 3 and 7 are not started.
 
 1. **Better Markdown editing.** Done. `MarkdownContinuation` in core-data decides what a
    return should do; `EditorScreen.update` calls `continueAfterReturn` with the field before
@@ -81,27 +81,50 @@ Rory's list, in the order given. Items 1 and 2 are done, on
    title. Decrypt must strip the heading before joining with the plaintext. This is a format
    change: old blobs have no heading and must still decode, so keep the prefix check on
    the encrypted line, not the whole content. Flag in the UI that the title is not encrypted.
-4. **Collapsible timeline groups.** `groupByDay` in `TimelineScreen.kt` groups by day only.
-   Wanted: days collapse into a week header when the week is older than the current one,
-   weeks into a month header when the month is older, and each header toggles its group.
-   Keep collapsed state in `AppPreferences` keyed by header label so it survives restarts.
-   Sticky headers already exist (`DayHeader`), so this is mostly the grouping function plus
-   a chevron.
-5. **Compact list view.** A toggle in the timeline top bar between the current cards and a
-   one-line list showing only each memo's title (first heading, else first non-blank line,
-   else "Untitled") with date and lock or pin badges. Persist the choice in
-   `AppPreferences`. Tapping a row opens the detail screen as now. Locked memos show the
-   clear title from item 3 once that lands, so do 3 before 5.
-6. **Import Markdown.** Take a single `.md` file or a zip holding many of them, from the
-   system file picker, and create a memo per file. Creation and modification dates must
-   survive the trip so imported notes land in the right place on the timeline rather than
-   all arriving today: prefer YAML front matter when the file carries it (`created:` and
-   `updated:`, which is what `MarkdownExporter` writes, so an export can be re-imported),
-   then the zip entry's own timestamp, then the file's last-modified date. Wanted after
-   items 1 to 5. Worth reusing: `MarkdownExporter` for the front-matter shape, and the
-   zip-slip guard already in the restore path. Memos v0.30 has no bulk create, so this is
-   a loop of ordinary creates through the outbox, which means it needs to cope with a
-   partial run and report how many landed.
+4. **Collapsible timeline groups.** Done. `TimelineGrouping.group` in core-data replaces
+   `groupByDay`: days for the current week, a week header for earlier weeks of the current
+   month, a month header before that. Collapsed keys live in `AppPreferences.collapsedGroups`.
+   The keys are derived from the dates (`day:2026-09-08`, `week:2026-08-31`,
+   `month:2026-09-01`) rather than the header label as first sketched, so collapsing "Today"
+   does not come back as a collapsed tomorrow and a translated label does not lose the
+   choice. A collapsed header shows its memo count.
+5. **Compact list view.** Done, except for one thread left hanging by the reordering. The
+   toggle sits in the timeline top bar, next to archive; `AppPreferences.compactList` holds
+   the choice. `MemoTitle.of` in core-data works out the title (first heading, else first
+   non-blank line, with Markdown decoration and the hidden colour line taken off) and returns
+   null when there is nothing to show, so the wording of the fallback stays in the UI where it
+   can be translated. `CompactMemoRow` draws it with the time and lock or pin badges.
+
+   Left hanging: item 5 was meant to follow item 3, so locked memos would show a clear title.
+   With 3 now last, `CompactMemoRow` shows a lock badge and the words "Locked memo" instead.
+   When item 3 lands, that is the one place to change: drop the `memo.isLocked` guard around
+   `MemoTitle.of` and let the heading through.
+6. **Import Markdown.** Done. "Import Markdown" in Settings > Data takes any number of `.md`
+   files or zips of them, in one pick. `MarkdownImport` in core-data does the parsing (front
+   matter, folder-to-tag, date resolution) and is unit tested, including a round trip through
+   `MarkdownExporter.render`; `MarkdownImporter` reads the URIs and loops through the outbox.
+
+   Settled while building it:
+
+   - **The server does honour a backdated `createTime` on create.** Verified against
+     memos.keltruc.com v0.30.0 by importing dated files on the emulator and then pulling them
+     down on a second device, where they arrived in March 2024 and November 2025 rather than
+     today. The whole feature rests on this, so re-check it if the server is ever upgraded.
+   - Folders become one nested tag: `work/projects/notes.md` gets `#work/projects`, matching
+     how Memos treats `/` as hierarchy. Folder names are made tag-safe (spaces to hyphens) and
+     `..` segments are dropped rather than becoming tags of their own.
+   - Dates: front matter first (`created`/`date`/`created_at`, `updated`/`modified`), then the
+     zip entry or the file's own timestamp, then the clock. ISO instants, `yyyy-MM-dd HH:mm`
+     and bare dates all parse.
+   - Zips are detected by their magic bytes, not the extension or the reported MIME type,
+     because providers label `.md` as text/plain, octet-stream or nothing at all.
+   - Imported memos are PRIVATE unless the file's own front matter says otherwise. An import
+     that quietly published someone's notes would be a much worse surprise than one that did not.
+   - `MemoRepository.create` gained optional `createdAtEpochMs`/`updatedAtEpochMs`; the sync
+     engine already sent `createTime` on create, so nothing else needed changing.
+7. **Last modified in the memo detail.** Asked for on 8 September, not started. Show a memo's
+   update time in small text at the bottom of `MemoDetailScreen`, near the existing
+   "Private · memos/..." line.
 
 ## Geofenced reminders
 

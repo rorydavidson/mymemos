@@ -7,7 +7,9 @@ import androidx.lifecycle.viewModelScope
 import com.keltruc.mymemos.backup.BackupManager
 import com.keltruc.mymemos.data.export.BackupCrypto
 import com.keltruc.mymemos.data.export.MarkdownExporter
+import com.keltruc.mymemos.data.imports.MarkdownImporter
 import com.keltruc.mymemos.data.repository.AccountRepository
+import com.keltruc.mymemos.model.Visibility
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +25,7 @@ class DataViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val accountRepository: AccountRepository,
     private val exporter: MarkdownExporter,
+    private val importer: MarkdownImporter,
     private val backupManager: BackupManager,
 ) : ViewModel() {
     val busy = MutableStateFlow(false)
@@ -34,6 +37,18 @@ class DataViewModel @Inject constructor(
             context.contentResolver.openOutputStream(target, "wt")!!.use { exporter.export(account.id, it) }
         }
         "Exported $count memos"
+    }
+
+    fun importMarkdown(sources: List<Uri>) = run {
+        val account = accountRepository.activeAccount.filterNotNull().first()
+        // Private unless the file's own front matter says otherwise: an import that quietly
+        // published someone's notes would be a much worse surprise than one that did not.
+        val result = importer.import(account.id, sources, Visibility.PRIVATE)
+        buildString {
+            append("Imported ${result.imported} memo${if (result.imported == 1) "" else "s"}")
+            if (result.skipped > 0) append(", ${result.skipped} had no Markdown in them")
+            if (result.failures.isNotEmpty()) append(". ${result.failures.size} failed: ${result.failures.first()}")
+        }
     }
 
     fun backup(target: Uri, password: String) = run {

@@ -126,9 +126,22 @@ class MemoRepository @Inject constructor(
 
     // ---- writes ----------------------------------------------------------------------
 
-    suspend fun create(accountId: Long, rawContent: String, visibility: Visibility, pinned: Boolean = false): String {
+    /**
+     * [createdAtEpochMs] and [updatedAtEpochMs] exist for import, where a memo's dates come from the
+     * file rather than the clock; the sync engine sends the create time on to the server.
+     */
+    suspend fun create(
+        accountId: Long,
+        rawContent: String,
+        visibility: Visibility,
+        pinned: Boolean = false,
+        createdAtEpochMs: Long? = null,
+        updatedAtEpochMs: Long? = null,
+    ): String {
         val content = applyContentRules(rawContent)
-        val now = System.currentTimeMillis()
+        val clock = System.currentTimeMillis()
+        val created = createdAtEpochMs ?: clock
+        val updated = updatedAtEpochMs ?: created
         val localId = UUID.randomUUID().toString()
         val entity = MemoEntity(
             localId = localId,
@@ -140,8 +153,8 @@ class MemoRepository @Inject constructor(
             state = MemoState.NORMAL.name,
             pinned = pinned,
             tagsJoined = extractTags(content).joinToString(MemoEntity.TAG_SEPARATOR),
-            createTimeEpochMs = now,
-            updateTimeEpochMs = now,
+            createTimeEpochMs = created,
+            updateTimeEpochMs = updated,
             snippet = content.lineSequence().firstOrNull().orEmpty().take(120),
             hasTaskList = content.contains(Regex("^\\s*[-*] \\[[ xX]] ", RegexOption.MULTILINE)),
             hasIncompleteTasks = content.contains(Regex("^\\s*[-*] \\[ ] ", RegexOption.MULTILINE)),
