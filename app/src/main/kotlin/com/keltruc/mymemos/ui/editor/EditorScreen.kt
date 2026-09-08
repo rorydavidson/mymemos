@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.keltruc.mymemos.R
+import com.keltruc.mymemos.data.text.MarkdownContinuation
 import com.keltruc.mymemos.model.Visibility
 import com.keltruc.mymemos.ui.components.AttachmentStrip
 import com.keltruc.mymemos.ui.components.MemoPasswordDialog
@@ -96,8 +97,14 @@ fun EditorScreen(onDone: () -> Unit, viewModel: EditorViewModel = hiltViewModel(
     }
 
     fun update(value: TextFieldValue) {
-        field = value
-        viewModel.onContent(value.text)
+        val continued = if (field.selection.collapsed && value.selection.collapsed) {
+            MarkdownContinuation.continueAfterReturn(field.text, field.selection.start, value.text, value.selection.start)
+        } else {
+            null
+        }
+        val next = continued?.let { TextFieldValue(it.text, TextRange(it.cursor)) } ?: value
+        field = next
+        viewModel.onContent(next.text)
     }
 
     fun insertAtCursor(prefix: String, suffix: String = "", lineStart: Boolean = false) {
