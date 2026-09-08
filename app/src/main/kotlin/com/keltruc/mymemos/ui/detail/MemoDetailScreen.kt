@@ -350,12 +350,23 @@ fun MemoDetailScreen(
                     Icon(Icons.AutoMirrored.Filled.Send, stringResource(R.string.comment_send))
                 }
             }
-            Text(
-                "${m.visibility.name.lowercase().replaceFirstChar(Char::uppercase)} · ${m.remoteName ?: "not yet synced"}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Column(
+                verticalArrangement = Arrangement.spacedBy(2.dp),
                 modifier = Modifier.padding(bottom = 24.dp),
-            )
+            ) {
+                // The date at the top of the screen is when the memo was written; this is when it
+                // last changed, which for an untouched memo is the same moment.
+                Text(
+                    stringResource(R.string.last_modified, formatter.format(m.updateTime.atZone(ZoneId.systemDefault()))),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "${m.visibility.name.lowercase().replaceFirstChar(Char::uppercase)} · ${m.remoteName ?: "not yet synced"}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 
