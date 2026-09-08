@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.keltruc.mymemos.data.timeline.TimelineGrouping
@@ -30,6 +31,11 @@ data class Settings(
     /** Show the timeline as one-line rows instead of cards. */
     val compactList: Boolean = false,
     /**
+     * Servers signed into before, newest first. Kept so that a sign-out, wanted or not, does not
+     * mean retyping the address. Only the address: no username, password or token is stored here.
+     */
+    val knownServers: List<String> = emptyList(),
+    /**
      * Order the timeline by when memos were last changed rather than when they were written. The
      * dates shown on cards and at the top of the detail screen follow the same choice, so what you
      * are sorting on is always the date you can see.
@@ -45,6 +51,8 @@ class AppPreferences @Inject constructor(@ApplicationContext private val context
     private val collapsed = stringSetPreferencesKey("collapsed_groups")
     private val compact = booleanPreferencesKey("compact_list")
     private val byModified = booleanPreferencesKey("sort_by_modified")
+    // Newline separated because a URL cannot contain one, and a Set would lose the ordering.
+    private val servers = stringPreferencesKey("known_servers")
 
     val settings: Flow<Settings> = context.dataStore.data.map { p ->
         Settings(
@@ -54,6 +62,7 @@ class AppPreferences @Inject constructor(@ApplicationContext private val context
             collapsedGroups = p[collapsed].orEmpty(),
             compactList = p[compact] ?: false,
             sortByModified = p[byModified] ?: false,
+            knownServers = p[servers].orEmpty().lines().filter { it.isNotBlank() },
         )
     }
 
@@ -79,11 +88,30 @@ class AppPreferences @Inject constructor(@ApplicationContext private val context
         context.dataStore.edit { it[byModified] = enabled }
     }
 
+    /** Records a server that was signed into, newest first, keeping the most recent few. */
+    suspend fun rememberServer(url: String) {
+        if (url.isBlank()) return
+        context.dataStore.edit { p ->
+            val existing = p[servers].orEmpty().lines().filter { it.isNotBlank() && it != url }
+            p[servers] = (listOf(url) + existing).take(MAX_REMEMBERED_SERVERS).joinToString("\n")
+        }
+    }
+
+    suspend fun forgetServer(url: String) {
+        context.dataStore.edit { p ->
+            p[servers] = p[servers].orEmpty().lines().filter { it.isNotBlank() && it != url }.joinToString("\n")
+        }
+    }
+
     suspend fun setGroupCollapsed(key: String, collapsedNow: Boolean) {
         context.dataStore.edit { p ->
             val current = p[collapsed].orEmpty()
             p[collapsed] = if (collapsedNow) current + key else current - key
         }
+    }
+
+    private companion object {
+        const val MAX_REMEMBERED_SERVERS = 5
     }
 
     /** When the last full reconcile of server memo names ran for this account, or 0. */

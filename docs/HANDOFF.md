@@ -153,6 +153,18 @@ Rory reordered this on 8 September: 4, 5 and 6 come before 3, which is now last.
     many were "already here". Deliberately skip rather than update: overwriting a memo with an
     older file would quietly lose whatever was written since the export.
 
+11. **Remembering servers on the sign-in screen.** Done on `feature/undo-and-dedup`.
+    `AppPreferences.knownServers` holds the last five addresses signed into, newest first,
+    written only after a sign-in succeeds so a typo never becomes a suggestion. They appear as
+    chips under the URL field, filtered as you type, each with an x to forget it. Only the
+    address is stored: no username, password or token. Sign-out does not touch DataStore, which
+    is what makes this survive the case it exists for. Remembering the username per server
+    would save more typing again and is equally not a secret, if that is wanted later.
+
+    Not verified on a device: reaching the sign-in screen means signing out, which would wipe
+    the local database and need Rory's password to undo. Compiles, and the preference and
+    filtering logic are straightforward, but nobody has watched the chips appear.
+
 ## Geofenced reminders
 
 The idea: a memo with a location can remind you when you arrive there ("pick up the
