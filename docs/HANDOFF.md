@@ -57,20 +57,23 @@ Note for automation users: apps sending `CREATE_MEMO` now need the
 
 ## Requested next
 
-Rory's list, in the order given. None started.
+Rory's list, in the order given. Items 1 and 2 are done, on
+`feature/markdown-continuation` and `feature/date-completion`; the rest are not started.
 
-1. **Better Markdown editing.** Pressing return inside a task or bullet line should start
-   the next line with the same marker (`- [ ] `, `- `, `1. ` incremented), and return on an
-   empty marker line should clear it. Hook the `onValueChange` in `EditorScreen.kt`: compare
-   the previous and new `TextFieldValue`, and when the only change is a newline inserted at
-   the cursor, rewrite the value with the prefix and move the selection past it. Keep it in
-   a pure function (`MarkdownContinuation.kt` or similar) with unit tests; the editor already
-   has that shape for tag autocompletion.
-2. **Completion for `@` dates.** The editor completes `#tags` only (`suggestions` in
-   `EditorScreen.kt`). Add the same popup for `@` with the tokens `DueDateParser.kt` already
-   understands: `@today`, `@tomorrow`, weekday names, and a "pick a date" entry that opens
-   the existing `DateTimePicker` and inserts `@yyyy-MM-dd`. Anything new here must also be
-   taught to the parser so the tasks screen picks it up.
+1. **Better Markdown editing.** Done. `MarkdownContinuation` in core-data decides what a
+   return should do; `EditorScreen.update` calls `continueAfterReturn` with the field before
+   and after the change. One trap worth remembering: the keyboard commits its composing text
+   in the same change as the return, and it may recase that text as it does ("1. first"
+   arrives as "1. First\n"), so the guard compares the cursor, the length and everything
+   after the cursor, never the text before it.
+2. **Completion for `@` dates.** Done. `DueDateParser.suggest` produces the completions, so
+   they cannot drift from what `parse` understands; a test round-trips every suggestion back
+   through `parse` for seven different "todays". Weekday suggestions stop six days out,
+   because the seventh wraps to today's own weekday and `parse` would read it as today.
+   Tokens stay English even under another locale, since that is all `parse` knows; the
+   localised date rides along as a hint on the chip. "Pick a date" opens a new
+   `DueDatePickerDialog`, date only, rather than the existing `DateTimePickerDialog`, whose
+   time step has nowhere to go in a `@yyyy-MM-dd` token.
 3. **Locked notes keep their title visible.** Today the whole body is encrypted, so the
    list shows only a lock badge. Change `MemoRepository.updateLockedContent` so that when the
    first line is a Markdown heading it is written in clear ahead of the `mymemos-enc:v1:`
@@ -89,6 +92,16 @@ Rory's list, in the order given. None started.
    else "Untitled") with date and lock or pin badges. Persist the choice in
    `AppPreferences`. Tapping a row opens the detail screen as now. Locked memos show the
    clear title from item 3 once that lands, so do 3 before 5.
+6. **Import Markdown.** Take a single `.md` file or a zip holding many of them, from the
+   system file picker, and create a memo per file. Creation and modification dates must
+   survive the trip so imported notes land in the right place on the timeline rather than
+   all arriving today: prefer YAML front matter when the file carries it (`created:` and
+   `updated:`, which is what `MarkdownExporter` writes, so an export can be re-imported),
+   then the zip entry's own timestamp, then the file's last-modified date. Wanted after
+   items 1 to 5. Worth reusing: `MarkdownExporter` for the front-matter shape, and the
+   zip-slip guard already in the restore path. Memos v0.30 has no bulk create, so this is
+   a loop of ordinary creates through the outbox, which means it needs to cope with a
+   partial run and report how many landed.
 
 ## Geofenced reminders
 
