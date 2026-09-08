@@ -2,9 +2,13 @@ package com.keltruc.mymemos.ui.signin
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.keltruc.mymemos.data.prefs.AppPreferences
 import com.keltruc.mymemos.data.repository.AccountRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -33,9 +37,17 @@ data class SignInUiState(
 @HiltViewModel
 class SignInViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
+    private val preferences: AppPreferences,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SignInUiState())
     val state: StateFlow<SignInUiState> = _state
+
+    /** Servers signed into before, offered so an unwanted sign-out does not mean retyping one. */
+    val knownServers: StateFlow<List<String>> = preferences.settings
+        .map { it.knownServers }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    fun forgetServer(url: String) = viewModelScope.launch { preferences.forgetServer(url) }
 
     fun onServerUrl(value: String) = _state.update { it.copy(serverUrl = value, serverVersion = null, error = null) }
     fun onUsername(value: String) = _state.update { it.copy(username = value, error = null) }
@@ -64,6 +76,9 @@ class SignInViewModel @Inject constructor(
                     SignInMode.PASSWORD -> accountRepository.signInWithPassword(s.serverUrl, s.username, s.password)
                     SignInMode.TOKEN -> accountRepository.signInWithToken(s.serverUrl, s.token)
                 }
+            }.onSuccess { account ->
+                // Only after it worked, so a typo never becomes a suggestion.
+                preferences.rememberServer(account.serverUrl)
             }.onFailure { e ->
                 _state.update { it.copy(submitting = false, error = e.message ?: "Sign-in failed") }
             }

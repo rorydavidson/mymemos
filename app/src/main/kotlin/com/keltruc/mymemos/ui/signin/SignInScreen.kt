@@ -1,13 +1,15 @@
 package com.keltruc.mymemos.ui.signin
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
@@ -15,16 +17,18 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Notes
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -42,6 +46,11 @@ import com.keltruc.mymemos.R
 @Composable
 fun SignInScreen(viewModel: SignInViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val knownServers by viewModel.knownServers.collectAsStateWithLifecycle()
+    // Everything when the field is empty, narrowing to matches as the address is typed.
+    val serverSuggestions = knownServers.filter {
+        state.serverUrl.isBlank() || (it.contains(state.serverUrl, ignoreCase = true) && it != state.serverUrl)
+    }
 
     Scaffold { padding ->
         Column(
@@ -93,6 +102,25 @@ fun SignInScreen(viewModel: SignInViewModel = hiltViewModel()) {
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
+
+                if (serverSuggestions.isNotEmpty()) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        serverSuggestions.forEach { url ->
+                            InputChip(
+                                selected = false,
+                                onClick = { viewModel.onServerUrl(url); viewModel.probeServer() },
+                                label = { Text(url.removePrefix("https://").trimEnd('/'), maxLines = 1) },
+                                trailingIcon = {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = stringResource(R.string.signin_forget_server),
+                                        modifier = Modifier.size(16.dp).clickable { viewModel.forgetServer(url) },
+                                    )
+                                },
+                            )
+                        }
+                    }
+                }
 
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                     SignInMode.entries.forEachIndexed { index, mode ->

@@ -62,6 +62,7 @@
     <string name="untitled">Untitled</string>
     <string name="group_collapse">Collapse</string>
     <string name="group_expand">Expand</string>
+    <string name="signin_forget_server">Forget this server</string>
     <string name="undo">Undo</string>
     <string name="memo_deleted">Memo deleted</string>
     <string name="memo_archived">Memo archived</string>
