@@ -26,14 +26,17 @@ class MarkdownImporter @Inject constructor(
     @ApplicationContext private val context: Context,
     private val memoRepository: MemoRepository,
 ) {
-    data class Result(val imported: Int, val skipped: Int, val failures: List<String>)
+    data class Result(val imported: Int, val skipped: Int, val duplicates: Int, val failures: List<String>)
 
     private data class Source(val name: String, val text: String, val modifiedEpochMs: Long?, val folderTag: String?)
 
     suspend fun import(accountId: Long, uris: List<Uri>, visibility: Visibility): Result = withContext(Dispatchers.IO) {
         var imported = 0
         var skipped = 0
+        var duplicates = 0
         val failures = mutableListOf<String>()
+        // Memos already recognised in this run, so a zip holding the same note twice adds it once.
+        val seen = mutableSetOf<String>()
 
         for (uri in uris) {
             val label = displayName(uri) ?: uri.lastPathSegment ?: "file"
@@ -43,17 +46,23 @@ class MarkdownImporter @Inject constructor(
             }
             if (sources.isEmpty()) skipped++
             for (source in sources) {
-                runCatching { create(accountId, source, visibility) }
-                    .onSuccess { imported++ }
+                runCatching { create(accountId, source, visibility, seen) }
+                    .onSuccess { if (it) imported++ else duplicates++ }
                     .onFailure { failures += "${source.name}: ${it.message ?: "could not be imported"}" }
             }
         }
-        Result(imported, skipped, failures)
+        Result(imported, skipped, duplicates, failures)
     }
 
-    private suspend fun create(accountId: Long, source: Source, visibility: Visibility) {
+    /** Returns false when the file is a memo this account already has, rather than a new one. */
+    private suspend fun create(accountId: Long, source: Source, visibility: Visibility, seen: MutableSet<String>): Boolean {
         val parsed = MarkdownImport.parse(source.text)
-        if (parsed.body.isBlank()) return
+        if (parsed.body.isBlank()) return false
+        // Re-importing an export of this account would otherwise duplicate every memo in it.
+        parsed.remoteName?.let { name ->
+            if (!seen.add(name)) return false
+            if (memoRepository.findByRemoteName(accountId, name) != null) return false
+        }
         val tags = (listOfNotNull(source.folderTag) + parsed.tags).distinct()
         // Front matter first, then the zip entry or file's own timestamp, then the clock.
         val created = parsed.created?.toEpochMilli() ?: source.modifiedEpochMs
@@ -66,6 +75,7 @@ class MarkdownImporter @Inject constructor(
             createdAtEpochMs = created,
             updatedAtEpochMs = updated,
         )
+        return true
     }
 
     private fun read(uri: Uri, label: String): List<Source> {

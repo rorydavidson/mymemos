@@ -49,6 +49,11 @@ data class TimelineUiState(
     val message: String? = null,
 )
 
+enum class UndoOf { DELETE, ARCHIVE, UNARCHIVE }
+
+/** Something the user just did that can be put back, with what is needed to put it back. */
+data class Undoable(val of: UndoOf, val localId: String, val previousState: MemoState? = null)
+
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
 class TimelineViewModel @Inject constructor(
@@ -94,6 +99,11 @@ class TimelineViewModel @Inject constructor(
     private val selectedShortcut = MutableStateFlow<Shortcut?>(null)
     /** Server names returned by the active shortcut; null when no shortcut is selected. */
     private val shortcutResults = MutableStateFlow<List<String>?>(null)
+    private val _undoable = MutableStateFlow<Undoable?>(null)
+
+    /** The last action that can still be taken back, shown as a snackbar with an Undo button. */
+    val undoable: StateFlow<Undoable?> = _undoable
+
     private val refreshing = MutableStateFlow(false)
     private val message = MutableStateFlow<String?>(null)
 
@@ -200,10 +210,29 @@ class TimelineViewModel @Inject constructor(
     fun togglePin(memo: Memo) = viewModelScope.launch { memoRepository.setPinned(memo.localId, !memo.pinned) }
 
     fun toggleArchive(memo: Memo) = viewModelScope.launch {
-        memoRepository.setState(memo.localId, if (memo.state == MemoState.NORMAL) MemoState.ARCHIVED else MemoState.NORMAL)
+        val wasArchived = memo.state == MemoState.ARCHIVED
+        memoRepository.setState(memo.localId, if (wasArchived) MemoState.NORMAL else MemoState.ARCHIVED)
+        _undoable.value = Undoable(if (wasArchived) UndoOf.UNARCHIVE else UndoOf.ARCHIVE, memo.localId, memo.state)
     }
 
-    fun delete(memo: Memo) = viewModelScope.launch { memoRepository.delete(memo.localId) }
+    fun delete(memo: Memo) = viewModelScope.launch {
+        // A memo that never reached the server is gone for good, so no Undo is offered for it.
+        val canUndo = memoRepository.delete(memo.localId)
+        _undoable.value = if (canUndo) Undoable(UndoOf.DELETE, memo.localId) else null
+    }
+
+    fun undo() = viewModelScope.launch {
+        val action = _undoable.value ?: return@launch
+        _undoable.value = null
+        when (action.of) {
+            UndoOf.DELETE -> if (!memoRepository.undoDelete(action.localId)) {
+                message.value = "That memo had already gone to the server."
+            }
+            UndoOf.ARCHIVE, UndoOf.UNARCHIVE -> action.previousState?.let { memoRepository.setState(action.localId, it) }
+        }
+    }
+
+    fun dismissUndo() { _undoable.value = null }
 
     fun setColour(memo: Memo, colour: NoteColour?) = viewModelScope.launch { memoRepository.setColour(memo.localId, colour) }
 

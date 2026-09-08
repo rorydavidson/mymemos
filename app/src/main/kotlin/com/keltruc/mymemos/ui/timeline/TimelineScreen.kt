@@ -52,6 +52,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -118,6 +119,19 @@ fun TimelineScreen(
             snackbar.showSnackbar(it)
             viewModel.dismissMessage()
         }
+    }
+
+    val undoable by viewModel.undoable.collectAsStateWithLifecycle()
+    val undoLabel = stringResource(R.string.undo)
+    val undoMessages = mapOf(
+        UndoOf.DELETE to stringResource(R.string.memo_deleted),
+        UndoOf.ARCHIVE to stringResource(R.string.memo_archived),
+        UndoOf.UNARCHIVE to stringResource(R.string.memo_unarchived),
+    )
+    LaunchedEffect(undoable) {
+        val action = undoable ?: return@LaunchedEffect
+        val result = snackbar.showSnackbar(undoMessages.getValue(action.of), actionLabel = undoLabel)
+        if (result == SnackbarResult.ActionPerformed) viewModel.undo() else viewModel.dismissUndo()
     }
 
     val collapsedGroups by viewModel.collapsedGroups.collectAsStateWithLifecycle()

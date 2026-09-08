@@ -62,6 +62,10 @@
     <string name="untitled">Untitled</string>
     <string name="group_collapse">Collapse</string>
     <string name="group_expand">Expand</string>
+    <string name="undo">Undo</string>
+    <string name="memo_deleted">Memo deleted</string>
+    <string name="memo_archived">Memo archived</string>
+    <string name="memo_unarchived">Memo moved back</string>
     <string name="created_on">Created %1$s</string>
     <string name="last_modified">Last modified %1$s</string>
     <string name="setting_sort_by_modified">Sort by last modified</string>

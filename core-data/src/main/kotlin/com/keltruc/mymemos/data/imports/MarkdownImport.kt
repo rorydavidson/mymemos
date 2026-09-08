@@ -20,6 +20,8 @@ object MarkdownImport {
         val tags: List<String>,
         val pinned: Boolean,
         val visibility: String?,
+        /** The `memos_id` this app's own export writes, so a re-import can recognise its own work. */
+        val remoteName: String?,
     )
 
     private val fence = Regex("\\A---\\r?\\n(.*?)\\r?\\n---[ \\t]*\\r?\\n?", RegexOption.DOT_MATCHES_ALL)
@@ -34,7 +36,7 @@ object MarkdownImport {
 
     fun parse(fileContent: String): Parsed {
         val match = fence.find(fileContent)
-            ?: return Parsed(fileContent.trim(), null, null, emptyList(), pinned = false, visibility = null)
+            ?: return Parsed(fileContent.trim(), null, null, emptyList(), pinned = false, visibility = null, remoteName = null)
         val fields = readFields(match.groupValues[1])
         return Parsed(
             body = fileContent.substring(match.range.last + 1).trim(),
@@ -43,6 +45,7 @@ object MarkdownImport {
             tags = (fields.list("tags") + fields.single(setOf("tags")).orEmpty().splitInline()).mapNotNull(::sanitiseTag).distinct(),
             pinned = fields.single(setOf("pinned"))?.lowercase() == "true",
             visibility = fields.single(setOf("visibility"))?.uppercase()?.takeIf { it in setOf("PRIVATE", "PROTECTED", "PUBLIC") },
+            remoteName = fields.single(setOf("memos_id", "memos-id"))?.trim()?.trim('"', '\'')?.takeIf { it.isNotEmpty() },
         )
     }
 
