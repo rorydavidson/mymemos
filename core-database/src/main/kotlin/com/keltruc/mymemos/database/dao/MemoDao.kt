@@ -10,6 +10,7 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.keltruc.mymemos.database.entity.AttachmentEntity
 import com.keltruc.mymemos.database.entity.MemoEntity
+import com.keltruc.mymemos.database.entity.MemoRelationEntity
 import kotlinx.coroutines.flow.Flow
 
 data class MemoWithAttachments(
@@ -70,6 +71,13 @@ interface MemoDao {
 
     @Query("DELETE FROM memos WHERE localId = :localId")
     suspend fun deleteByLocalId(localId: String)
+
+    @Transaction
+    @Query("SELECT * FROM memos WHERE accountId = :accountId AND syncStatus != 'PENDING_DELETE' ORDER BY createTimeEpochMs")
+    suspend fun allForExport(accountId: Long): List<MemoWithAttachments>
+
+    @Query("SELECT * FROM memo_relations WHERE type = 'REFERENCE'")
+    suspend fun allReferences(): List<MemoRelationEntity>
 
     @Query("UPDATE memos SET colour = :colour WHERE localId = :localId")
     suspend fun setColour(localId: String, colour: String?)

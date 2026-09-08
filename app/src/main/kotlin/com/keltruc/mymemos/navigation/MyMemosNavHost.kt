@@ -21,6 +21,7 @@ import com.keltruc.mymemos.ui.settings.SettingsNav
 import com.keltruc.mymemos.ui.settings.SettingsScreen
 import com.keltruc.mymemos.ui.review.ReviewScreen
 import com.keltruc.mymemos.ui.templates.TemplatesScreen
+import com.keltruc.mymemos.ui.data.DataScreen
 import com.keltruc.mymemos.ui.shortcuts.ShortcutsScreen
 import com.keltruc.mymemos.ui.signin.SignInScreen
 import com.keltruc.mymemos.ui.timeline.TimelineScreen
@@ -40,6 +41,7 @@ import kotlinx.serialization.Serializable
 @Serializable object AdminInstanceRoute
 @Serializable object ReviewRoute
 @Serializable object TemplatesRoute
+@Serializable object DataRoute
 
 @Composable
 fun MyMemosNavHost() {
@@ -105,6 +107,7 @@ fun MyMemosNavHost() {
                             onAdminUsers = { navController.navigate(AdminUsersRoute) },
                             onAdminInstance = { navController.navigate(AdminInstanceRoute) },
                             onTemplates = { navController.navigate(TemplatesRoute) },
+                            onData = { navController.navigate(DataRoute) },
                         ),
                     )
                 }
@@ -128,6 +131,7 @@ fun MyMemosNavHost() {
                     )
                 }
                 composable<TemplatesRoute> { TemplatesScreen(onBack = { navController.popBackStack() }) }
+                composable<DataRoute> { DataScreen(onBack = { navController.popBackStack() }) }
                 composable<AdminInstanceRoute> { AdminInstanceScreen(onBack = { navController.popBackStack() }) }
             }
         }

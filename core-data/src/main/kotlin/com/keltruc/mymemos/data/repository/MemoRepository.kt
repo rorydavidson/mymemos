@@ -434,6 +434,20 @@ class MemoRepository @Inject constructor(
 
     suspend fun memosWithLocation(accountId: Long): List<Memo> = memoDao.withLocation(accountId).map { it.toModel() }
 
+    /** Nodes and reference edges for the graph view. */
+    suspend fun referenceGraph(accountId: Long): Pair<List<Memo>, List<Pair<String, String>>> {
+        val memos = memoDao.allForExport(accountId).map { it.toModel() }.filter { it.remoteName != null && !it.isComment }
+        val byLocal = memos.associateBy { it.localId }
+        val byRemote = memos.associateBy { it.remoteName }
+        val edges = memoDao.allReferences().mapNotNull { r ->
+            val from = byLocal[r.memoLocalId] ?: return@mapNotNull null
+            val to = byRemote[r.relatedRemoteName] ?: return@mapNotNull null
+            from.localId to to.localId
+        }
+        val connected = edges.flatMap { listOf(it.first, it.second) }.toSet()
+        return memos.filter { it.localId in connected } to edges
+    }
+
     /** Memos with unticked tasks, newest first, for the tasks widget. */
     suspend fun memosWithOpenTasks(accountId: Long): List<Memo> =
         memoDao.withOpenTasks(accountId).map { it.toModel() }

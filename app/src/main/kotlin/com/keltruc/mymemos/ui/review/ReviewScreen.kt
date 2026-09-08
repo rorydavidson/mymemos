@@ -62,7 +62,11 @@ fun ReviewScreen(
     val account by viewModel.account_.collectAsStateWithLifecycle()
     var tab by remember { mutableIntStateOf(0) }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { if (it) viewModel.loadNearby() }
-    LaunchedEffect(tab) { if (tab == 2 && nearby == null) permission.launch(Manifest.permission.ACCESS_FINE_LOCATION) }
+    val graph by viewModel.graph.collectAsStateWithLifecycle()
+    LaunchedEffect(tab) {
+        if (tab == 2 && nearby == null) permission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        if (tab == 3) viewModel.loadGraph()
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -78,6 +82,7 @@ fun ReviewScreen(
                 Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.review_day)) })
                 Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(R.string.review_on_this_day)) })
                 Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text(stringResource(R.string.review_nearby)) })
+                Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text(stringResource(R.string.review_graph)) })
             }
             when (tab) {
                 0 -> {
@@ -110,6 +115,7 @@ fun ReviewScreen(
                     stringResource(R.string.review_empty_history),
                     viewModel, onOpenMemo, onEditMemo,
                 )
+                3 -> graph?.let { (nodes, edges) -> GraphView(nodes, edges, onOpenMemo) }
                 else -> MemoList(
                     nearby.orEmpty().map { n -> n.memo to (if (n.metres < 1000) "%.0f m".format(n.metres) else "%.1f km".format(n.metres / 1000)) },
                     account?.serverUrl.orEmpty(),

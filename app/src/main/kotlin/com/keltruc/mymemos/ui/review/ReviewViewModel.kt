@@ -63,6 +63,9 @@ class ReviewViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val graph = MutableStateFlow<Pair<List<Memo>, List<Pair<String, String>>>?>(null)
+    fun loadGraph() = viewModelScope.launch { graph.value = memoRepository.referenceGraph(account.first().id) }
+
     val nearby = MutableStateFlow<List<NearbyMemo>?>(null)
     val nearbyError = MutableStateFlow<String?>(null)
 

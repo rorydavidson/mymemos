@@ -171,4 +171,15 @@
     <string name="one_year_ago">A year ago</string>
     <string name="months_ago">%1$d months ago</string>
     <string name="one_month_ago">A month ago</string>
+    <string name="data">Data</string>
+    <string name="export_markdown">Export as Markdown</string>
+    <string name="export_markdown_hint">A zip of .md files with front matter, plus local attachments. Works in Obsidian.</string>
+    <string name="backup">Encrypted backup</string>
+    <string name="backup_hint">Memos, attachments and settings, AES-256 with a password of your choosing. Sign-in details are not included.</string>
+    <string name="backup_password_hint">Choose a password of at least 6 characters. There is no way to recover it.</string>
+    <string name="restore">Restore backup</string>
+    <string name="restore_hint">Replaces everything on this device with the backup, then restarts the app.</string>
+    <string name="restore_warning">This replaces all local data and restarts the app. You will need to sign in again.</string>
+    <string name="review_graph">Graph</string>
+    <string name="graph_empty">No references between memos yet. Link memos from a memo\'s menu to see them here.</string>
 </resources>

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Webhook
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -68,6 +69,7 @@ data class SettingsNav(
     val onAdminUsers: () -> Unit,
     val onAdminInstance: () -> Unit,
     val onTemplates: () -> Unit,
+    val onData: () -> Unit,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -173,6 +175,9 @@ fun SettingsScreen(onBack: () -> Unit, nav: SettingsNav, viewModel: SettingsView
                 trailingContent = { Switch(checked = settings.dynamicColour, onCheckedChange = viewModel::setDynamicColour) },
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
             )
+
+            Section(stringResource(R.string.data))
+            LinkRow(Icons.Default.Storage, stringResource(R.string.data), nav.onData)
 
             if (account?.role == UserRole.ADMIN) {
                 Section(stringResource(R.string.admin))
