@@ -128,6 +128,10 @@ interface MemoDao {
     )
     suspend fun deleteSyncedNotIn(accountId: Long, keepRemoteNames: List<String>)
 
+    /** How many rows [deleteSyncedNotIn] is entitled to remove; 0 means a wipe would be harmless. */
+    @Query("SELECT COUNT(*) FROM memos WHERE accountId = :accountId AND syncStatus = 'SYNCED' AND remoteName IS NOT NULL")
+    suspend fun countSynced(accountId: Long): Int
+
     @Transaction
     @Query("SELECT * FROM memos WHERE accountId = :accountId AND state = 'NORMAL' AND parent IS NULL AND hasIncompleteTasks = 1 AND syncStatus != 'PENDING_DELETE' ORDER BY pinned DESC, updateTimeEpochMs DESC LIMIT 20")
     suspend fun withOpenTasks(accountId: Long): List<MemoWithAttachments>

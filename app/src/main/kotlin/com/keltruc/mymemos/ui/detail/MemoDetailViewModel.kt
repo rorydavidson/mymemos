@@ -262,7 +262,6 @@ class MemoDetailViewModel @AssistedInject constructor(
 
     fun captureLocation() = viewModelScope.launch {
         val loc = locationProvider.current() ?: run { message.value = "Could not get a location fix."; return@launch }
-        android.util.Log.i("MemoDetail", "location fix: ${loc.latitude},${loc.longitude} '${loc.placeholder}'")
         memoRepository.setLocation(route.localId, loc)
     }
 

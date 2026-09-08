@@ -24,6 +24,18 @@ class MarkdownExporterTest {
     }
 
     @Test
+    fun `attachment path keeps a plain name`() {
+        assertEquals("attachments/id1-photo.jpg", MarkdownExporter.attachmentPath("id1", "photo.jpg"))
+    }
+
+    @Test
+    fun `attachment path strips a traversing server filename`() {
+        assertEquals("attachments/id1-bashrc", MarkdownExporter.attachmentPath("id1", "../../.bashrc"))
+        assertEquals("attachments/id1-evil.sh", MarkdownExporter.attachmentPath("id1", "..\\..\\evil.sh"))
+        assertEquals("attachments/id1-file", MarkdownExporter.attachmentPath("id1", "../"))
+    }
+
+    @Test
     fun `front matter carries the metadata and content follows`() {
         val md = MarkdownExporter.render(memo)
         assertTrue(md.startsWith("---\ncreated: 2026-09-08T09:00:00Z\n"))

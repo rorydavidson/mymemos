@@ -51,6 +51,7 @@ fun RouteMap(points: List<Location>, modifier: Modifier = Modifier, height: Dp =
     val context = LocalContext.current
     val density = LocalDensity.current
     val measurer = rememberTextMeasurer()
+    val tilesEnabled = LocalMapTiles.current
     val lineColour = MaterialTheme.colorScheme.primary
     val markerColour = MaterialTheme.colorScheme.error
 
@@ -84,7 +85,7 @@ fun RouteMap(points: List<Location>, modifier: Modifier = Modifier, height: Dp =
         val n = 1 shl zoom
         val tx0 = floor(origin.x / tilePx).toInt(); val ty0 = floor(origin.y / tilePx).toInt()
         val tx1 = floor((origin.x + widthPx) / tilePx).toInt(); val ty1 = floor((origin.y + heightPx) / tilePx).toInt()
-        for (ty in ty0..ty1) for (tx in tx0..tx1) {
+        if (tilesEnabled) for (ty in ty0..ty1) for (tx in tx0..tx1) {
             if (ty !in 0 until n) continue
             val ox = with(density) { (tx * tilePx - origin.x).toDp() }
             val oy = with(density) { (ty * tilePx - origin.y).toDp() }

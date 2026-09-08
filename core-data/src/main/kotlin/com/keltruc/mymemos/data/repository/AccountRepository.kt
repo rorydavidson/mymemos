@@ -1,8 +1,11 @@
 package com.keltruc.mymemos.data.repository
 
+import com.keltruc.mymemos.data.attachments.AttachmentStore
 import com.keltruc.mymemos.data.auth.ApiClientRegistry
+import com.keltruc.mymemos.data.crypto.PasswordSession
 import com.keltruc.mymemos.data.mapper.toModel
 import com.keltruc.mymemos.database.dao.AccountDao
+import com.keltruc.mymemos.database.dao.AttachmentDao
 import com.keltruc.mymemos.database.dao.MemoDao
 import com.keltruc.mymemos.database.entity.AccountEntity
 import com.keltruc.mymemos.model.Account
@@ -25,6 +28,9 @@ import javax.inject.Singleton
 class AccountRepository @Inject constructor(
     private val accountDao: AccountDao,
     private val memoDao: MemoDao,
+    private val attachmentDao: AttachmentDao,
+    private val attachmentStore: AttachmentStore,
+    private val passwordSession: PasswordSession,
     private val registry: ApiClientRegistry,
     private val json: Json,
 ) {
@@ -54,7 +60,10 @@ class AccountRepository @Inject constructor(
         store.setPasswordSession(response.accessToken, response.accessTokenExpiresAt)
 
         val minted = runCatching {
-            api.createPersonalAccessToken(user.name, CreatePersonalAccessTokenRequestDto(description = "MyMemos on $deviceName"))
+            api.createPersonalAccessToken(
+                user.name,
+                CreatePersonalAccessTokenRequestDto(description = "MyMemos on $deviceName", expiresInDays = TOKEN_LIFETIME_DAYS),
+            )
         }.getOrNull()?.takeIf { it.token.isNotEmpty() }
 
         val canonical = registry.tokenStore(url, user.name)
@@ -69,7 +78,7 @@ class AccountRepository @Inject constructor(
         }
         registry.evict(url, pending)
         registry.evict(url, user.name)
-        saveAccount(url, user, if (minted != null) AuthMethod.PASSWORD else AuthMethod.PASSWORD)
+        saveAccount(url, user, if (minted != null) AuthMethod.PERSONAL_ACCESS_TOKEN else AuthMethod.PASSWORD)
     }
 
     /** Same as [signInWithPassword], for an account whose credential stopped working. */
@@ -100,8 +109,22 @@ class AccountRepository @Inject constructor(
         if (account.authMethod == AuthMethod.PASSWORD && store.mintedTokenName() == null) runCatching { api.signOut() }
         store.clear()
         registry.evict(account.serverUrl, account.userResourceName)
+        // Cached attachment files are not covered by the database cascade, so remove them by hand
+        // before the rows that name them disappear.
+        attachmentDao.localIdsForAccount(account.id).forEach { attachmentStore.delete(it) }
         memoDao.deleteAllForAccount(account.id)
         accountDao.delete(account.id)
+        // The memo password is app-wide, so it only goes when the last account does.
+        if (accountDao.count() == 0) passwordSession.forget()
+    }
+
+    private companion object {
+        /**
+         * Life of the token minted at password sign-in. The password is never kept, so this cannot
+         * be renewed in the background: when it lapses the app falls back to the "sign in again"
+         * banner and the user retypes their password.
+         */
+        const val TOKEN_LIFETIME_DAYS = 90
     }
 
     private val deviceName: String

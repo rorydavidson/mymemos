@@ -36,7 +36,8 @@ class Notifier @Inject constructor(@ApplicationContext private val context: Cont
 
     /** Posts a notification that opens the memo (or the app) when tapped. */
     fun post(channel: Channel, id: Int, title: String, text: String, memoLocalId: String? = null) {
-        if (!canPost()) return
+        // Inline rather than via canPost() so lint can see the guard on the notify() below.
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         ensureChannels()
         val intent = Intent(context, MainActivity::class.java).apply {
             if (memoLocalId != null) {

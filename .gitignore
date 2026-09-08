@@ -11,3 +11,5 @@ build/
 *.jks
 /keystore.properties
 .vscode/settings.json
+.kotlin/
+bin/

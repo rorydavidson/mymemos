@@ -26,4 +26,8 @@ interface AttachmentDao {
 
     @Query("DELETE FROM attachments WHERE localId = :localId")
     suspend fun deleteByLocalId(localId: String)
+
+    /** Every attachment belonging to an account, so its cached files can be removed with it. */
+    @Query("SELECT a.localId FROM attachments a JOIN memos m ON m.localId = a.memoLocalId WHERE m.accountId = :accountId")
+    suspend fun localIdsForAccount(accountId: Long): List<String>
 }

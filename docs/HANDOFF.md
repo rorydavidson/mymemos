@@ -1,44 +1,55 @@
 # MyMemos handoff
 
-State as of 8 September 2026. Feature branches up to `feature/config-memo` are merged to
-`main`. Open branches: `chore/readme-features` (README rewrite) and `fix/security-review`
-(closes the high and medium findings from the security review, see below).
+State as of 8 September 2026. Every feature branch, `chore/readme-features` and
+`fix/security-review` are merged to `main`. Open branch: `fix/security-review-low`, which
+closes the low findings and the two lint errors (see below).
 
 ## Where things stand
 
-- Feature complete against Memos v0.30 (see README for the list). 47 unit tests pass and a
-  shrunk release build has been smoke-tested on an emulator. Lint has two errors, listed
-  under the security review below.
+- Feature complete against Memos v0.30 (see README for the list). 49 unit tests pass, a
+  shrunk release build has been smoke-tested on an emulator, and `:app:lintDebug` is clean
+  of errors.
 - Two known gaps that were deliberately left: geofenced reminders (below) and Wear OS.
 - Note colours sync as a trailing `#colour/<name>` line, hidden in the app.
-- Password sign-in mints a personal access token per device and revokes it on sign out. If
-  a device ever loses that token, the app shows a "Sign in again" banner rather than failing
-  quietly.
+- Password sign-in mints a personal access token per device, good for 90 days, and revokes it
+  on sign out. If a device ever loses that token or it expires, the app shows a "Sign in
+  again" banner rather than failing quietly.
 
 ## Security review, 8 September 2026
 
-A full review was run over the app. Fixed on `fix/security-review`: image bearer token
-sent to look-alike hosts, permissionless `CREATE_MEMO` activity, `file://` URIs accepted from
-the share sheet, unvalidated config memo from any creator, off-by-a-separator zip-slip
-check in restore. Still open, all low:
+A full review was run over the app. Every finding is now closed.
 
-- Export zip uses server-supplied attachment filenames verbatim (`MarkdownExporter.kt`).
-  Pass them through `File(name).name`.
-- Markdown links open any URI scheme (`MemoContent.kt`). Allow `http`, `https`, `mailto`,
-  `geo` only.
-- A full reconcile that gets an empty memo list from the server deletes every synced local
-  memo (`SyncEngine.kt`, `deleteSyncedNotIn`). Skip the delete pass when the server returned
-  nothing but local has memos.
-- Sign-out leaves attachment files and the remembered lock password on disk.
-- Debug builds log request bodies including the sign-in password. Add
-  `redactHeader("Authorization")` and drop to `HEADERS`.
-- Minted PAT has no expiry. Consider 90 days with re-mint on refresh.
-- `AccountRepository.kt` records `AuthMethod.PASSWORD` on both sides of a ternary.
-- Coordinates logged in `MemoDetailViewModel.kt`.
-- Map tiles reach openstreetmap.org for every located memo with no opt-in.
-- GitHub CI never defines `KEYSTORE_BASE64`; `.kotlin/errors/*.log` are committed.
-- Two lint errors pre-date the review: `Notifier.kt` needs a `POST_NOTIFICATIONS` check
-  before `notify`, and `MemoDetailScreen.kt` reads a resource through `LocalContext`.
+Fixed on `fix/security-review`: image bearer token sent to look-alike hosts, permissionless
+`CREATE_MEMO` activity, `file://` URIs accepted from the share sheet, unvalidated config memo
+from any creator, off-by-a-separator zip-slip check in restore.
+
+Fixed on `fix/security-review-low`, the remaining low findings and the two lint errors:
+
+- Export zip entries go through `MarkdownExporter.attachmentPath`, which reduces a
+  server-supplied filename to a bare name. Covered by unit tests.
+- Markdown links only open `http`, `https`, `mailto` and `geo` (`isOpenable` in
+  `MemoContent.kt`). No test: the app module has no unit test source set.
+- A full reconcile that gets an empty memo list now skips the delete pass when the account
+  still has synced memos locally, and logs a warning (`SyncEngine.pull`, `MemoDao.countSynced`).
+- Sign-out deletes the account's cached attachment files, and clears the remembered memo
+  password once the last account goes.
+- Debug HTTP logging is `HEADERS` with `Authorization`, `Cookie` and `Set-Cookie` redacted,
+  so the sign-in password no longer reaches logcat.
+- The token minted at password sign-in expires after 90 days
+  (`AccountRepository.TOKEN_LIFETIME_DAYS`). The password is never stored, so it cannot be
+  renewed silently: when it lapses the existing "sign in again" banner asks for the password.
+- `AccountRepository` now records `PERSONAL_ACCESS_TOKEN` when minting succeeded. The field
+  is only read by `signOut`, so stored accounts need no migration.
+- Coordinates are no longer logged in `MemoDetailViewModel`.
+- Map tiles are behind a "Map previews" setting (`Settings.mapTiles`, off by default, provided
+  through `LocalMapTiles`). With it off both `MapPreview` and `RouteMap` still draw markers
+  and the route, but fetch nothing from openstreetmap.org.
+- CI now passes `KEYSTORE_BASE64` to the release step and only decodes it when both it and
+  `STORE_FILE` are set. `.kotlin/` is git-ignored and the committed error logs are gone.
+- The two lint errors are fixed: `Notifier.post` checks `POST_NOTIFICATIONS` inline so lint
+  can see the guard, and `MemoDetailScreen` hoists `reminder_exact_hint` out of the
+  `LaunchedEffect`. `:app:lintDebug` reports no errors; the remaining findings are warnings
+  that pre-date the review.
 
 Note for automation users: apps sending `CREATE_MEMO` now need the
 `com.keltruc.mymemos.permission.CREATE_MEMO` permission granted once.
