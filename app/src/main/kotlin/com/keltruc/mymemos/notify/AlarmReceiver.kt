@@ -37,12 +37,15 @@ class AlarmReceiver : BroadcastReceiver() {
         val result = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                when (intent.action) {
-                    AlarmScheduler.REMINDER -> fireReminder(context, entry, id)
-                    AlarmScheduler.RECURRING -> fireRecurring(context, entry, id)
+                runCatching {
+                    when (intent.action) {
+                        AlarmScheduler.REMINDER -> fireReminder(context, entry, id)
+                        AlarmScheduler.RECURRING -> fireRecurring(context, entry, id)
+                    }
                 }
             } finally {
-                entry.scheduler().rescheduleNow()
+                // Never let a bad alarm take the process down; the next reschedule will retry.
+                runCatching { entry.scheduler().rescheduleNow() }
                 result.finish()
             }
         }
@@ -78,7 +81,7 @@ class BootReceiver : BroadcastReceiver() {
         val entry = EntryPointAccessors.fromApplication(context.applicationContext, AlarmEntryPoint::class.java)
         val result = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
-            try { entry.scheduler().rescheduleNow() } finally { result.finish() }
+            try { runCatching { entry.scheduler().rescheduleNow() } } finally { result.finish() }
         }
     }
 }

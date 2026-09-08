@@ -62,7 +62,8 @@ class BackupManager @Inject constructor(
                 var entry: ZipEntry? = zip.nextEntry
                 while (entry != null) {
                     val out = File(staging, entry.name)
-                    if (!out.canonicalPath.startsWith(staging.canonicalPath)) throw BackupCrypto.WrongPasswordOrCorrupt()
+                    // Prefix must end in a separator, otherwise "../restore-x/evil" would pass.
+                    if (!out.canonicalPath.startsWith(staging.canonicalPath + File.separator)) throw BackupCrypto.WrongPasswordOrCorrupt()
                     out.parentFile?.mkdirs()
                     out.outputStream().use { zip.copyTo(it) }
                     if (entry.name == "db/${MyMemosDatabase.NAME}") sawDb = true

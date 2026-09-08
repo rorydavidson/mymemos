@@ -32,7 +32,7 @@ class ConfigRepository @Inject constructor(
     private val writes = Mutex()
 
     val config: Flow<AppConfig> = accountRepository.activeAccount.filterNotNull().flatMapLatest { acc ->
-        memoDao.observeConfigMemo(acc.id).map { it?.let { m -> ConfigCodec.decode(m.content) } ?: AppConfig() }
+        memoDao.observeConfigMemo(acc.id, acc.userResourceName).map { it?.let { m -> ConfigCodec.decode(m.content) } ?: AppConfig() }
     }
 
     suspend fun current(): AppConfig = config.first()
@@ -47,7 +47,7 @@ class ConfigRepository @Inject constructor(
     /** Applies [change] to the latest config and stores it, creating the memo on first use. */
     suspend fun update(change: (AppConfig) -> AppConfig) = writes.withLock {
         val account = accountRepository.activeAccount.filterNotNull().first()
-        val existing = memoDao.observeConfigMemo(account.id).first()
+        val existing = memoDao.observeConfigMemo(account.id, account.userResourceName).first()
         val next = change(existing?.let { ConfigCodec.decode(it.content) } ?: AppConfig())
         val text = ConfigCodec.encode(next)
         if (existing == null) {

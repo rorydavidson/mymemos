@@ -240,4 +240,6 @@
     <string name="review_journey">Journey</string>
     <string name="journey_empty">No located memos on this day.</string>
     <string name="notifications_denied">Notifications are off for MyMemos. Enable them in system settings to receive this.</string>
+    <string name="permission_create_memo_label">Create memos in MyMemos</string>
+    <string name="permission_create_memo_description">Allows the app to save new memos to your Memos account without showing the editor.</string>
 </resources>
