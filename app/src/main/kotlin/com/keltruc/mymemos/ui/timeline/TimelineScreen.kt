@@ -3,6 +3,11 @@ package com.keltruc.mymemos.ui.timeline
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import com.keltruc.mymemos.ui.tags.LocalTagStyles
+import com.keltruc.mymemos.ui.tags.label
+import com.keltruc.mymemos.ui.tags.styleFor
+import com.keltruc.mymemos.ui.components.tint
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -90,6 +95,7 @@ fun TimelineScreen(
     onManageShortcuts: () -> Unit,
     onNotifications: () -> Unit,
     onReview: () -> Unit,
+    onTagSettings: (String) -> Unit,
     viewModel: TimelineViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -142,6 +148,7 @@ fun TimelineScreen(
                         unread = unread,
                         onNotifications = onNotifications,
                         onReview = onReview,
+                        onTagSettings = onTagSettings,
                     )
                 }
                 if (state.sync.authExpired) {
@@ -264,7 +271,9 @@ private fun Header(
     unread: Int,
     onNotifications: () -> Unit,
     onReview: () -> Unit,
+    onTagSettings: (String) -> Unit,
 ) {
+    val tagStyles = LocalTagStyles.current
     Column(Modifier.statusBarsPadding().padding(top = 8.dp)) {
         Row(
             Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp),
@@ -295,9 +304,6 @@ private fun Header(
                 )
             }
             SyncStatusChip(state.sync, onClick = onSync)
-            IconButton(onClick = onReview) {
-                Icon(Icons.Default.CalendarMonth, contentDescription = stringResource(R.string.review), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
             IconButton(onClick = onNotifications) {
                 BadgedBox(badge = { if (unread > 0) Badge { Text(unread.toString()) } }) {
                     Icon(Icons.Default.Notifications, contentDescription = stringResource(R.string.notifications), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -317,18 +323,24 @@ private fun Header(
             Spacer(Modifier.height(10.dp))
             LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(state.tags) { tag ->
-                    FilterChip(
-                        selected = state.selectedTag == tag,
-                        onClick = { onTag(tag) },
-                        label = { Text("#$tag") },
+                    val style = tagStyles.styleFor(tag)
+                    val selected = state.selectedTag == tag
+                    Surface(
                         shape = CircleShape,
-                        border = null,
-                        colors = FilterChipDefaults.filterChipColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        ),
-                    )
+                        color = when {
+                            selected -> MaterialTheme.colorScheme.primaryContainer
+                            style?.colour != null -> style.colour!!.tint()
+                            else -> MaterialTheme.colorScheme.surfaceContainerHigh
+                        },
+                        modifier = Modifier.combinedClickable(onClick = { onTag(tag) }, onLongClick = { onTagSettings(tag) }),
+                    ) {
+                        Text(
+                            tagStyles.label(tag),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                        )
+                    }
                 }
             }
         }

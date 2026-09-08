@@ -24,8 +24,11 @@ class SessionViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val memoRepository: MemoRepository,
     private val intentRouter: IntentRouter,
+    configRepository: com.keltruc.mymemos.data.config.ConfigRepository,
 ) : ViewModel() {
     val pendingDestination: StateFlow<Destination?> = intentRouter.pending
+    val tagStyles: StateFlow<Map<String, com.keltruc.mymemos.model.TagStyle>> = configRepository.config.map { it.tagStyles }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
     fun consumeDestination() = intentRouter.consume()
 
     /** Turns a server memo name into a local id (fetching if needed) and hands it on. */

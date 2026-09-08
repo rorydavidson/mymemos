@@ -486,6 +486,10 @@ class MemoRepository @Inject constructor(
         return memos.filter { it.localId in connected } to edges
     }
 
+    /** Memos with unticked tasks as a live flow, for the tasks screen. */
+    fun observeMemosWithOpenTasks(accountId: Long): Flow<List<Memo>> =
+        memoDao.observeWithOpenTasks(accountId).map { rows -> rows.map { it.toModel() } }
+
     /** Memos with unticked tasks, newest first, for the tasks widget. */
     suspend fun memosWithOpenTasks(accountId: Long): List<Memo> =
         memoDao.withOpenTasks(accountId).map { it.toModel() }

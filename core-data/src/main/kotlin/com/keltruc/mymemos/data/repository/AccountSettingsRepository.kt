@@ -22,6 +22,10 @@ import com.keltruc.mymemos.network.dto.InstanceGeneralSettingDto
 import com.keltruc.mymemos.network.dto.InstanceSettingDto
 import com.keltruc.mymemos.network.dto.NotificationWriteDto
 import com.keltruc.mymemos.network.dto.UserGeneralSettingDto
+import com.keltruc.mymemos.network.dto.TagsSettingDto
+import com.keltruc.mymemos.network.dto.TagMetadataDto
+import com.keltruc.mymemos.network.dto.ColorDto
+import com.keltruc.mymemos.model.NoteColour
 import com.keltruc.mymemos.network.dto.UserSettingDto
 import com.keltruc.mymemos.network.dto.UserWebhookDto
 import com.keltruc.mymemos.network.dto.UserWriteDto
@@ -83,6 +87,18 @@ class AccountSettingsRepository @Inject constructor(
             UserSettingDto(name = name, generalSetting = UserGeneralSettingDto(memoVisibility = visibility.name)),
             "general_setting.memo_visibility",
         )
+        Unit
+    }
+
+    /** Sets or clears the server's background colour for a tag (the web UI paints it). */
+    suspend fun setTagColour(account: Account, tag: String, colour: NoteColour?) = wrap {
+        val name = "${account.userResourceName}/settings/TAGS"
+        val current = runCatching { api(account).getUserSetting(name).tagsSetting?.tags }.getOrNull().orEmpty().toMutableMap()
+        if (colour == null) current.remove(tag) else {
+            val hex = colour.hex
+            current[tag] = TagMetadataDto(ColorDto(((hex shr 16) and 0xFF) / 255f, ((hex shr 8) and 0xFF) / 255f, (hex and 0xFF) / 255f))
+        }
+        api(account).updateUserSetting(name, UserSettingDto(name = name, tagsSetting = TagsSettingDto(current)), "tags")
         Unit
     }
 

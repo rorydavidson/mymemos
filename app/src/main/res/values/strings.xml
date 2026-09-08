@@ -205,4 +205,18 @@
     <string name="review_add_tag">Add tag</string>
     <string name="review_done">That is everything for this day.</string>
     <string name="review_swipe_hint">Swipe left to archive, right to keep.</string>
+    <string name="tags">Tags</string>
+    <string name="tag_style">Tag style</string>
+    <string name="tag_emoji">Emoji</string>
+    <string name="tag_emoji_hint">One emoji, shown before the tag everywhere.</string>
+    <string name="tag_colour">Colour</string>
+    <string name="tags_empty">No tags yet. Add #tags to memos and they appear here.</string>
+    <string name="nav_memos">Memos</string>
+    <string name="nav_tasks">Tasks</string>
+    <string name="nav_review">Review</string>
+    <string name="tasks_title">Open tasks</string>
+    <string name="tasks_empty">Nothing open. Add \"- [ ] something @tomorrow\" to a memo.</string>
+    <string name="tasks_due_hint">Write @today, @fri or @12/9 in a task to give it a date.</string>
+    <string name="tasks_overdue">Overdue</string>
+    <string name="tasks_undated">No date</string>
 </resources>

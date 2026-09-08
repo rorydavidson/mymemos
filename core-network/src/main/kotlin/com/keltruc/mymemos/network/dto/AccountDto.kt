@@ -36,7 +36,17 @@ data class ListUsersResponseDto(val users: List<UserDto> = emptyList(), val next
 data class UserGeneralSettingDto(val locale: String = "", val memoVisibility: String = "", val theme: String = "")
 
 @Serializable
-data class UserSettingDto(val name: String = "", val generalSetting: UserGeneralSettingDto? = null)
+data class UserSettingDto(val name: String = "", val generalSetting: UserGeneralSettingDto? = null, val tagsSetting: TagsSettingDto? = null)
+
+@Serializable
+data class TagsSettingDto(val tags: Map<String, TagMetadataDto> = emptyMap())
+
+@Serializable
+data class TagMetadataDto(val backgroundColor: ColorDto? = null, val blurContent: Boolean = false)
+
+/** google.type.Color: channels as 0..1 floats. */
+@Serializable
+data class ColorDto(val red: Float = 0f, val green: Float = 0f, val blue: Float = 0f)
 
 @Serializable
 data class PersonalAccessTokenDto(
