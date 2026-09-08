@@ -88,7 +88,7 @@ class ReviewViewModel @Inject constructor(
 
     fun addTag(memo: Memo, tag: String) = viewModelScope.launch {
         if (memo.isLocked || tag.isBlank() || tag in memo.tags) return@launch
-        memoRepository.updateContent(memo.localId, memo.content.trimEnd() + " #$tag")
+        memoRepository.updateContent(memo.localId, memo.displayContent.trimEnd() + " #$tag")
     }
 
     private fun distanceMetres(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {

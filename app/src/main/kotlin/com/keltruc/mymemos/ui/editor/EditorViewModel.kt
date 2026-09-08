@@ -82,7 +82,7 @@ class EditorViewModel @Inject constructor(
             } else {
                 val memo = memoRepository.observeMemo(id).first()
                 val locked = memo?.isLocked == true
-                val plain = if (locked) passwordSession.current()?.let { pw -> runCatching { memoRepository.decrypt(memo!!, pw) }.getOrNull() } else memo?.content
+                val plain = if (locked) passwordSession.current()?.let { pw -> runCatching { memoRepository.decrypt(memo!!, pw) }.getOrNull() } else memo?.displayContent
                 _state.update {
                     it.copy(
                         content = plain.orEmpty(),

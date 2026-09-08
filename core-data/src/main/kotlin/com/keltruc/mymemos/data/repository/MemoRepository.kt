@@ -15,6 +15,7 @@ import com.keltruc.mymemos.model.Reference
 import com.keltruc.mymemos.data.prefs.AppPreferences
 import com.keltruc.mymemos.data.text.TaskListSorter
 import com.keltruc.mymemos.data.crypto.MemoCipher
+import com.keltruc.mymemos.data.text.ColourTag
 import com.keltruc.mymemos.data.widget.WidgetRefresher
 import com.keltruc.mymemos.data.sync.FailedOp
 import com.keltruc.mymemos.data.sync.SyncEngine
@@ -89,7 +90,7 @@ class MemoRepository @Inject constructor(
 
     fun observeTags(accountId: Long): Flow<List<String>> =
         memoDao.observeTagStrings(accountId).map { joined ->
-            joined.flatMap { it.split(MemoEntity.TAG_SEPARATOR) }.filter { it.isNotEmpty() }
+            joined.flatMap { it.split(MemoEntity.TAG_SEPARATOR) }.filter { it.isNotEmpty() && !ColourTag.isColourTag(it) }
                 .groupingBy { it }.eachCount()
                 .entries.sortedByDescending { it.value }.map { it.key }
         }
@@ -162,13 +163,19 @@ class MemoRepository @Inject constructor(
     }
 
     suspend fun updateContent(localId: String, rawContent: String) {
-        val content = applyContentRules(rawContent)
         db.withTransaction {
             val memo = memoDao.getByLocalId(localId) ?: return@withTransaction
+            var content = applyContentRules(rawContent)
+            // Editors work on the text without the colour line; put it back so the tint survives.
+            val keptColour = memo.colour?.let { c -> runCatching { NoteColour.valueOf(c) }.getOrNull() }
+            if (!MemoCipher.isEncrypted(content) && ColourTag.extract(content) == null && keptColour != null) {
+                content = ColourTag.apply(content, keptColour)
+            }
             if (memo.content == content) return@withTransaction
             memoDao.upsert(
                 memo.copy(
                     content = content,
+                    colour = if (MemoCipher.isEncrypted(content)) memo.colour else ColourTag.extract(content)?.name,
                     tagsJoined = extractTags(content).joinToString(MemoEntity.TAG_SEPARATOR),
                     snippet = content.lineSequence().firstOrNull().orEmpty().take(120),
                     hasTaskList = content.contains(Regex("^\\s*[-*] \\[[ xX]] ", RegexOption.MULTILINE)),
@@ -439,9 +446,17 @@ class MemoRepository @Inject constructor(
 
     fun decrypt(memo: Memo, password: CharArray): String = MemoCipher.decrypt(memo.content, password)
 
-    /** Local-only tint; never touches the server. */
+    /**
+     * Sets the tint. For plain memos it rides along as a `#colour/x` tag line so other
+     * devices pick it up; locked memos keep it on this device only, since nothing readable
+     * can sit next to the ciphertext.
+     */
     suspend fun setColour(localId: String, colour: NoteColour?) {
+        val memo = memoDao.getByLocalId(localId) ?: return
         memoDao.setColour(localId, colour?.name)
+        if (!MemoCipher.isEncrypted(memo.content)) {
+            updateContent(localId, ColourTag.apply(memo.content, colour))
+        }
         widgets.refresh()
     }
 
@@ -518,6 +533,7 @@ class MemoRepository @Inject constructor(
         private val tagRegex = Regex("(?<![\\w/])#([\\p{L}\\p{N}_/-]+)")
 
         fun extractTags(content: String): List<String> =
-            tagRegex.findAll(content).map { it.groupValues[1].trimEnd('/', '-') }.filter { it.isNotEmpty() }.distinct().toList()
+            tagRegex.findAll(content).map { it.groupValues[1].trimEnd('/', '-') }
+                .filter { it.isNotEmpty() && !ColourTag.isColourTag(it) }.distinct().toList()
     }
 }

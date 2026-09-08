@@ -8,6 +8,7 @@ import com.keltruc.mymemos.database.entity.MemoRelationEntity
 import com.keltruc.mymemos.database.entity.ReactionEntity
 import com.keltruc.mymemos.database.entity.ShortcutEntity
 import com.keltruc.mymemos.database.entity.TemplateEntity
+import com.keltruc.mymemos.data.text.ColourTag
 import com.keltruc.mymemos.model.Account
 import com.keltruc.mymemos.model.Attachment
 import com.keltruc.mymemos.model.AuthMethod
@@ -89,7 +90,7 @@ fun MemoDto.toEntity(accountId: Long, existingLocalId: String? = null, existingC
         syncStatus = SyncStatus.SYNCED.name,
         baseUpdateTimeEpochMs = update.toEpochMilli(),
         parent = parent,
-        colour = existingColour,
+        colour = ColourTag.extract(content)?.name ?: existingColour,
     )
 }
 
@@ -153,7 +154,7 @@ fun MemoEntity.toModel(attachments: List<Attachment> = emptyList()) = Memo(
     visibility = runCatching { Visibility.valueOf(visibility) }.getOrDefault(Visibility.PRIVATE),
     state = runCatching { MemoState.valueOf(state) }.getOrDefault(MemoState.NORMAL),
     pinned = pinned,
-    tags = if (tagsJoined.isEmpty()) emptyList() else tagsJoined.split(MemoEntity.TAG_SEPARATOR),
+    tags = if (tagsJoined.isEmpty()) emptyList() else tagsJoined.split(MemoEntity.TAG_SEPARATOR).filter { !ColourTag.isColourTag(it) },
     createTime = Instant.ofEpochMilli(createTimeEpochMs),
     updateTime = Instant.ofEpochMilli(updateTimeEpochMs),
     snippet = snippet,

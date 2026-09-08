@@ -53,7 +53,7 @@ fun ReferencePickerDialog(
                 LazyColumn(Modifier.heightIn(max = 320.dp).padding(top = 8.dp)) {
                     items(results, key = { it.localId }) { memo ->
                         Text(
-                            memo.content.lineSequence().firstOrNull().orEmpty().ifEmpty { memo.snippet },
+                            memo.displayContent.lineSequence().firstOrNull().orEmpty().ifEmpty { memo.snippet },
                             Modifier.fillMaxWidth().clickable { onPick(memo) }.padding(vertical = 10.dp),
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,

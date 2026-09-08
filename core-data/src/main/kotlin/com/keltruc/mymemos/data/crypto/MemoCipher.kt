@@ -36,7 +36,7 @@ object MemoCipher {
     }
 
     fun decrypt(content: String, password: CharArray): String {
-        val blob = runCatching { Base64.getDecoder().decode(content.trim().removePrefix(PREFIX)) }.getOrNull()
+        val blob = runCatching { Base64.getDecoder().decode(content.trim().lineSequence().first().removePrefix(PREFIX)) }.getOrNull()
             ?: throw WrongPassword()
         if (blob.size < 29) throw WrongPassword()
         val salt = blob.copyOfRange(0, 16)

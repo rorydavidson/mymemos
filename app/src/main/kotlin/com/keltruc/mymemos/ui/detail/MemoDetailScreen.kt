@@ -84,6 +84,7 @@ import com.keltruc.mymemos.ui.components.AttachmentStrip
 import com.keltruc.mymemos.ui.components.Avatar
 import com.keltruc.mymemos.ui.components.ColourPickerDialog
 import com.keltruc.mymemos.ui.components.tint
+import com.keltruc.mymemos.ui.components.MapPreview
 import com.keltruc.mymemos.ui.components.MemoContent
 import com.keltruc.mymemos.ui.components.MemoPasswordDialog
 import java.time.ZoneId
@@ -205,7 +206,7 @@ fun MemoDetailScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             when {
-                !m.isLocked -> MemoContent(content = m.content, onToggleTask = viewModel::toggleTask, modifier = Modifier.fillMaxWidth())
+                !m.isLocked -> MemoContent(content = m.displayContent, onToggleTask = viewModel::toggleTask, modifier = Modifier.fillMaxWidth())
                 unlockedText != null -> {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Icon(Icons.Default.LockOpen, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
@@ -227,6 +228,7 @@ fun MemoDetailScreen(
             if (m.attachments.isNotEmpty()) {
                 AttachmentStrip(attachments = m.attachments, serverUrl = state.account?.serverUrl.orEmpty(), thumbSize = 140)
             }
+            m.location?.let { loc -> MapPreview(loc) }
             m.location?.let { loc ->
                 AssistChip(
                     onClick = {

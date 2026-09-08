@@ -74,16 +74,16 @@ fun SwipeReview(
         return
     }
 
-    val dismiss = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            when (value) {
-                SwipeToDismissBoxValue.EndToStart -> { onArchive(memo); true }
-                SwipeToDismissBoxValue.StartToEnd -> { index++; true }
-                else -> false
-            }
-        },
-    )
-    LaunchedEffect(memo.localId) { dismiss.reset() }
+    // Act once the box has settled, not in confirmValueChange, which can fire several times
+    // during one drag.
+    val dismiss = rememberSwipeToDismissBoxState()
+    LaunchedEffect(dismiss.currentValue) {
+        when (dismiss.currentValue) {
+            SwipeToDismissBoxValue.EndToStart -> { onArchive(memo); dismiss.reset() }
+            SwipeToDismissBoxValue.StartToEnd -> { index++; dismiss.reset() }
+            else -> Unit
+        }
+    }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {

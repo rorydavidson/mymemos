@@ -86,6 +86,7 @@ class SyncEngine @Inject constructor(
             push(account, api)
             pull(account, api, fullPull)
             runCatching { pullShortcuts(account, api) }
+            runCatching { refreshProfile(account, api) }
             _state.update { it.copy(running = false, lastSuccess = Instant.now()) }
             widgets.refresh()
             Outcome.Success
@@ -412,6 +413,14 @@ class SyncEngine @Inject constructor(
         val existing = reactionDao.forMemo(memoLocalId).filter { it.remoteName != null }.associateBy { it.remoteName }
         reactionDao.deleteSyncedForMemo(memoLocalId)
         reactionDao.upsertAll(dto.reactions.map { it.toEntity(memoLocalId, existing[it.name]?.localId) })
+    }
+
+    /** Keeps the cached name and avatar in step with what the server shows. */
+    private suspend fun refreshProfile(account: AccountEntity, api: MemosApi) {
+        val user = call { api.getUser(account.userResourceName) }
+        val fresh = accountDao.getById(account.id) ?: return
+        val updated = fresh.copy(displayName = user.displayName.ifEmpty { user.username }, avatarUrl = user.avatarUrl, role = user.role)
+        if (updated != fresh) accountDao.update(updated)
     }
 
     private suspend fun pullShortcuts(account: AccountEntity, api: MemosApi) {

@@ -91,9 +91,10 @@ fun MemoCard(
                         }
                     }
                 } else {
-                    MemoContent(content = memo.content, onToggleTask = onToggleTask, onTagClick = onTagClick, maxLines = 12)
+                    MemoContent(content = memo.displayContent, onToggleTask = onToggleTask, onTagClick = onTagClick, maxLines = 12)
                 }
                 AttachmentStrip(attachments = memo.attachments, serverUrl = serverUrl, thumbSize = 88)
+                memo.location?.let { MapPreview(it, height = 120.dp, zoom = 14) }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         timeFormatter.format(memo.createTime.atZone(ZoneId.systemDefault())),
