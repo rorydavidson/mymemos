@@ -1,14 +1,15 @@
 # MyMemos handoff
 
-State as of 8 September 2026. Everything up to and including the security review, plus
-feature items 1 and 2 below, is merged to `main`. Open branch: `feature/timeline-grouping`,
-which carries items 4, 5 and 6.
+State as of 8 September 2026. Everything below is merged to `main` and there are no open
+branches. The one piece of work still outstanding is item 3, locked notes keeping a
+readable title, which was deliberately left until last because it changes a stored format.
 
 ## Where things stand
 
-- Feature complete against Memos v0.30 (see README for the list). 49 unit tests pass, a
-  shrunk release build has been smoke-tested on an emulator, and `:app:lintDebug` is clean
-  of errors.
+- Feature complete against Memos v0.30 (see README for the list). 90 unit tests pass on
+  `main` and `:app:lintDebug` reports no errors. The last shrunk release build was
+  smoke-tested on an emulator before the September feature work; worth repeating before a
+  release.
 - Two known gaps that were deliberately left: geofenced reminders (below) and Wear OS.
 - Note colours sync as a trailing `#colour/<name>` line, hidden in the app.
 - Password sign-in mints a personal access token per device, good for 90 days, and revokes it
@@ -57,8 +58,13 @@ Note for automation users: apps sending `CREATE_MEMO` now need the
 
 ## Requested next
 
-Rory reordered this on 8 September: 4, 5 and 6 come before 3, which is now last. Items 1 and
-2 are merged; 4, 5 and 6 are done on `feature/timeline-grouping`; 3 and 7 are not started.
+Rory reordered this on 8 September so that 3 comes last, and added items 6 to 11 as the work
+went on. Everything here is merged except item 3, which is the only thing left to build.
+
+One item is merged but unverified: the sign-in screen's remembered servers (item 11). Reaching
+that screen means signing out, which wipes the local database and needs Rory's password to put
+right, so nobody has watched the chips appear. Worth ten seconds the next time anyone signs
+out on purpose.
 
 1. **Better Markdown editing.** Done. `MarkdownContinuation` in core-data decides what a
    return should do; `EditorScreen.update` calls `continueAfterReturn` with the field before
@@ -74,13 +80,24 @@ Rory reordered this on 8 September: 4, 5 and 6 come before 3, which is now last.
    localised date rides along as a hint on the chip. "Pick a date" opens a new
    `DueDatePickerDialog`, date only, rather than the existing `DateTimePickerDialog`, whose
    time step has nowhere to go in a `@yyyy-MM-dd` token.
-3. **Locked notes keep their title visible.** Today the whole body is encrypted, so the
-   list shows only a lock badge. Change `MemoRepository.updateLockedContent` so that when the
-   first line is a Markdown heading it is written in clear ahead of the `mymemos-enc:v1:`
-   blob, and `Memo.isLocked` / `displayContent` treat "heading plus blob" as locked with a
-   title. Decrypt must strip the heading before joining with the plaintext. This is a format
-   change: old blobs have no heading and must still decode, so keep the prefix check on
-   the encrypted line, not the whole content. Flag in the UI that the title is not encrypted.
+3. **Locked notes keep their title visible. THE ONE THING LEFT.** Today the whole body is
+   encrypted, so the list shows only a lock badge. Change `MemoRepository.updateLockedContent`
+   so that when the first line is a Markdown heading it is written in clear ahead of the
+   `mymemos-enc:v1:` blob, and `Memo.isLocked` / `displayContent` treat "heading plus blob" as
+   locked with a title. Decrypt must strip the heading before joining with the plaintext. This
+   is a format change: old blobs have no heading and must still decode, so keep the prefix
+   check on the encrypted line, not the whole content.
+
+   Talk it through with Rory before writing it. Two things deserve a decision rather than an
+   assumption: the heading leaves the device unencrypted, which is a real change to what a
+   locked memo promises and needs saying plainly in the UI, not just in a commit message; and
+   an old blob that gains a heading can no longer be read by an older build of the app, so the
+   format only moves one way. Migration is lazy either way, since old blobs still decode.
+
+   Two places downstream are already waiting for it. `CompactMemoRow` shows a lock badge and
+   the words "Locked memo" where the title would go: drop the `memo.isLocked` guard around
+   `MemoTitle.of` once the heading is there. `MemoCard` renders locked memos as a badge and a
+   hint, and could show the heading too.
 4. **Collapsible timeline groups.** Done. `TimelineGrouping.group` in core-data replaces
    `groupByDay`: days for the current week, a week header for earlier weeks of the current
    month, a month header before that. Collapsed keys live in `AppPreferences.collapsedGroups`.
@@ -122,7 +139,7 @@ Rory reordered this on 8 September: 4, 5 and 6 come before 3, which is now last.
      that quietly published someone's notes would be a much worse surprise than one that did not.
    - `MemoRepository.create` gained optional `createdAtEpochMs`/`updatedAtEpochMs`; the sync
      engine already sent `createTime` on create, so nothing else needed changing.
-7. **Dates and sorting.** Done, on `feature/detail-modified` then `feature/sort-and-dates`.
+7. **Dates and sorting.** Done.
    The detail footer lists both created and last modified. "Sort by last modified" in Settings
    flips the timeline between the two dates, and one accessor, `Memo.timelineTime(byModified)`,
    decides which date every surface shows, so the order, the group headers, the card and row
@@ -130,13 +147,13 @@ Rory reordered this on 8 September: 4, 5 and 6 come before 3, which is now last.
    parameterise an ORDER BY, so `observeTimeline` chooses inside a CASE expression. The review
    screens deliberately stay on the created date: they are about revisiting what you wrote.
 
-8. **Tapping a memo card.** Fixed on `feature/sort-and-dates`. Only the margins of a card used
+8. **Tapping a memo card.** Fixed. Only the margins of a card used
    to open the memo. `MemoContent` drew each paragraph with `ClickableText`, whose tap handler
    covers the whole paragraph and swallowed every tap on the text, which is most of a card.
    Links and tags are now `LinkAnnotation`s inside a plain `Text`, so only the link itself takes
    the tap and everything else reaches the card. This also retires a deprecated API.
 
-9. **Undo for delete and archive.** Done on `feature/undo-and-dedup`. A snackbar with Undo
+9. **Undo for delete and archive.** Done. A snackbar with Undo
    follows both. Two things had to change for it to mean anything: `delete` no longer removes
    the memo's attachment files (the sync engine does that once the server confirms, so undo
    cannot restore a memo with its images missing), and the delete's sync is held back
@@ -145,7 +162,7 @@ Rory reordered this on 8 September: 4, 5 and 6 come before 3, which is now last.
    after the window says so rather than pretending. Any unsent edits made before a delete are
    not restored, since `delete` clears the memo's queued operations.
 
-10. **Import de-duplication.** Done on the same branch, closing a gap in item 6. `MarkdownImport`
+10. **Import de-duplication.** Done, closing a gap in item 6. `MarkdownImport`
     now reads the `memos_id` that `MarkdownExporter` writes, and the importer skips a file whose
     id this account already holds, or that appeared earlier in the same run. Re-importing an
     export is therefore a no-op rather than a second copy of everything. A file with no
@@ -153,7 +170,7 @@ Rory reordered this on 8 September: 4, 5 and 6 come before 3, which is now last.
     many were "already here". Deliberately skip rather than update: overwriting a memo with an
     older file would quietly lose whatever was written since the export.
 
-11. **Remembering servers on the sign-in screen.** Done on `feature/undo-and-dedup`.
+11. **Remembering servers on the sign-in screen.** Done.
     `AppPreferences.knownServers` holds the last five addresses signed into, newest first,
     written only after a sign-in succeeds so a typo never becomes a suggestion. They appear as
     chips under the URL field, filtered as you type, each with an x to forget it. Only the
@@ -162,8 +179,9 @@ Rory reordered this on 8 September: 4, 5 and 6 come before 3, which is now last.
     would save more typing again and is equally not a secret, if that is wanted later.
 
     Not verified on a device: reaching the sign-in screen means signing out, which would wipe
-    the local database and need Rory's password to undo. Compiles, and the preference and
-    filtering logic are straightforward, but nobody has watched the chips appear.
+    the local database and need Rory's password to undo. It compiles and the logic is
+    straightforward, but nobody has watched the chips appear. Check it next time you sign out
+    on purpose.
 
 ## Geofenced reminders
 
