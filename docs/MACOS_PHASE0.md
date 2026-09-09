@@ -131,14 +131,18 @@ fragile: a password with German, French and Chinese characters, and one with emo
 SunJCE's `PBEKeySpec(char[])` encodes to UTF-8, the same as `Array(password.utf8)` on the
 Swift side. A memo locked on one platform opens on the other, byte for byte.
 
-Two things this spike did **not** settle:
+**Android settled too, 9 September 2026.** Android does not use SunJCE: it resolves
+`PBKDF2WithHmacSHA256` through **Bouncy Castle 1.77**, and providers have historically
+disagreed about whether a `char[]` password becomes UTF-8 or Latin-1 bytes. That would have
+broken any non-ASCII password across platforms while working fine on each one alone.
+`AndroidCryptoParityTest` in `core-data/src/androidTest` settles it on a real Android
+runtime, against Android 16 on API 36: the derived keys match SunJCE and CryptoKit exactly,
+`MemoCipher` opens blobs sealed on the other two platforms, and blobs it seals open on both.
+`BackupCrypto` round-trips with a non-ASCII password as well. Run it with
+`./gradlew :core-data:connectedDebugAndroidTest`.
 
-- **Android's provider is not SunJCE.** The vectors were generated on Temurin 21 with
-  SunJCE. Android resolves `PBKDF2WithHmacSHA256` through Conscrypt or Bouncy Castle, and
-  historically some providers encode `char[]` as Latin-1 rather than UTF-8, which would
-  give a different key for any non-ASCII password. `crypto-parity/vectors.json`
-  should be checked from an instrumented Android test before anyone locks a memo with a
-  non-ASCII password on two platforms. Until then the risk is real but narrow.
+One thing this spike did **not** settle:
+
 - **CryptoKit has no streaming AES-GCM.** `BackupCrypto` wraps a `CipherOutputStream`
   around the whole backup. `AES.GCM.seal` is one-shot, so a Swift implementation either
   holds the entire backup in memory or the format changes to chunked GCM with a per-chunk

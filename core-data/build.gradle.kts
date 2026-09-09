@@ -10,6 +10,9 @@ android {
     compileSdk = 37
     defaultConfig {
         minSdk = 26
+        // The crypto parity test has to run on a real Android runtime: the whole point is
+        // that Android's JCE provider is not the JVM's.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -43,6 +46,8 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.test.runner)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(project(":core-network"))
 }
