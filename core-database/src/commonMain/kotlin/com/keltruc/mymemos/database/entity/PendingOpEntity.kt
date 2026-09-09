@@ -4,11 +4,14 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * One queued change waiting to be pushed. Ops are applied in id order per account so a
  * memo's CREATE always lands before its later edits and attachment uploads.
  */
+@OptIn(ExperimentalTime::class)
 @Entity(
     tableName = "pending_ops",
     foreignKeys = [
@@ -33,7 +36,7 @@ data class PendingOpEntity(
     val lastError: String? = null,
     /** True once the server rejected this op for good (4xx other than 401/409). */
     val failed: Boolean = false,
-    val createdAtEpochMs: Long = System.currentTimeMillis(),
+    val createdAtEpochMs: Long = Clock.System.now().toEpochMilliseconds(),
 ) {
     object Type {
         const val CREATE = "CREATE"

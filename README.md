@@ -155,12 +155,19 @@ Then:
 ./gradlew test
 ```
 
-`core-network` is a Kotlin Multiplatform module, built for the JVM and for `macosArm64` in
-preparation for a macOS client (see `docs/MACOS_PLAN.md`). `./gradlew test` covers the JVM
-side on any machine; the native tests need a Mac:
+`core-network` and `core-database` are Kotlin Multiplatform modules, built for `macosArm64`
+alongside their usual target in preparation for a macOS client (see `docs/MACOS_PLAN.md`).
+`./gradlew test` covers everything that runs on any machine; the native tests need a Mac:
 
 ```bash
-./gradlew :core-network:macosArm64Test
+./gradlew :core-network:macosArm64Test :core-database:macosArm64Test
+```
+
+The cipher's cross-platform byte compatibility is checked on a real Android runtime, which
+needs an emulator or device attached:
+
+```bash
+./gradlew :core-data:connectedDebugAndroidTest
 ```
 
 ## Layout
@@ -169,7 +176,7 @@ side on any machine; the native tests need a Mac:
 |-----------------|----------------------------------------------------------------------|
 | `core-model`    | Plain Kotlin domain types, no Android or framework dependencies.     |
 | `core-network`  | Ktor client for the Memos API, bearer auth, token refresh, persistent cookie storage. Multiplatform (JVM and macOS), tested with Ktor's MockEngine. |
-| `core-database` | Room schema: accounts, memos (with FTS index), attachments, outbox, relations, reactions, shortcuts, templates. |
+| `core-database` | Room schema: accounts, memos (with FTS index), attachments, outbox, relations, reactions, shortcuts, templates. Multiplatform (Android and macOS); Android keeps the platform's SQLite, macOS uses Room's bundled driver. |
 | `core-data`     | Repositories, sync engine and three-way merge, mappers, encrypted credential store, memo cipher, config memo, Hilt wiring. |
 | `app`           | Jetpack Compose UI (Material 3), navigation, widgets, notifications, view models. |
 

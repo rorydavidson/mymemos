@@ -160,8 +160,20 @@ Done when the Android app builds and passes on the new network module.
 
 ### Phase 2: `core-database` to KMP
 
-Room KMP, bundled SQLite driver, same schema and version 3, same exported schema JSON so
-existing Android installs migrate untouched. Add a schema validation test on both targets.
+**Done.** Room KMP with an Android target alongside `macosArm64`, so Android goes on using
+the platform's SQLite and Room's Android artifacts exactly as before and only the macOS
+build gets the bundled driver. Schema and version 3 are untouched, and the exported schema
+JSON is byte for byte what it was, identity hash included, so an install from the first
+release still migrates. Spike 1's FTS and auto-migration tests now live in the module and
+run on the macOS target.
+
+Two things worth remembering from doing it. AGP 9 refuses to apply `com.android.library`
+alongside the multiplatform plugin, so the module uses
+`com.android.kotlin.multiplatform.library` and configures Android inside the `kotlin` block.
+And Room's KSP dependency has to go on the target-level `kspAndroid` configuration, not the
+compilation-level `kspAndroidMain`: on the latter it runs, sees none of `commonMain`,
+generates nothing, and the build stays green while the app dies on launch with
+`MyMemosDatabase_Impl does not exist`.
 
 ### Phase 3: `core-data` to KMP
 
