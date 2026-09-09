@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.keltruc.mymemos.R
 import com.keltruc.mymemos.model.MemoShare
+import com.keltruc.mymemos.ui.format.atZone
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 

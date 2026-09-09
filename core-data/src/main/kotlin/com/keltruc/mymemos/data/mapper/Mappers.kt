@@ -31,11 +31,11 @@ import com.keltruc.mymemos.network.dto.MemoShareDto
 import com.keltruc.mymemos.network.dto.ReactionDto
 import com.keltruc.mymemos.network.dto.ShortcutDto
 import com.keltruc.mymemos.network.dto.UserDto
-import java.time.Instant
+import kotlin.time.Instant
 import java.util.UUID
 
 fun parseInstant(rfc3339: String?): Instant =
-    rfc3339?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: Instant.EPOCH
+    rfc3339?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: Instant.fromEpochMilliseconds(0)
 
 fun Instant.toRfc3339(): String = toString()
 
@@ -77,8 +77,8 @@ fun MemoDto.toEntity(accountId: Long, existingLocalId: String? = null, existingC
         state = state,
         pinned = pinned,
         tagsJoined = tags.joinToString(MemoEntity.TAG_SEPARATOR),
-        createTimeEpochMs = parseInstant(createTime).toEpochMilli(),
-        updateTimeEpochMs = update.toEpochMilli(),
+        createTimeEpochMs = parseInstant(createTime).toEpochMilliseconds(),
+        updateTimeEpochMs = update.toEpochMilliseconds(),
         snippet = snippet,
         hasTaskList = property?.hasTaskList ?: false,
         hasIncompleteTasks = property?.hasIncompleteTasks ?: false,
@@ -88,7 +88,7 @@ fun MemoDto.toEntity(accountId: Long, existingLocalId: String? = null, existingC
         latitude = location?.latitude,
         longitude = location?.longitude,
         syncStatus = SyncStatus.SYNCED.name,
-        baseUpdateTimeEpochMs = update.toEpochMilli(),
+        baseUpdateTimeEpochMs = update.toEpochMilliseconds(),
         parent = parent,
         colour = ColourTag.extract(content)?.name ?: existingColour,
     )
@@ -104,10 +104,10 @@ fun ReactionDto.toEntity(memoLocalId: String, existingLocalId: String? = null) =
     remoteName = name,
     creator = creator,
     reactionType = reactionType,
-    createTimeEpochMs = parseInstant(createTime).toEpochMilli(),
+    createTimeEpochMs = parseInstant(createTime).toEpochMilliseconds(),
 )
 
-fun ReactionEntity.toModel() = Reaction(localId, remoteName, creator, reactionType, Instant.ofEpochMilli(createTimeEpochMs))
+fun ReactionEntity.toModel() = Reaction(localId, remoteName, creator, reactionType, Instant.fromEpochMilliseconds(createTimeEpochMs))
 fun MemoRelationEntity.toReference() = Reference(relatedRemoteName, relatedSnippet)
 fun ShortcutEntity.toModel() = Shortcut(name, title, filter)
 fun ShortcutDto.toEntity(accountId: Long) = ShortcutEntity(accountId, name, title, filter)
@@ -128,7 +128,7 @@ fun AttachmentDto.toEntity(memoLocalId: String, existingLocalId: String? = null)
     sizeBytes = size,
     externalLink = externalLink.ifEmpty { null },
     localPath = null,
-    createTimeEpochMs = parseInstant(createTime).toEpochMilli(),
+    createTimeEpochMs = parseInstant(createTime).toEpochMilliseconds(),
 )
 
 fun AttachmentEntity.toModel() = Attachment(
@@ -140,7 +140,7 @@ fun AttachmentEntity.toModel() = Attachment(
     sizeBytes = sizeBytes,
     externalLink = externalLink,
     localPath = localPath,
-    createTime = Instant.ofEpochMilli(createTimeEpochMs),
+    createTime = Instant.fromEpochMilliseconds(createTimeEpochMs),
 )
 
 fun MemoWithAttachments.toModel(): Memo = memo.toModel(attachments.map { it.toModel() })
@@ -155,8 +155,8 @@ fun MemoEntity.toModel(attachments: List<Attachment> = emptyList()) = Memo(
     state = runCatching { MemoState.valueOf(state) }.getOrDefault(MemoState.NORMAL),
     pinned = pinned,
     tags = if (tagsJoined.isEmpty()) emptyList() else tagsJoined.split(MemoEntity.TAG_SEPARATOR).filter { !ColourTag.isColourTag(it) },
-    createTime = Instant.ofEpochMilli(createTimeEpochMs),
-    updateTime = Instant.ofEpochMilli(updateTimeEpochMs),
+    createTime = Instant.fromEpochMilliseconds(createTimeEpochMs),
+    updateTime = Instant.fromEpochMilliseconds(updateTimeEpochMs),
     snippet = snippet,
     hasTaskList = hasTaskList,
     hasIncompleteTasks = hasIncompleteTasks,

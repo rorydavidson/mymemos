@@ -1,6 +1,6 @@
 package com.keltruc.mymemos.data.sync
 
-import java.time.Instant
+import kotlin.time.Instant
 
 data class SyncState(
     val running: Boolean = false,

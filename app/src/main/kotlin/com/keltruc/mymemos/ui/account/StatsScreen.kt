@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.keltruc.mymemos.R
+import com.keltruc.mymemos.ui.format.atZone
 import java.time.LocalDate
 import java.time.ZoneId
 

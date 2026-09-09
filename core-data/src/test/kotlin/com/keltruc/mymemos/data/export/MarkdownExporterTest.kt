@@ -7,7 +7,7 @@ import com.keltruc.mymemos.model.Visibility
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Instant
+import kotlin.time.Instant
 
 class MarkdownExporterTest {
     private val memo = Memo(

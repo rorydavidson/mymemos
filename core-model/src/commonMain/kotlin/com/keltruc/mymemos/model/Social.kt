@@ -1,6 +1,6 @@
 package com.keltruc.mymemos.model
 
-import java.time.Instant
+import kotlin.time.Instant
 
 data class Reaction(
     val localId: String,

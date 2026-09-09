@@ -9,7 +9,7 @@ import com.keltruc.mymemos.network.ApiException
 import com.keltruc.mymemos.network.dto.MemoShareDto
 import io.ktor.client.plugins.ResponseException
 import kotlinx.serialization.json.Json
-import java.time.Instant
+import kotlin.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 

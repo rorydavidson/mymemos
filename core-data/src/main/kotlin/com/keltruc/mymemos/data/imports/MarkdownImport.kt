@@ -1,10 +1,10 @@
 package com.keltruc.mymemos.data.imports
 
-import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.time.Instant
 
 /**
  * Reads one Markdown file into the pieces a memo is made of. Deliberately forgiving: files come
@@ -105,9 +105,18 @@ object MarkdownImport {
         return Fields(singles, lists)
     }
 
-    private fun parseInstant(raw: String): Instant? {
+    /**
+     * Front matter comes from whatever wrote it, so this tries the shapes seen in the wild in
+     * turn. The parsing stays on `java.time`, which is lenient in ways worth keeping; only the
+     * result crosses into the model's `kotlin.time.Instant`.
+     */
+    private fun parseInstant(raw: String): Instant? = parseJavaInstant(raw)?.let {
+        Instant.fromEpochMilliseconds(it.toEpochMilli())
+    }
+
+    private fun parseJavaInstant(raw: String): java.time.Instant? {
         val text = raw.trim().trim('"', '\'')
-        runCatching { return Instant.parse(text) }
+        runCatching { return java.time.Instant.parse(text) }
         runCatching { return java.time.OffsetDateTime.parse(text).toInstant() }
         runCatching { return LocalDateTime.parse(text).atZone(ZoneId.systemDefault()).toInstant() }
         runCatching { return LocalDateTime.parse(text, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).atZone(ZoneId.systemDefault()).toInstant() }

@@ -5,11 +5,11 @@ import com.keltruc.mymemos.model.MemoState
 import com.keltruc.mymemos.model.SyncStatus
 import com.keltruc.mymemos.model.Visibility
 import com.keltruc.mymemos.data.export.MarkdownExporter
+import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -57,11 +57,11 @@ class MarkdownImportTest {
     fun `other tools' date keys and formats are accepted`() {
         val zone = ZoneId.systemDefault()
         assertEquals(
-            LocalDate.of(2026, 9, 8).atStartOfDay(zone).toInstant(),
+            LocalDate.of(2026, 9, 8).atStartOfDay(zone).toInstant().toKotlinInstant(),
             MarkdownImport.parse("---\ndate: 2026-09-08\n---\nx").created,
         )
         assertEquals(
-            LocalDate.of(2026, 9, 8).atTime(14, 30).atZone(zone).toInstant(),
+            LocalDate.of(2026, 9, 8).atTime(14, 30).atZone(zone).toInstant().toKotlinInstant(),
             MarkdownImport.parse("---\ncreated_at: 2026-09-08 14:30\n---\nx").created,
         )
         assertEquals(
@@ -128,3 +128,6 @@ class MarkdownImportTest {
         assertEquals(memo.remoteName, parsed.remoteName)
     }
 }
+
+/** These fixtures build instants with java.time; the parser now returns kotlin.time. */
+private fun java.time.Instant.toKotlinInstant(): Instant = Instant.fromEpochMilliseconds(toEpochMilli())

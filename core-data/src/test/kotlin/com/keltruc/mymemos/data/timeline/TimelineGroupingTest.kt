@@ -4,6 +4,7 @@ import com.keltruc.mymemos.model.Memo
 import com.keltruc.mymemos.model.MemoState
 import com.keltruc.mymemos.model.SyncStatus
 import com.keltruc.mymemos.model.Visibility
+import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.LocalDate
@@ -19,8 +20,8 @@ class TimelineGroupingTest {
     private fun memo(date: LocalDate, pinned: Boolean = false) = Memo(
         localId = date.toString() + pinned, accountId = 1, remoteName = null, creator = null,
         content = date.toString(), visibility = Visibility.PRIVATE, state = MemoState.NORMAL,
-        pinned = pinned, tags = emptyList(), createTime = date.atTime(LocalTime.NOON).toInstant(ZoneOffset.UTC),
-        updateTime = date.atTime(LocalTime.NOON).toInstant(ZoneOffset.UTC), snippet = "", hasTaskList = false,
+        pinned = pinned, tags = emptyList(), createTime = date.atTime(LocalTime.NOON).toInstant(ZoneOffset.UTC).toKotlinInstant(),
+        updateTime = date.atTime(LocalTime.NOON).toInstant(ZoneOffset.UTC).toKotlinInstant(), snippet = "", hasTaskList = false,
         hasIncompleteTasks = false, hasLink = false, hasCode = false, location = null, attachments = emptyList(),
         syncStatus = SyncStatus.SYNCED,
     )
@@ -76,7 +77,7 @@ class TimelineGroupingTest {
         // Written in July, edited today: created-order puts it in a July group, modified-order
         // puts it under Today.
         val edited = memo(LocalDate.of(2026, 7, 1)).copy(
-            updateTime = today.atTime(LocalTime.NOON).toInstant(ZoneOffset.UTC),
+            updateTime = today.atTime(LocalTime.NOON).toInstant(ZoneOffset.UTC).toKotlinInstant(),
         )
         assertEquals(
             listOf("July 2026"),
@@ -117,3 +118,6 @@ class TimelineGroupingTest {
         assertEquals("month:2026-09-01", keyOn(LocalDate.of(2026, 10, 6)))
     }
 }
+
+/** These fixtures date memos with java.time; the model carries kotlin.time. */
+private fun java.time.Instant.toKotlinInstant(): Instant = Instant.fromEpochMilliseconds(toEpochMilli())

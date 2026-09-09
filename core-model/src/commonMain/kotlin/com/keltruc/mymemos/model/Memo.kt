@@ -1,6 +1,6 @@
 package com.keltruc.mymemos.model
 
-import java.time.Instant
+import kotlin.time.Instant
 
 enum class Visibility { PRIVATE, PROTECTED, PUBLIC }
 
@@ -49,7 +49,7 @@ data class Memo(
     val isLocked: Boolean get() = content.trimStart().startsWith(LOCKED_PREFIX)
 
     /** The date the timeline is currently ordered on, so what is shown matches what is sorted. */
-    fun timelineTime(byModified: Boolean): java.time.Instant = if (byModified) updateTime else createTime
+    fun timelineTime(byModified: Boolean): Instant = if (byModified) updateTime else createTime
 
     /** Content without the `#colour/x` line, for rendering and editing. */
     val displayContent: String get() = colourLine.replace(content, "").trimEnd('\n')

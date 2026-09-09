@@ -8,6 +8,7 @@ import com.keltruc.mymemos.data.mapper.toModel
 import com.keltruc.mymemos.data.mapper.toReference
 import com.keltruc.mymemos.data.mapper.relationEntities
 import com.keltruc.mymemos.data.auth.ApiClientRegistry
+import com.keltruc.mymemos.data.text.toLocalDateIn
 import com.keltruc.mymemos.model.Account
 import com.keltruc.mymemos.model.Location
 import com.keltruc.mymemos.model.Reaction
@@ -44,7 +45,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
-import java.time.Instant
+import kotlin.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
@@ -519,7 +520,7 @@ class MemoRepository @Inject constructor(
 
     /** Days with at least one memo, for streaks and "on this day". */
     fun observeActiveDays(accountId: Long, zone: ZoneId = ZoneId.systemDefault()): Flow<Set<LocalDate>> =
-        memoDao.observeCreateTimes(accountId).map { times -> times.map { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }.toSet() }
+        memoDao.observeCreateTimes(accountId).map { times -> times.map { it.toLocalDateIn(zone) }.toSet() }
 
     suspend fun memosWithLocation(accountId: Long): List<Memo> = memoDao.withLocation(accountId).map { it.toModel() }
 

@@ -65,8 +65,8 @@ class MarkdownImporter @Inject constructor(
         }
         val tags = (listOfNotNull(source.folderTag) + parsed.tags).distinct()
         // Front matter first, then the zip entry or file's own timestamp, then the clock.
-        val created = parsed.created?.toEpochMilli() ?: source.modifiedEpochMs
-        val updated = parsed.updated?.toEpochMilli() ?: created
+        val created = parsed.created?.toEpochMilliseconds() ?: source.modifiedEpochMs
+        val updated = parsed.updated?.toEpochMilliseconds() ?: created
         memoRepository.create(
             accountId = accountId,
             rawContent = MarkdownImport.withTags(parsed.body, tags),

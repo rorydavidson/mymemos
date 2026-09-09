@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.keltruc.mymemos.R
 import com.keltruc.mymemos.data.text.MemoTitle
 import com.keltruc.mymemos.model.Memo
+import com.keltruc.mymemos.ui.format.atZone
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 

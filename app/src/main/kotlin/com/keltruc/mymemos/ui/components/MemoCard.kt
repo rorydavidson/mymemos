@@ -43,6 +43,7 @@ import com.keltruc.mymemos.model.Memo
 import com.keltruc.mymemos.model.MemoState
 import com.keltruc.mymemos.model.SyncStatus
 import com.keltruc.mymemos.model.Visibility
+import com.keltruc.mymemos.ui.format.atZone
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 

@@ -44,7 +44,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import java.io.IOException
-import java.time.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -88,7 +89,7 @@ class SyncEngine @Inject constructor(
             pull(account, api, fullPull)
             runCatching { pullShortcuts(account, api) }
             runCatching { refreshProfile(account, api) }
-            _state.update { it.copy(running = false, lastSuccess = Instant.now()) }
+            _state.update { it.copy(running = false, lastSuccess = Clock.System.now()) }
             widgets.refresh()
             Outcome.Success
         } catch (e: Exception) {
@@ -175,7 +176,7 @@ class SyncEngine @Inject constructor(
                             content = memo.content,
                             visibility = memo.visibility,
                             pinned = memo.pinned.takeIf { it },
-                            createTime = Instant.ofEpochMilli(memo.createTimeEpochMs).toRfc3339(),
+                            createTime = Instant.fromEpochMilliseconds(memo.createTimeEpochMs).toRfc3339(),
                         ),
                     )
                 }
@@ -269,7 +270,7 @@ class SyncEngine @Inject constructor(
                         MemoWriteDto(
                             content = memo.content,
                             visibility = memo.visibility,
-                            createTime = Instant.ofEpochMilli(memo.createTimeEpochMs).toRfc3339(),
+                            createTime = Instant.fromEpochMilliseconds(memo.createTimeEpochMs).toRfc3339(),
                         ),
                     )
                 }
@@ -389,7 +390,7 @@ class SyncEngine @Inject constructor(
                         state = state,
                         orderBy = "update_time desc",
                         // Small overlap so clock skew between phone and server cannot drop an edit.
-                        filter = since?.let { "updated_ts > timestamp(\"${Instant.ofEpochMilli(it - 60_000).toRfc3339()}\")" },
+                        filter = since?.let { "updated_ts > timestamp(\"${Instant.fromEpochMilliseconds(it - 60_000).toRfc3339()}\")" },
                     )
                 }
                 fetched += page.memos
@@ -463,7 +464,7 @@ class SyncEngine @Inject constructor(
     }
 
     private fun parseEpoch(rfc3339: String?): Long =
-        rfc3339?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() } ?: 0L
+        rfc3339?.let { runCatching { Instant.parse(it).toEpochMilliseconds() }.getOrNull() } ?: 0L
 
     private companion object {
         const val TAG = "SyncEngine"
