@@ -7,8 +7,8 @@ import com.keltruc.mymemos.model.Account
 import com.keltruc.mymemos.model.MemoShare
 import com.keltruc.mymemos.network.ApiException
 import com.keltruc.mymemos.network.dto.MemoShareDto
+import io.ktor.client.plugins.ResponseException
 import kotlinx.serialization.json.Json
-import retrofit2.HttpException
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -34,9 +34,9 @@ class ShareRepository @Inject constructor(
         registry.api(account.serverUrl, account.userResourceName).deleteMemoShare(share.name)
     }
 
-    private inline fun <T> wrap(block: () -> T): T = try {
+    private suspend inline fun <T> wrap(block: () -> T): T = try {
         block()
-    } catch (e: HttpException) {
+    } catch (e: ResponseException) {
         throw ApiException.from(e, json)
     }
 }

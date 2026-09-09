@@ -34,6 +34,7 @@ import com.keltruc.mymemos.network.dto.UpsertReactionRequestDto
 import com.keltruc.mymemos.network.dto.MemoDto
 import com.keltruc.mymemos.network.dto.MemoWriteDto
 import com.keltruc.mymemos.network.dto.SetMemoAttachmentsRequestDto
+import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,7 +43,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
-import retrofit2.HttpException
 import java.io.IOException
 import java.time.Instant
 import java.util.UUID
@@ -456,9 +456,9 @@ class SyncEngine @Inject constructor(
         attachmentDao.upsertAll(fromServer + stillLocal)
     }
 
-    private inline fun <T> call(block: () -> T): T = try {
+    private suspend inline fun <T> call(block: () -> T): T = try {
         block()
-    } catch (e: HttpException) {
+    } catch (e: ResponseException) {
         throw ApiException.from(e, json)
     }
 

@@ -29,10 +29,10 @@ import com.keltruc.mymemos.model.NoteColour
 import com.keltruc.mymemos.network.dto.UserSettingDto
 import com.keltruc.mymemos.network.dto.UserWebhookDto
 import com.keltruc.mymemos.network.dto.UserWriteDto
+import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.Json
-import retrofit2.HttpException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -238,9 +238,9 @@ class AccountSettingsRepository @Inject constructor(
         InstanceStats(s.database?.driver.orEmpty(), s.database?.sizeBytes ?: 0, s.localStorageBytes)
     }
 
-    private inline fun <T> wrap(block: () -> T): T = try {
+    private suspend inline fun <T> wrap(block: () -> T): T = try {
         block()
-    } catch (e: HttpException) {
+    } catch (e: ResponseException) {
         throw ApiException.from(e, json)
     }
 }

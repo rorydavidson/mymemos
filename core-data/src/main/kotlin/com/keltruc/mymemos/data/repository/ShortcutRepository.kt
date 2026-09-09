@@ -14,10 +14,10 @@ import com.keltruc.mymemos.model.Shortcut
 import com.keltruc.mymemos.model.SyncStatus
 import com.keltruc.mymemos.network.ApiException
 import com.keltruc.mymemos.network.dto.ShortcutDto
+import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
-import retrofit2.HttpException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -79,9 +79,9 @@ class ShortcutRepository @Inject constructor(
         shortcutDao.replaceAll(account.id, api.listShortcuts(account.userResourceName).shortcuts.map { it.toEntity(account.id) })
     }
 
-    private inline fun <T> wrap(block: () -> T): T = try {
+    private suspend inline fun <T> wrap(block: () -> T): T = try {
         block()
-    } catch (e: HttpException) {
+    } catch (e: ResponseException) {
         throw ApiException.from(e, json)
     }
 }

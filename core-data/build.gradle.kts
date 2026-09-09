@@ -26,6 +26,10 @@ dependencies {
     implementation(project(":core-network"))
     implementation(project(":core-database"))
 
+    // Only for the Coil image-loader interceptor in ActiveSession. It used to come in
+    // transitively through core-network, which no longer speaks OkHttp directly.
+    implementation(libs.okhttp)
+
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.security.crypto)

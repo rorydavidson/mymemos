@@ -17,10 +17,10 @@ import com.keltruc.mymemos.network.dto.CreatePersonalAccessTokenRequestDto
 import com.keltruc.mymemos.network.dto.PasswordCredentialsDto
 import com.keltruc.mymemos.network.dto.SignInRequestDto
 import com.keltruc.mymemos.network.dto.UserDto
+import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
-import retrofit2.HttpException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -147,9 +147,9 @@ class AccountRepository @Inject constructor(
         return accountDao.getById(id)!!.toModel()
     }
 
-    private inline fun <T> wrap(block: () -> T): T = try {
+    private suspend inline fun <T> wrap(block: () -> T): T = try {
         block()
-    } catch (e: HttpException) {
+    } catch (e: ResponseException) {
         throw ApiException.from(e, json)
     }
 }
