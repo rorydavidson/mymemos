@@ -16,7 +16,7 @@ struct MemoListView: View {
                             MemoRowView(memo: memo)
                                 .tag(memo.localId)
                                 .listRowSeparator(.hidden)
-                                .listRowInsets(EdgeInsets(top: 3, leading: 8, bottom: 3, trailing: 8))
+                                .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10))
                         }
                     }
                 } header: {
@@ -48,8 +48,8 @@ private struct SectionHeader: View {
                     .font(.caption2.weight(.semibold))
                     .rotationEffect(.degrees(collapsed ? 0 : 90))
                 Text(label.uppercased())
-                    .font(.caption.weight(.semibold))
-                    .tracking(0.6)
+                    .font(Type.sectionHeader)
+                    .tracking(0.8)
                 Text("\(count)")
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(Theme.inkSoft)
@@ -62,7 +62,7 @@ private struct SectionHeader: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.vertical, 2)
+        .padding(.vertical, 6)
     }
 }
 
@@ -76,22 +76,23 @@ struct MemoRowView: View {
             if let tint = Color.memoTint(memo.colourHex, isDark: scheme == .dark) {
                 Rectangle().fill(tint).frame(width: 3)
             }
-            VStack(alignment: .leading, spacing: Theme.rowSpacing) {
+            VStack(alignment: .leading, spacing: 7) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(memo.locked ? "Locked memo" : memo.title)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(Type.rowTitle)
                         .foregroundStyle(Theme.ink)
                         .lineLimit(1)
                     Spacer(minLength: 8)
                     Text(memo.timeLabel)
-                        .font(.caption.monospacedDigit())
+                        .font(Type.rowMeta.monospacedDigit())
                         .foregroundStyle(Theme.inkSoft)
                 }
 
                 if !memo.locked, !bodyPreview.isEmpty {
                     Text(bodyPreview)
-                        .font(.system(size: 12))
+                        .font(Type.rowBody)
                         .foregroundStyle(Theme.inkSoft)
+                        .lineSpacing(2.5)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -107,8 +108,8 @@ struct MemoRowView: View {
                     }
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 11)
         }
         .background(
             RoundedRectangle(cornerRadius: Theme.cardRadius)

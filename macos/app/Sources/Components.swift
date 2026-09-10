@@ -8,10 +8,10 @@ struct TagChip: View {
 
     var body: some View {
         Text("#\(tag)")
-            .font(.caption)
+            .font(Type.rowMeta)
             .foregroundStyle(selected ? Color.white : Theme.accent)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 2)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
             .background(
                 Capsule().fill(selected ? Theme.accent : Theme.accent.opacity(0.12))
             )
@@ -41,7 +41,7 @@ struct MemoBadges: View {
                 }
             }
         }
-        .font(.caption)
+        .font(Type.rowMeta)
         .foregroundStyle(Theme.inkSoft)
     }
 }

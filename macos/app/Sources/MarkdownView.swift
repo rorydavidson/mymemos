@@ -11,12 +11,13 @@ struct MarkdownView: View {
     var lineLimit: Int?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 view(for: block)
             }
         }
         .textSelection(.enabled)
+        .lineSpacing(Theme.readingLeading)
     }
 
     private var blocks: [Block] { Block.parse(text, limit: lineLimit) }
@@ -26,48 +27,50 @@ struct MarkdownView: View {
         switch block {
         case let .heading(level, content):
             Text(inline(content))
-                .font(.system(size: headingSize(level), weight: .semibold))
-                .padding(.top, level == 1 ? 2 : 0)
+                .font(headingFont(level))
+                .padding(.top, level <= 2 ? 8 : 4)
 
         case let .paragraph(content):
-            Text(inline(content)).font(.body)
+            Text(inline(content)).font(Type.body)
 
         case let .quote(content):
             HStack(alignment: .top, spacing: 10) {
                 Rectangle().fill(Theme.accent.opacity(0.5)).frame(width: 3)
-                Text(inline(content)).font(.body).foregroundStyle(Theme.inkSoft)
+                Text(inline(content)).font(Type.body).foregroundStyle(Theme.inkSoft)
             }
             .fixedSize(horizontal: false, vertical: true)
 
         case let .bullet(depth, content):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("•").foregroundStyle(Theme.inkSoft)
-                Text(inline(content)).font(.body)
+                Text("•").font(Type.body).foregroundStyle(Theme.inkSoft)
+                Text(inline(content)).font(Type.body)
             }
-            .padding(.leading, CGFloat(depth) * 16)
+            .padding(.leading, CGFloat(depth) * 18)
 
         case let .numbered(depth, marker, content):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(marker).foregroundStyle(Theme.inkSoft).monospacedDigit()
-                Text(inline(content)).font(.body)
+                Text(marker).font(Type.body).foregroundStyle(Theme.inkSoft).monospacedDigit()
+                Text(inline(content)).font(Type.body)
             }
-            .padding(.leading, CGFloat(depth) * 16)
+            .padding(.leading, CGFloat(depth) * 18)
 
         case let .task(depth, done, content):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: done ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 14))
                     .foregroundStyle(done ? Theme.accent : Theme.inkSoft)
                 Text(inline(content))
-                    .font(.body)
+                    .font(Type.body)
                     .strikethrough(done, color: Theme.inkSoft)
                     .foregroundStyle(done ? Theme.inkSoft : Theme.ink)
             }
-            .padding(.leading, CGFloat(depth) * 16)
+            .padding(.leading, CGFloat(depth) * 18)
 
         case let .code(content):
             Text(content)
-                .font(.system(.callout, design: .monospaced))
-                .padding(10)
+                .font(Type.code)
+                .lineSpacing(3)
+                .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Theme.canvas, in: RoundedRectangle(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.hairline))
@@ -77,12 +80,11 @@ struct MarkdownView: View {
         }
     }
 
-    private func headingSize(_ level: Int) -> CGFloat {
+    private func headingFont(_ level: Int) -> Font {
         switch level {
-        case 1: return 22
-        case 2: return 18
-        case 3: return 16
-        default: return 15
+        case 1: return Type.heading1
+        case 2: return Type.heading2
+        default: return Type.heading3
         }
     }
 

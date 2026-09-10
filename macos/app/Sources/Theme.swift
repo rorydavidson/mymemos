@@ -29,7 +29,35 @@ enum Theme {
     // MARK: Metrics
 
     static let cardRadius: CGFloat = 10
-    static let rowSpacing: CGFloat = 6
+
+    /// A comfortable measure for prose. Much past this and the eye loses the line.
+    static let readingWidth: CGFloat = 680
+
+    /// Extra leading for body text. The default is tuned for controls, not paragraphs.
+    static let readingLeading: CGFloat = 6
+}
+
+/// The type scale.
+///
+/// The first pass used the platform defaults everywhere, which is right for controls and far
+/// too small for reading someone's writing: 13pt with default leading is a list row, not a
+/// page. Reading sizes are set explicitly here, with the leading they need.
+enum Type {
+
+    // Reading: the memo itself.
+    static let body = Font.system(size: 15)
+    static let bodyLeading: CGFloat = 7
+    static let title = Font.system(size: 26, weight: .semibold)
+    static let heading1 = Font.system(size: 21, weight: .semibold)
+    static let heading2 = Font.system(size: 18, weight: .semibold)
+    static let heading3 = Font.system(size: 16, weight: .semibold)
+    static let code = Font.system(size: 13.5, design: .monospaced)
+
+    // Lists and chrome, where the platform's own sizes are right.
+    static let rowTitle = Font.system(size: 13.5, weight: .semibold)
+    static let rowBody = Font.system(size: 12.5)
+    static let rowMeta = Font.system(size: 11)
+    static let sectionHeader = Font.system(size: 11, weight: .semibold)
 }
 
 extension Color {

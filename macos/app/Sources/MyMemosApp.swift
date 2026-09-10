@@ -48,6 +48,43 @@ final class SessionModel: ObservableObject {
         try? await session.memo(localId: localId)
     }
 
+    func rawContent(_ localId: String) async -> String? {
+        try? await session.rawContent(localId: localId)
+    }
+
+    /// Writes land in the local database and the outbox first, so this works with the network
+    /// off; the sync afterwards is the push, not the save.
+    func save(editing: String?, text: String, visibility: String, pinned: Bool) async {
+        do {
+            if let editing {
+                try await session.updateContent(localId: editing, content: text)
+                if model(editing)?.pinned != pinned {
+                    try await session.setPinned(localId: editing, pinned: pinned)
+                }
+            } else {
+                _ = try await session.create(content: text, visibility: visibility, pinned: pinned)
+            }
+            await reload()
+            await sync()
+        } catch {
+            phase = .failed(readable(error))
+        }
+    }
+
+    private func model(_ localId: String) -> MemoRow? { memo(localId) }
+
+    func setPinned(_ localId: String, _ pinned: Bool) async {
+        try? await session.setPinned(localId: localId, pinned: pinned)
+        await reload()
+        await sync()
+    }
+
+    func delete(_ localId: String) async {
+        _ = try? await session.delete(localId: localId)
+        await reload()
+        await sync()
+    }
+
     // MARK: Lifecycle
 
     /// Credentials live in the Keychain, so a signed-in account survives a quit.
@@ -137,6 +174,7 @@ final class SessionModel: ObservableObject {
 struct RootView: View {
     @StateObject private var model = SessionModel()
     @State private var selection: String?
+    @State private var editing: EditorTarget?
 
     var body: some View {
         Group {
@@ -146,8 +184,11 @@ struct RootView: View {
                 library
             }
         }
-        .frame(minWidth: 820, minHeight: 560)
+        .frame(minWidth: 860, minHeight: 580)
         .task { await model.restore() }
+        .sheet(item: $editing) { target in
+            EditorView(model: model, editing: target.localId)
+        }
     }
 
     private var library: some View {
@@ -160,17 +201,33 @@ struct RootView: View {
                 .navigationTitle(model.activeTag.map { "#\($0)" } ?? "Memos")
                 .navigationSubtitle(subtitle)
         } detail: {
-            DetailPane(model: model, selection: selection)
+            DetailPane(model: model, selection: selection, edit: { editing = EditorTarget(localId: $0) })
         }
         .searchable(text: $model.query, placement: .toolbar, prompt: "Search memos")
         .onChange(of: model.query) { _, _ in Task { await model.reload() } }
         .onChange(of: model.activeTag) { _, _ in Task { await model.reload() } }
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button { editing = EditorTarget(localId: nil) } label: {
+                    Image(systemName: "square.and.pencil")
+                }
+                .help("New memo (⌘N)")
+                .keyboardShortcut("n")
+
+                Button {
+                    if let selection { editing = EditorTarget(localId: selection) }
+                } label: {
+                    Image(systemName: "pencil")
+                }
+                .help("Edit this memo (⌘E)")
+                .keyboardShortcut("e")
+                .disabled(selection == nil || model.memo(selection ?? "")?.locked == true)
+
                 Button { Task { await model.sync() } } label: {
                     Image(systemName: "arrow.triangle.2.circlepath")
                 }
-                .help("Sync with the server")
+                .help("Sync with the server (⌘R)")
+                .keyboardShortcut("r")
                 .disabled(model.isBusy)
             }
         }
@@ -231,25 +288,33 @@ struct Sidebar: View {
 
 // MARK: - Detail
 
+/// Identifiable so a sheet can be driven by it; nil localId means a new memo.
+struct EditorTarget: Identifiable {
+    let localId: String?
+    var id: String { localId ?? "new" }
+}
+
 struct DetailPane: View {
     @ObservedObject var model: SessionModel
     let selection: String?
+    var edit: (String) -> Void = { _ in }
     @State private var detail: MemoDetail?
 
     var body: some View {
         Group {
             if let detail {
-                MemoDetailView(detail: detail)
+                MemoDetailView(detail: detail, model: model, edit: { edit(detail.row.localId) })
             } else {
                 EmptyState(
                     icon: "doc.text",
                     title: "No memo selected",
-                    detail: "Pick one from the list, or search to narrow it down."
+                    detail: "Pick one from the list, or press ⌘N to write a new one."
                 )
                 .background(Theme.canvas)
             }
         }
         .task(id: selection) { await load() }
+        .task(id: model.sections.count) { await load() }
     }
 
     private func load() async {

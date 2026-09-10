@@ -7,6 +7,7 @@ import com.keltruc.mymemos.data.sync.SyncScheduler
 import com.keltruc.mymemos.data.text.MemoTitle
 import com.keltruc.mymemos.data.timeline.TimelineGrouping
 import com.keltruc.mymemos.model.Memo
+import com.keltruc.mymemos.model.Visibility
 import kotlinx.coroutines.flow.first
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -109,6 +110,32 @@ class MemosSession {
             wordCount = memo.displayContent.split(Regex("\\s+")).count { it.isNotBlank() },
         )
     }
+
+    // MARK: writing
+
+    /** Saves a new memo locally and pushes it; the outbox handles the network being away. */
+    suspend fun create(content: String, visibility: String, pinned: Boolean): String? {
+        val account = db.accountDao().getActive() ?: return null
+        return memos.create(account.id, content, Visibility.valueOf(visibility), pinned)
+    }
+
+    suspend fun updateContent(localId: String, content: String) {
+        memos.updateContent(localId, content)
+    }
+
+    suspend fun setPinned(localId: String, pinned: Boolean) {
+        memos.setPinned(localId, pinned)
+    }
+
+    suspend fun setVisibility(localId: String, visibility: String) {
+        memos.setVisibility(localId, Visibility.valueOf(visibility))
+    }
+
+    /** True when the delete can still be taken back, which is what the phone's Undo relies on. */
+    suspend fun delete(localId: String): Boolean = memos.delete(localId)
+
+    /** The raw Markdown, which is what the editor opens. */
+    suspend fun rawContent(localId: String): String? = memos.observeMemoOnce(localId)?.displayContent
 
     private fun group(all: List<Memo>): List<TimelineSection> {
         val zone = TimeZone.currentSystemDefault()
