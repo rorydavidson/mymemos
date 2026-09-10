@@ -1,8 +1,5 @@
 package com.keltruc.mymemos.data.sync
 
-import com.github.difflib.DiffUtils
-import com.github.difflib.patch.AbstractDelta
-
 /**
  * Line-based three-way merge. Both sides' edits are expressed as deltas against [base];
  * non-overlapping deltas are applied together, overlapping ones are a conflict.
@@ -20,23 +17,23 @@ object ThreeWayMerge {
         if (base == server) return Result.Merged(local)
 
         val baseLines = base.lines()
-        val localDeltas = DiffUtils.diff(baseLines, local.lines()).deltas.map { Side.LOCAL to it }
-        val serverDeltas = DiffUtils.diff(baseLines, server.lines()).deltas.map { Side.SERVER to it }
-        val all = (localDeltas + serverDeltas).sortedWith(compareBy({ it.second.source.position }, { it.first }))
+        val localDeltas = LineDiff.deltas(baseLines, local.lines()).map { Side.LOCAL to it }
+        val serverDeltas = LineDiff.deltas(baseLines, server.lines()).map { Side.SERVER to it }
+        val all = (localDeltas + serverDeltas).sortedWith(compareBy({ it.second.position }, { it.first }))
 
         val out = mutableListOf<String>()
         var cursor = 0
         var i = 0
         while (i < all.size) {
             val (side, delta) = all[i]
-            val start = delta.source.position
-            val end = start + delta.source.size()
+            val start = delta.position
+            val end = delta.endPosition
             val next = all.getOrNull(i + 1)
             if (next != null && next.first != side && overlaps(delta, next.second)) {
                 // Same region changed on both sides. Identical edits are fine; anything else is a clash.
-                if (delta.source.position == next.second.source.position &&
-                    delta.source.lines == next.second.source.lines &&
-                    delta.target.lines == next.second.target.lines
+                if (delta.position == next.second.position &&
+                    delta.source == next.second.source &&
+                    delta.target == next.second.target
                 ) {
                     i += 1 // skip the duplicate, apply this one
                 } else {
@@ -45,7 +42,7 @@ object ThreeWayMerge {
             }
             if (start < cursor) return Result.Conflict
             out += baseLines.subList(cursor, start)
-            out += delta.target.lines
+            out += delta.target
             cursor = end
             i += 1
         }
@@ -53,14 +50,10 @@ object ThreeWayMerge {
         return Result.Merged(out.joinToString("\n"))
     }
 
-    private fun overlaps(a: AbstractDelta<String>, b: AbstractDelta<String>): Boolean {
-        val aStart = a.source.position
-        val aEnd = aStart + a.source.size()
-        val bStart = b.source.position
-        val bEnd = bStart + b.source.size()
+    private fun overlaps(a: LineDiff.Delta, b: LineDiff.Delta): Boolean {
         // Two pure inserts at the same point clash; an insert adjacent to a change does not.
-        if (a.source.size() == 0 && b.source.size() == 0) return aStart == bStart
-        return aStart < bEnd && bStart < aEnd
+        if (a.source.isEmpty() && b.source.isEmpty()) return a.position == b.position
+        return a.position < b.endPosition && b.position < a.endPosition
     }
 
     private enum class Side { LOCAL, SERVER }
