@@ -35,8 +35,9 @@ struct MarkdownView: View {
 
         case let .quote(content):
             HStack(alignment: .top, spacing: 10) {
-                Rectangle().fill(Theme.accent.opacity(0.5)).frame(width: 3)
-                Text(inline(content)).font(Type.body).foregroundStyle(Theme.inkSoft)
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(Theme.accent.opacity(0.45)).frame(width: 3)
+                Text(inline(content)).font(Type.quote).italic().foregroundStyle(Theme.inkSoft)
             }
             .fixedSize(horizontal: false, vertical: true)
 
@@ -58,7 +59,7 @@ struct MarkdownView: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: done ? "checkmark.square.fill" : "square")
                     .font(.system(size: 14))
-                    .foregroundStyle(done ? Theme.accent : Theme.inkSoft)
+                    .foregroundStyle(done ? Theme.accent : Theme.inkSoft.opacity(0.75))
                 Text(inline(content))
                     .font(Type.body)
                     .strikethrough(done, color: Theme.inkSoft)
@@ -72,8 +73,8 @@ struct MarkdownView: View {
                 .lineSpacing(3)
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Theme.canvas, in: RoundedRectangle(cornerRadius: 6))
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.hairline))
+                .background(Theme.raised.opacity(0.6), in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.hairline, lineWidth: 0.5))
 
         case .rule:
             Divider()

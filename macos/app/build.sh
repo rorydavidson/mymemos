@@ -11,7 +11,11 @@ FRAMEWORK_DIR="macos/shared/build/bin/macosArm64/debugFramework"
 APP="macos/app/build/MyMemos.app"
 
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/Fonts"
+
+# Google Sans Flex, the same file the Android app ships, under the same licence.
+cp macos/app/Resources/GoogleSansFlex.ttf "$APP/Contents/Resources/Fonts/"
+cp macos/app/Resources/GOOGLE_SANS_FLEX_OFL.txt "$APP/Contents/Resources/"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -26,6 +30,10 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleShortVersionString</key><string>0.1.0</string>
     <key>LSMinimumSystemVersion</key><string>15.0</string>
     <key>NSHighResolutionCapable</key><true/>
+    <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
+    <key>NSHumanReadableCopyright</key><string>Bundles Google Sans Flex under the SIL Open Font License 1.1.</string>
+    <!-- Registers the bundled font, so the app reads the same as the Android one. -->
+    <key>ATSApplicationFontsPath</key><string>Fonts</string>
 </dict>
 </plist>
 PLIST

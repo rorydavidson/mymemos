@@ -45,7 +45,7 @@ struct EditorView: View {
     private var toolbar: some View {
         HStack(spacing: 12) {
             Text(isNew ? "New memo" : "Edit memo")
-                .font(.system(size: 13, weight: .semibold))
+                .font(Type.rowTitle)
 
             Spacer()
 

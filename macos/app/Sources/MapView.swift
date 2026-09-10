@@ -57,8 +57,8 @@ private struct Marker: View {
             Circle().strokeBorder(.white, lineWidth: 1.5)
             if let number {
                 Text("\(number)")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.white)
+                    .font(Type.label)
+                    .foregroundStyle(Theme.card)
             }
         }
         .frame(width: number == nil ? 12 : 18, height: number == nil ? 12 : 18)
@@ -211,7 +211,7 @@ struct MapTilesOffNotice: View {
         HStack(spacing: 12) {
             Image(systemName: "map").font(.system(size: 16)).foregroundStyle(Theme.inkSoft)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Map previews are off").font(.system(size: 13, weight: .medium))
+                Text("Map previews are off").font(Type.rowTitle)
                 Text("Drawing a map asks openstreetmap.org for the tiles around a memo, which tells them roughly where it was written.")
                     .font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)

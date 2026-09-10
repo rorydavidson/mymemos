@@ -23,10 +23,26 @@ Two things are checked rather than asserted, both because getting them wrong is 
 ```bash
 macos/app/check-cipher.sh   # a memo locked on Android opens here, and back again
 macos/app/check-tiles.sh    # no map tile is fetched while previews are off
+macos/app/check-font.sh     # the bundled font is present, licensed and resolvable
 ```
 
 `check-tiles.sh` has a control line: it turns previews on and expects a fetch, so a broken
-check fails rather than passing quietly.
+check fails rather than passing quietly. `check-font.sh` has one too: it confirms the family
+is not already installed system-wide before registering it, otherwise a machine that happened
+to have Google Sans would make the check pass while proving nothing about the bundle.
+
+## Look and feel
+
+The palette is the Android app's Material scheme rather than an approximation of it, so the
+two read as the same product: a warm paper ground, a deep green accent, brown-black ink. Type
+is Google Sans Flex, the same file Android ships, bundled under the SIL Open Font License
+whose text travels in the app bundle beside it.
+
+Sizes are set explicitly rather than taken from the platform's text styles. Those are tuned
+for controls, and 13pt with control leading is a list row, not a page, so reading sizes and
+chrome sizes are kept apart in `Type`. If the bundled font ever fails to register the theme
+falls back to the system font, which is why `check-font.sh` exists: the failure is otherwise
+silent.
 
 ## Packaging
 

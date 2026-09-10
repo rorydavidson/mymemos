@@ -9,11 +9,11 @@ struct TagChip: View {
     var body: some View {
         Text("#\(tag)")
             .font(Type.rowMeta)
-            .foregroundStyle(selected ? Color.white : Theme.accent)
+            .foregroundStyle(selected ? Theme.card : Theme.onAccentSoft)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(
-                Capsule().fill(selected ? Theme.accent : Theme.accent.opacity(0.12))
+                Capsule().fill(selected ? Theme.accent : Theme.accentSoft)
             )
     }
 }
@@ -25,14 +25,14 @@ struct MemoBadges: View {
     var body: some View {
         HStack(spacing: 8) {
             if memo.pinned {
-                Image(systemName: "pin.fill").foregroundStyle(.orange)
+                Image(systemName: "pin.fill").foregroundStyle(Theme.warm)
             }
             if memo.locked {
                 Image(systemName: "lock.fill")
             }
             if memo.hasTasks {
                 Image(systemName: memo.hasOpenTasks ? "checklist" : "checklist.checked")
-                    .foregroundStyle(memo.hasOpenTasks ? Theme.accent : Theme.inkSoft)
+                    .foregroundStyle(memo.hasOpenTasks ? Theme.accent : Theme.inkSoft.opacity(0.7))
             }
             if memo.attachmentCount > 0 {
                 HStack(spacing: 2) {
@@ -53,14 +53,14 @@ struct EmptyState: View {
     var detail: String?
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 32, weight: .light))
-                .foregroundStyle(Theme.inkSoft.opacity(0.6))
-            Text(title).font(.headline).foregroundStyle(Theme.ink)
+                .font(.system(size: 30, weight: .light))
+                .foregroundStyle(Theme.inkSoft.opacity(0.5))
+            Text(title).font(Type.heading3).foregroundStyle(Theme.ink)
             if let detail {
                 Text(detail)
-                    .font(.callout)
+                    .font(Type.rowBody)
                     .foregroundStyle(Theme.inkSoft)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 280)

@@ -11,8 +11,8 @@ struct AttachmentStrip: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("\(attachments.count) attachment\(attachments.count == 1 ? "" : "s")".uppercased())
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(0.5)
+                .font(Type.label)
+                .tracking(0.7)
                 .foregroundStyle(Theme.inkSoft.opacity(0.8))
 
             LazyVGrid(
@@ -79,10 +79,10 @@ private struct AttachmentTile: View {
             HStack(spacing: 5) {
                 Text(size)
                 if !attachment.uploaded {
-                    Text("· waiting to upload").foregroundStyle(.orange)
+                    Text("· waiting to upload").foregroundStyle(Theme.warm)
                 }
             }
-            .font(.system(size: 10))
+            .font(Type.rowMeta)
             .foregroundStyle(Theme.inkSoft)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

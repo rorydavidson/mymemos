@@ -105,7 +105,7 @@ struct MemoDetailView: View {
         HStack(spacing: 12) {
             Image(systemName: "lock.fill").font(.system(size: 16)).foregroundStyle(Theme.inkSoft)
             VStack(alignment: .leading, spacing: 3) {
-                Text("This memo is encrypted").font(.system(size: 14, weight: .medium))
+                Text("This memo is encrypted").font(Type.heading3)
                 Text("Its text never reaches the server. Open it with your memo password.")
                     .font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
             }
@@ -184,8 +184,8 @@ struct MemoDetailView: View {
     private func fact(_ name: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(name.uppercased())
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(0.5)
+                .font(Type.label)
+                .tracking(0.7)
                 .foregroundStyle(Theme.inkSoft.opacity(0.8))
             Text(value).font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
         }

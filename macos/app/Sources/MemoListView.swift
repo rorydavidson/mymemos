@@ -51,11 +51,9 @@ private struct SectionHeader: View {
                     .font(Type.sectionHeader)
                     .tracking(0.8)
                 Text("\(count)")
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(Theme.inkSoft)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(Capsule().fill(Theme.hairline))
+                    .font(Type.rowMeta)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.inkSoft.opacity(0.9))
                 Spacer()
             }
             .foregroundStyle(Theme.inkSoft)
@@ -74,9 +72,9 @@ struct MemoRowView: View {
     var body: some View {
         HStack(spacing: 0) {
             if let tint = Color.memoTint(memo.colourHex, isDark: scheme == .dark) {
-                Rectangle().fill(tint).frame(width: 3)
+                Rectangle().fill(tint.opacity(0.9)).frame(width: 4)
             }
-            VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(memo.locked ? "Locked memo" : memo.title)
                         .font(Type.rowTitle)
@@ -84,8 +82,9 @@ struct MemoRowView: View {
                         .lineLimit(1)
                     Spacer(minLength: 8)
                     Text(memo.timeLabel)
-                        .font(Type.rowMeta.monospacedDigit())
-                        .foregroundStyle(Theme.inkSoft)
+                        .font(Type.rowMeta)
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.inkSoft.opacity(0.8))
                 }
 
                 if !memo.locked, !bodyPreview.isEmpty {
@@ -101,15 +100,15 @@ struct MemoRowView: View {
                     HStack(spacing: 6) {
                         ForEach(memo.tags.prefix(3), id: \.self) { TagChip(tag: $0) }
                         if memo.tags.count > 3 {
-                            Text("+\(memo.tags.count - 3)").font(.caption2).foregroundStyle(Theme.inkSoft)
+                            Text("+\(memo.tags.count - 3)").font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
                         }
                         Spacer(minLength: 0)
                         MemoBadges(memo: memo)
                     }
                 }
             }
-            .padding(.horizontal, 13)
-            .padding(.vertical, 11)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
         }
         .background(
             RoundedRectangle(cornerRadius: Theme.cardRadius)
@@ -117,7 +116,8 @@ struct MemoRowView: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
         .overlay(
-            RoundedRectangle(cornerRadius: Theme.cardRadius).strokeBorder(Theme.hairline)
+            RoundedRectangle(cornerRadius: Theme.cardRadius)
+                .strokeBorder(Theme.hairline.opacity(0.8), lineWidth: 0.5)
         )
     }
 

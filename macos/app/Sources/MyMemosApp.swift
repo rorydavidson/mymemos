@@ -459,7 +459,7 @@ struct Sidebar: View {
                 Section("Tags") {
                     ForEach(model.tags, id: \.self) { tag in
                         HStack {
-                            Text("#\(tag)").font(.callout)
+                            Text("#\(tag)").font(Type.sidebar)
                             Spacer()
                         }
                         .contentShape(Rectangle())
@@ -495,7 +495,7 @@ struct Sidebar: View {
                     .font(.system(size: 15))
                     .foregroundStyle(Theme.inkSoft)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(model.displayName).font(Type.rowBody.weight(.medium)).lineLimit(1)
+                    Text(model.displayName).font(Type.rowTitle).lineLimit(1)
                     Text("Memos \(model.serverVersion)")
                         .font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
                 }
@@ -570,10 +570,10 @@ struct SignInView: View {
                         .font(.system(size: 26, weight: .medium))
                         .foregroundStyle(Theme.accent)
                         .padding(10)
-                        .background(Theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-                    Text("MyMemos").font(.system(size: 30, weight: .bold))
+                        .background(Theme.accentSoft, in: RoundedRectangle(cornerRadius: 12))
+                    Text("MyMemos").font(Type.title)
                     Text("Connect to your Memos server")
-                        .font(.callout).foregroundStyle(Theme.inkSoft)
+                        .font(Type.rowBody).foregroundStyle(Theme.inkSoft)
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
@@ -584,17 +584,17 @@ struct SignInView: View {
 
                 if let warning = model.credentialWarning {
                     Label(warning, systemImage: "exclamationmark.triangle")
-                        .font(.caption).foregroundStyle(.orange)
+                        .font(Type.rowMeta).foregroundStyle(Theme.warm)
                 }
                 if case let .failed(message) = model.phase {
                     Label(message, systemImage: "xmark.octagon")
-                        .font(.caption).foregroundStyle(.red).textSelection(.enabled)
+                        .font(Type.rowMeta).foregroundStyle(Theme.danger).textSelection(.enabled)
                 }
 
                 HStack {
                     if case let .working(what) = model.phase {
                         ProgressView().controlSize(.small)
-                        Text(what).font(.caption).foregroundStyle(Theme.inkSoft)
+                        Text(what).font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
                     }
                     Spacer()
                     Button("Sign in") { Task { await model.signIn() } }

@@ -22,7 +22,7 @@ struct PasswordSheet: View {
                     .padding(9)
                     .background(Theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Memo password").font(.system(size: 14, weight: .semibold))
+                    Text("Memo password").font(Type.heading3)
                     Text("One password opens every locked memo.")
                         .font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
                 }
@@ -39,7 +39,7 @@ struct PasswordSheet: View {
 
             if model.wrongPassword {
                 Label("That password did not open it.", systemImage: "exclamationmark.triangle")
-                    .font(Type.rowMeta).foregroundStyle(.red)
+                    .font(Type.rowMeta).foregroundStyle(Theme.danger)
             }
 
             Text("Your password never leaves this Mac. The server only ever holds the scrambled text.")

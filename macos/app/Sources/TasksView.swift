@@ -84,7 +84,7 @@ private struct TaskRowView: View {
             Button(action: complete) {
                 Image(systemName: hovering ? "checkmark.square.fill" : "square")
                     .font(.system(size: 15))
-                    .foregroundStyle(hovering ? Theme.accent : Theme.inkSoft)
+                    .foregroundStyle(hovering ? Theme.accent : Theme.inkSoft.opacity(0.75))
             }
             .buttonStyle(.plain)
             .help("Tick this off")
@@ -99,11 +99,11 @@ private struct TaskRowView: View {
             if let due = task.dueLabel {
                 Text(due)
                     .font(Type.rowMeta.weight(.medium))
-                    .foregroundStyle(task.overdue ? .white : Theme.accent)
+                    .foregroundStyle(task.overdue ? Theme.card : Theme.onAccentSoft)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 2)
                     .background(
-                        Capsule().fill(task.overdue ? Color.red.opacity(0.85) : Theme.accent.opacity(0.12))
+                        Capsule().fill(task.overdue ? Theme.danger : Theme.accentSoft)
                     )
             }
         }

@@ -31,7 +31,7 @@ struct ReviewView: View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(model.streak)")
-                    .font(.system(size: 34, weight: .semibold, design: .rounded))
+                    .font(Type.numeral)
                     .foregroundStyle(Theme.accent)
                 Text(model.streak == 1 ? "day in a row" : "days in a row")
                     .font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
@@ -39,7 +39,7 @@ struct ReviewView: View {
             Divider().frame(height: 40)
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(model.activeDays.count)")
-                    .font(.system(size: 34, weight: .semibold, design: .rounded))
+                    .font(Type.numeral)
                     .foregroundStyle(Theme.ink)
                 Text("days with writing").font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
             }
@@ -59,7 +59,7 @@ struct ReviewView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text("JOURNEY")
-                        .font(.system(size: 9, weight: .semibold)).tracking(0.5)
+                        .font(Type.label).tracking(0.7)
                         .foregroundStyle(Theme.inkSoft.opacity(0.8))
                     Spacer()
                     if model.journeyDays.count > 1 {
@@ -88,8 +88,8 @@ struct ReviewView: View {
                     Button { openMemo(stop.row.localId) } label: {
                         HStack(alignment: .top, spacing: 10) {
                             Text("\(index + 1)")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(.white)
+                                .font(Type.label)
+                                .foregroundStyle(Theme.card)
                                 .frame(width: 18, height: 18)
                                 .background(Circle().fill(Theme.accent))
                             VStack(alignment: .leading, spacing: 2) {
@@ -118,7 +118,7 @@ struct ReviewView: View {
     private var onThisDay: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("ON THIS DAY")
-                .font(.system(size: 9, weight: .semibold)).tracking(0.5)
+                .font(Type.label).tracking(0.7)
                 .foregroundStyle(Theme.inkSoft.opacity(0.8))
 
             if model.throwbacks.isEmpty {
@@ -169,7 +169,7 @@ struct HeatmapView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("THE LAST SIX MONTHS")
-                .font(.system(size: 9, weight: .semibold)).tracking(0.5)
+                .font(Type.label).tracking(0.7)
                 .foregroundStyle(Theme.inkSoft.opacity(0.8))
 
             HStack(alignment: .top, spacing: gap) {
@@ -219,7 +219,7 @@ struct HeatmapView: View {
     private func fill(for day: Date?) -> Color {
         guard let day else { return Theme.hairline.opacity(0.4) }
         return activeDays.contains(Self.key.string(from: day))
-            ? Theme.accent.opacity(0.75)
+            ? Theme.accent.opacity(0.8)
             : Theme.hairline
     }
 }
