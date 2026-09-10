@@ -19,6 +19,25 @@ object MemoTitle {
         return raw?.let(::tidy)?.takeIf { it.isNotBlank() }
     }
 
+    /**
+     * The content without the line [of] took the title from, for a view that shows the title
+     * separately and would otherwise print it twice.
+     *
+     * The comparison is on the tidied line rather than the raw one, so a first line of
+     * `**Wednesday**` or `## Wednesday` is recognised as the title it produced. A memo whose
+     * title came from somewhere other than the first line is left alone.
+     */
+    fun withoutTitleLine(content: String): String {
+        val title = of(content) ?: return content
+        val lines = content.lines()
+        val first = lines.indexOfFirst { it.isNotBlank() }
+        if (first < 0 || tidy(lines[first].removeHeadingMarker()) != title) return content
+        return lines.drop(first + 1).dropWhile { it.isBlank() }.joinToString("\n")
+    }
+
+    private fun String.removeHeadingMarker(): String =
+        heading.find(trim())?.groupValues?.get(1) ?: this
+
     // The list marker has to go before the trim: trimming "- " first leaves a bare "-", which no
     // longer looks like a marker and would be offered as the title.
     private fun tidy(line: String): String =
