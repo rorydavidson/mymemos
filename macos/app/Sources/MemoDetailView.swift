@@ -15,7 +15,11 @@ struct MemoDetailView: View {
             VStack(alignment: .leading, spacing: 22) {
                 header
 
-                if memo.locked {
+                if memo.locked, let opened = model.revealed[memo.localId] {
+                    revealedBanner
+                    MarkdownView(text: opened)
+                        .frame(maxWidth: Theme.readingWidth, alignment: .leading)
+                } else if memo.locked {
                     lockedNotice
                 } else {
                     MarkdownView(text: memo.body)
@@ -58,6 +62,19 @@ struct MemoDetailView: View {
                         Task { await model.setPinned(memo.localId, !memo.pinned) }
                     }
                     Divider()
+                    if memo.locked {
+                        Button("Show", systemImage: "eye") {
+                            Task { await model.reveal(memo.localId) }
+                        }
+                        Button("Remove encryption", systemImage: "lock.open") {
+                            Task { await model.unlockForGood(memo.localId) }
+                        }
+                    } else {
+                        Button("Encrypt", systemImage: "lock") {
+                            Task { await model.lock(memo.localId) }
+                        }
+                    }
+                    Divider()
                     Button("Delete", systemImage: "trash", role: .destructive) {
                         Task { await model.delete(memo.localId) }
                     }
@@ -74,18 +91,37 @@ struct MemoDetailView: View {
     }
 
     private var lockedNotice: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "lock.fill").foregroundStyle(Theme.inkSoft)
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 12) {
+            Image(systemName: "lock.fill").font(.system(size: 16)).foregroundStyle(Theme.inkSoft)
+            VStack(alignment: .leading, spacing: 3) {
                 Text("This memo is encrypted").font(.system(size: 14, weight: .medium))
-                Text("Its text never reaches the server. Unlocking it here is not built yet.")
-                    .font(.caption).foregroundStyle(Theme.inkSoft)
+                Text("Its text never reaches the server. Open it with your memo password.")
+                    .font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
             }
+            Spacer(minLength: 12)
+            Button("Show") { Task { await model.reveal(memo.localId) } }
         }
-        .padding(14)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cardRadius))
         .overlay(RoundedRectangle(cornerRadius: Theme.cardRadius).strokeBorder(Theme.hairline))
+    }
+
+    /// A reminder that what is on screen is not what is stored.
+    private var revealedBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "lock.open.fill").font(.system(size: 11))
+            Text("Shown with your password. Still encrypted on the server.")
+                .font(Type.rowMeta)
+            Spacer()
+            Button("Hide") { model.revealed.removeValue(forKey: memo.localId) }
+                .buttonStyle(.link)
+                .font(Type.rowMeta)
+        }
+        .foregroundStyle(Theme.inkSoft)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Theme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
     }
 
     private var footer: some View {

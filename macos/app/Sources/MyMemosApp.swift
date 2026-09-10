@@ -27,6 +27,10 @@ final class SessionModel: ObservableObject {
     @Published var displayName = ""
     @Published var credentialWarning: String?
     @Published var lastSynced: Date?
+    @Published var askingForPassword = false
+    @Published var wrongPassword = false
+    /// Revealed text for locked memos, by localId. Display only: nothing stored changes.
+    @Published var revealed: [String: String] = [:]
 
     private let session = MemosSession()
 
@@ -46,6 +50,61 @@ final class SessionModel: ObservableObject {
     /// Goes through the one session: building another would open a second database.
     func detail(for localId: String) async -> MemoDetail? {
         try? await session.memo(localId: localId)
+    }
+
+    // MARK: locked memos
+
+    var passwordRemembered: Bool { session.passwordRemembered }
+
+    func usePassword(_ password: String, remember: Bool) {
+        session.usePassword(password: password, remember: remember)
+        wrongPassword = false
+        Task { await revealAll() }
+    }
+
+    func forgetPassword() {
+        session.forgetPassword()
+        revealed.removeAll()
+    }
+
+    /// Shows a locked memo without changing it. Asks for the password if there is not one yet.
+    func reveal(_ localId: String) async {
+        guard let result = try? await session.reveal(localId: localId) else { return }
+        if let text = result.text {
+            revealed[localId] = text
+            wrongPassword = false
+            return
+        }
+        wrongPassword = result.wrongPassword
+        if result.needsPassword { askingForPassword = true }
+    }
+
+    /// After a password arrives, open everything already on screen that was waiting on it.
+    private func revealAll() async {
+        for memo in sections.flatMap(\.memos) where memo.locked {
+            await reveal(memo.localId)
+        }
+    }
+
+    /// Removes the encryption for good, so the server sees the text again.
+    func unlockForGood(_ localId: String) async {
+        guard (try? await session.unlockForGood(localId: localId)) == true else {
+            askingForPassword = true
+            return
+        }
+        revealed.removeValue(forKey: localId)
+        await reload()
+        await sync()
+    }
+
+    func lock(_ localId: String) async {
+        guard (try? await session.lock(localId: localId)) == true else {
+            askingForPassword = true
+            return
+        }
+        revealed.removeValue(forKey: localId)
+        await reload()
+        await sync()
     }
 
     func rawContent(_ localId: String) async -> String? {
@@ -189,6 +248,9 @@ struct RootView: View {
         .sheet(item: $editing) { target in
             EditorView(model: model, editing: target.localId)
         }
+        .sheet(isPresented: $model.askingForPassword) {
+            PasswordSheet(model: model)
+        }
     }
 
     private var library: some View {
@@ -271,17 +333,30 @@ struct Sidebar: View {
     }
 
     private var accountFooter: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 0) {
             Divider()
-            HStack(spacing: 6) {
-                Image(systemName: "person.crop.circle").foregroundStyle(Theme.inkSoft)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(model.displayName).font(.caption.weight(.medium)).lineLimit(1)
-                    Text("Memos \(model.serverVersion)").font(.caption2).foregroundStyle(Theme.inkSoft)
+            HStack(spacing: 8) {
+                Image(systemName: "person.crop.circle")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Theme.inkSoft)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(model.displayName).font(Type.rowBody.weight(.medium)).lineLimit(1)
+                    Text("Memos \(model.serverVersion)")
+                        .font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
+                }
+                Spacer()
+                if model.passwordRemembered {
+                    Button {
+                        model.forgetPassword()
+                    } label: {
+                        Image(systemName: "lock.rotation")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Forget the memo password on this Mac")
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
         }
     }
 }

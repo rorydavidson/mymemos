@@ -1,5 +1,8 @@
 package shared
 
+import com.keltruc.mymemos.data.crypto.MemoCipher
+import com.keltruc.mymemos.data.crypto.PasswordSession
+import com.keltruc.mymemos.data.crypto.RememberedPassword
 import com.keltruc.mymemos.data.repository.AccountRepository
 import com.keltruc.mymemos.data.repository.MemoRepository
 import com.keltruc.mymemos.data.sync.SyncEngine
@@ -44,9 +47,11 @@ class MemosSession {
         MacStack.preferences, MacStack.widgets, json,
     )
 
+    private val passwords = PasswordSession(KeychainPassword())
+
     private val accounts = AccountRepository(
         db.accountDao(), db.memoDao(), db.attachmentDao(), MacStack.attachments,
-        com.keltruc.mymemos.data.crypto.PasswordSession(InMemoryPassword()),
+        passwords,
         registry, json,
     )
 
@@ -109,6 +114,56 @@ class MemosSession {
             visibility = memo.visibility.name.lowercase().replaceFirstChar { it.uppercase() },
             wordCount = memo.displayContent.split(Regex("\\s+")).count { it.isNotBlank() },
         )
+    }
+
+    // MARK: locked memos
+
+    /** True once a memo password is available for this process. */
+    val hasPassword: Boolean get() = passwords.current() != null
+
+    val passwordRemembered: Boolean get() = passwords.isRemembered
+
+    /**
+     * Holds the memo password for this process, and on this device if asked. One password
+     * covers every locked memo, which is what the phone does.
+     */
+    fun usePassword(password: String, remember: Boolean) {
+        passwords.set(password.toCharArray(), remember)
+    }
+
+    fun forgetPassword() = passwords.forget()
+
+    /**
+     * The readable text of a locked memo, without changing what is stored. The memo stays
+     * encrypted on the server and on disk; this is only for showing it.
+     */
+    suspend fun reveal(localId: String): Reveal {
+        val memo = memos.observeMemoOnce(localId) ?: return Reveal(null, needsPassword = false, wrongPassword = false)
+        if (!memo.isLocked) return Reveal(memo.displayContent, needsPassword = false, wrongPassword = false)
+        val password = passwords.current() ?: return Reveal(null, needsPassword = true, wrongPassword = false)
+        return try {
+            Reveal(memos.decrypt(memo, password), needsPassword = false, wrongPassword = false)
+        } catch (e: MemoCipher.WrongPassword) {
+            Reveal(null, needsPassword = true, wrongPassword = true)
+        }
+    }
+
+    /** Removes the encryption for good, so the server sees the text again. */
+    suspend fun unlockForGood(localId: String): Boolean {
+        val password = passwords.current() ?: return false
+        return try {
+            memos.unlock(localId, password)
+            true
+        } catch (e: MemoCipher.WrongPassword) {
+            false
+        }
+    }
+
+    /** Locks a memo that is currently in the clear. */
+    suspend fun lock(localId: String): Boolean {
+        val password = passwords.current() ?: return false
+        memos.lock(localId, password)
+        return true
     }
 
     // MARK: writing
@@ -219,13 +274,25 @@ data class MemoDetail(
     val wordCount: Int,
 )
 
-/** The memo password is not persisted on macOS yet; see MacStack. */
-private class InMemoryPassword : com.keltruc.mymemos.data.crypto.RememberedPassword {
-    override fun read(): CharArray? = null
-    override fun write(password: CharArray) = Unit
-    override fun forget() = Unit
-    override fun isRemembered() = false
+/**
+ * "Remember on this device" for the memo password, in the Keychain.
+ *
+ * The password is what protects text the server never sees, so it goes where the operating
+ * system guards it rather than anywhere this app controls.
+ */
+private class KeychainPassword : RememberedPassword {
+    override fun read(): CharArray? = Keychain.read(KEY)?.toCharArray()
+    override fun write(password: CharArray) = Keychain.write(KEY, password.concatToString())
+    override fun forget() = Keychain.delete(KEY)
+    override fun isRemembered(): Boolean = Keychain.read(KEY) != null
+
+    private companion object {
+        const val KEY = "memo_password"
+    }
 }
+
+/** What a locked memo looks like when asked to show itself. */
+data class Reveal(val text: String?, val needsPassword: Boolean, val wrongPassword: Boolean)
 
 /** One row on screen. A plain class so Swift sees plain properties. */
 data class MemoRow(
