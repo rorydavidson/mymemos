@@ -44,6 +44,14 @@ final class SessionModel: ObservableObject {
     @Published var activeDays: Set<String> = []
     @Published var streak = 0
 
+    /// Per-machine, so it lives in UserDefaults rather than the synced settings memo.
+    @Published var appearance: Appearance = .system {
+        didSet {
+            UserDefaults.standard.set(appearance.rawValue, forKey: "appearance")
+            appearance.apply()
+        }
+    }
+
     enum Pane: Hashable { case memos, tasks, review }
 
     private let session = MemosSession()
@@ -51,6 +59,14 @@ final class SessionModel: ObservableObject {
     init() {
         // The shared cipher has no AES-GCM of its own on this platform; hand it CryptoKit's.
         MacCrypto.shared.provider = AppleCrypto()
+        let stored = UserDefaults.standard.string(forKey: "appearance") ?? Appearance.system.rawValue
+        appearance = Appearance(rawValue: stored) ?? .system
+    }
+
+    var openTaskCount: Int { taskGroups.reduce(0) { $0 + $1.tasks.count } }
+
+    func count(forTag tag: String) -> Int {
+        sections.flatMap(\.memos).filter { $0.tags.contains(tag) }.count
     }
 
     var memoCount: Int { sections.reduce(0) { $0 + $1.memos.count } }
@@ -366,7 +382,10 @@ struct RootView: View {
             }
         }
         .frame(minWidth: 860, minHeight: 580)
-        .task { await model.restore() }
+        .task {
+            model.appearance.apply()
+            await model.restore()
+        }
         .sheet(item: $model.editing) { target in
             EditorView(model: model, editing: target.localId)
         }
@@ -391,21 +410,31 @@ struct RootView: View {
         .onChange(of: model.query) { _, _ in Task { await model.reload() } }
         .onChange(of: model.activeTag) { _, _ in Task { await model.reload() } }
         .toolbar {
+            ToolbarItemGroup(placement: .navigation) {
+                SyncStatusButton(model: model)
+            }
             ToolbarItemGroup(placement: .primaryAction) {
                 // No keyboard shortcuts here: those belong in the menu bar, where they are
                 // discoverable and where the system can show them.
-                Button { model.newMemo() } label: { Image(systemName: "square.and.pencil") }
-                    .help("New memo")
-
-                Button { model.editSelected() } label: { Image(systemName: "pencil") }
-                    .help("Edit this memo")
-                    .disabled(model.selectedMemo == nil || model.selectedMemo?.locked == true)
-
-                Button { Task { await model.sync() } } label: {
-                    Image(systemName: "arrow.triangle.2.circlepath")
+                ToolbarIcon(symbol: "pencil", help: "Edit this memo",
+                            disabled: model.selectedMemo == nil || model.selectedMemo?.locked == true) {
+                    model.editSelected()
                 }
-                .help("Sync with the server")
-                .disabled(model.isBusy)
+                ToolbarIcon(symbol: "square.and.pencil", help: "New memo") { model.newMemo() }
+
+                Menu {
+                    Picker("Appearance", selection: $model.appearance) {
+                        ForEach(Appearance.allCases) { option in
+                            Label(option.title, systemImage: option.symbol).tag(option)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                } label: {
+                    Image(systemName: model.appearance.symbol)
+                }
+                .menuStyle(.borderlessButton)
+                .help("Light or dark")
+                .frame(width: 30)
             }
         }
     }
@@ -439,79 +468,6 @@ struct RootView: View {
             let count = model.taskGroups.reduce(0) { $0 + $1.tasks.count }
             return "\(count) open across \(model.taskGroups.count) memos"
         case .review: return model.streak == 1 ? "1 day in a row" : "\(model.streak) days in a row"
-        }
-    }
-}
-
-// MARK: - Sidebar
-
-struct Sidebar: View {
-    @ObservedObject var model: SessionModel
-
-    var body: some View {
-        List {
-            Section("Library") {
-                sidebarItem("All memos", "tray.full", pane: .memos, clearsTag: true)
-                sidebarItem("Tasks", "checklist", pane: .tasks)
-                sidebarItem("Review", "calendar.badge.clock", pane: .review)
-            }
-            if !model.tags.isEmpty {
-                Section("Tags") {
-                    ForEach(model.tags, id: \.self) { tag in
-                        HStack {
-                            Text("#\(tag)").font(Type.sidebar)
-                            Spacer()
-                        }
-                        .contentShape(Rectangle())
-                        .foregroundStyle(model.activeTag == tag ? Theme.accent : Theme.ink)
-                        .onTapGesture {
-                            model.activeTag = model.activeTag == tag ? nil : tag
-                            model.pane = .memos
-                        }
-                    }
-                }
-            }
-        }
-        .listStyle(.sidebar)
-        .safeAreaInset(edge: .bottom) { accountFooter }
-    }
-
-    private func sidebarItem(_ title: String, _ symbol: String, pane: SessionModel.Pane, clearsTag: Bool = false) -> some View {
-        let active = model.pane == pane && (!clearsTag || model.activeTag == nil)
-        return Label(title, systemImage: symbol)
-            .foregroundStyle(active ? Theme.accent : Theme.ink)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                model.pane = pane
-                if clearsTag { model.activeTag = nil }
-            }
-    }
-
-    private var accountFooter: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Divider()
-            HStack(spacing: 8) {
-                Image(systemName: "person.crop.circle")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.inkSoft)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(model.displayName).font(Type.rowTitle).lineLimit(1)
-                    Text("Memos \(model.serverVersion)")
-                        .font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
-                }
-                Spacer()
-                if model.passwordRemembered {
-                    Button {
-                        model.forgetPassword()
-                    } label: {
-                        Image(systemName: "lock.rotation")
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Forget the memo password on this Mac")
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
         }
     }
 }

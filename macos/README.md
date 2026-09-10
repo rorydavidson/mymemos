@@ -24,6 +24,7 @@ Two things are checked rather than asserted, both because getting them wrong is 
 macos/app/check-cipher.sh   # a memo locked on Android opens here, and back again
 macos/app/check-tiles.sh    # no map tile is fetched while previews are off
 macos/app/check-font.sh     # the bundled font is present, licensed and resolvable
+macos/app/check-appearance.sh   # light, dark and system map and persist correctly
 ```
 
 `check-tiles.sh` has a control line: it turns previews on and expects a fetch, so a broken
@@ -37,6 +38,15 @@ The palette is the Android app's Material scheme rather than an approximation of
 two read as the same product: a warm paper ground, a deep green accent, brown-black ink. Type
 is Google Sans Flex, the same file Android ships, bundled under the SIL Open Font License
 whose text travels in the app bundle beside it.
+
+Light and dark are both real palettes rather than one derived from the other, and there is a
+switcher in the toolbar, the View menu and Settings. It is a per-machine choice, so it lives
+in UserDefaults rather than the settings memo that syncs between devices.
+
+The sidebar and toolbar are built rather than left to the defaults: sidebar rows carry counts
+and select as a filled capsule in the app's own green, and the toolbar says when the app last
+agreed with the server, which on an offline-first app is the one thing worth knowing, since
+everything on screen came from the local database.
 
 Sizes are set explicitly rather than taken from the platform's text styles. Those are tuned
 for controls, and 13pt with control leading is a list row, not a page, so reading sizes and

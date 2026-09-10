@@ -77,6 +77,13 @@ struct AppCommands: Commands {
         // View
         CommandGroup(after: .toolbar) {
             Divider()
+            Picker("Appearance", selection: Binding(
+                get: { model.appearance },
+                set: { model.appearance = $0 }
+            )) {
+                ForEach(Appearance.allCases) { Text($0.title).tag($0) }
+            }
+            Divider()
             Button("All Memos") { model.pane = .memos; model.activeTag = nil }
                 .keyboardShortcut("1", modifiers: .command)
             Button("Tasks") { model.pane = .tasks }
@@ -122,6 +129,16 @@ struct SettingsView: View {
                 LabeledContent("Signed in as", value: model.displayName.isEmpty ? "—" : model.displayName)
                 LabeledContent("Server", value: model.server)
                 LabeledContent("Memos version", value: model.serverVersion.isEmpty ? "—" : model.serverVersion)
+            }
+
+            Section("Appearance") {
+                Picker("Theme", selection: Binding(
+                    get: { model.appearance },
+                    set: { model.appearance = $0 }
+                )) {
+                    ForEach(Appearance.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
             }
 
             Section("Timeline") {
