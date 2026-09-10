@@ -17,6 +17,9 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/Fonts"
 cp macos/app/Resources/GoogleSansFlex.ttf "$APP/Contents/Resources/Fonts/"
 cp macos/app/Resources/GOOGLE_SANS_FLEX_OFL.txt "$APP/Contents/Resources/"
 
+# The app icon, the Android launcher artwork redrawn for this platform's shape.
+cp macos/app/Icon/MyMemos.icns "$APP/Contents/Resources/"
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -26,6 +29,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleDisplayName</key><string>MyMemos</string>
     <key>CFBundleIdentifier</key><string>com.keltruc.mymemos.macos</string>
     <key>CFBundleExecutable</key><string>MyMemos</string>
+    <key>CFBundleIconFile</key><string>MyMemos</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>0.1.0</string>
     <key>LSMinimumSystemVersion</key><string>15.0</string>

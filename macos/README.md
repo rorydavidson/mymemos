@@ -32,6 +32,18 @@ check fails rather than passing quietly. `check-font.sh` has one too: it confirm
 is not already installed system-wide before registering it, otherwise a machine that happened
 to have Google Sans would make the check pass while proving nothing about the bundle.
 
+## The icon
+
+`macos/app/Icon/make-icon.sh` regenerates `MyMemos.icns` from the Android launcher artwork: a
+white rounded card with three lines on the app's green, the same shapes as
+`ic_launcher_foreground.xml` and the same `#1F6F5C` behind them.
+
+It is redrawn rather than exported, because the two platforms want different shapes. Android
+masks a 108dp square down to whatever the launcher uses at display time; macOS expects a
+rounded rectangle inset within the canvas, on its own grid of 824 units of 1024 with a 185.4
+radius. Scaling the Android file up would give an icon that either filled its square like
+nothing else in the Dock, or floated inside two sets of margins.
+
 ## Look and feel
 
 The palette is the Android app's Material scheme rather than an approximation of it, so the
