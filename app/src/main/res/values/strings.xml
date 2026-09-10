@@ -256,6 +256,16 @@
     <string name="digest">Weekly digest</string>
     <string name="digest_hint">A notification on Sunday evening: what you wrote, tasks closed, your streak and a few old memos to revisit.</string>
     <string name="digest_title">Your week in memos</string>
+    <string name="digest_revisit">Worth a look again:</string>
+    <string name="digest_nothing">Nothing written this week. Next week is a fresh page.</string>
+    <plurals name="digest_written">
+        <item quantity="one">%1$d memo written</item>
+        <item quantity="other">%1$d memos written</item>
+    </plurals>
+    <plurals name="digest_tasks_closed">
+        <item quantity="one">%1$d task closed</item>
+        <item quantity="other">%1$d tasks closed</item>
+    </plurals>
     <string name="review_journey">Journey</string>
     <string name="journey_empty">No located memos on this day.</string>
     <string name="notifications_denied">Notifications are off for MyMemos. Enable them in system settings to receive this.</string>
