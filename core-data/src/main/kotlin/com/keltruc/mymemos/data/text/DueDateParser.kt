@@ -5,7 +5,6 @@ import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.plus
-import java.util.Locale
 
 /**
  * Finds a due date written into a task line: `@today`, `@tomorrow`, `@mon` … `@sunday`

@@ -6,6 +6,7 @@ import android.content.Intent
 import com.keltruc.mymemos.R
 import com.keltruc.mymemos.data.config.ConfigRepository
 import com.keltruc.mymemos.data.repository.AccountRepository
+import com.keltruc.mymemos.data.repository.JavaTimeTemplateValues
 import com.keltruc.mymemos.data.repository.MemoRepository
 import com.keltruc.mymemos.data.repository.TemplateRepository
 import com.keltruc.mymemos.model.Visibility
@@ -67,7 +68,7 @@ class AlarmReceiver : BroadcastReceiver() {
     private suspend fun fireRecurring(context: Context, entry: AlarmEntryPoint, templateTitle: String) {
         val account = entry.accounts().activeAccountOrNull() ?: return
         val template = entry.templates().templates.first().firstOrNull { it.title == templateTitle } ?: return
-        val body = TemplateRepository.expand(template.body)
+        val body = TemplateRepository.expand(template.body, JavaTimeTemplateValues())
         val firstLine = body.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty()
         val today = entry.memos().observeCreatedOn(account.id, LocalDate.now()).first()
         if (firstLine.isNotEmpty() && today.any { it.content.lineSequence().firstOrNull { l -> l.isNotBlank() } == firstLine }) return

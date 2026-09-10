@@ -6,11 +6,6 @@ import com.keltruc.mymemos.database.entity.TemplateEntity
 import com.keltruc.mymemos.model.Template
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
-import java.util.Locale
 
 class TemplateRepository constructor(private val dao: TemplateDao) {
     val templates: Flow<List<Template>> = dao.observeAll().map { list -> list.map { it.toModel() } }
@@ -27,15 +22,20 @@ class TemplateRepository constructor(private val dao: TemplateDao) {
     suspend fun delete(id: Long) = dao.delete(id)
 
     companion object {
-        /** Expands {{date}}, {{time}}, {{weekday}}, {{year}}, {{month}} at insert time. */
-        fun expand(body: String, date: LocalDate = LocalDate.now(), time: LocalTime = LocalTime.now(), locale: Locale = Locale.getDefault()): String =
+        /**
+         * Expands {{date}}, {{time}}, {{weekday}}, {{year}}, {{month}} at insert time.
+         *
+         * The substitution is here; writing today's date out in the reader's language is
+         * [TemplateValues], because month and weekday names come from the platform.
+         */
+        fun expand(body: String, values: TemplateValues): String =
             body
-                .replace("{{date}}", date.format(DateTimeFormatter.ofPattern("d MMMM yyyy", locale)))
-                .replace("{{isodate}}", date.toString())
-                .replace("{{time}}", time.format(DateTimeFormatter.ofPattern("HH:mm")))
-                .replace("{{weekday}}", date.dayOfWeek.getDisplayName(TextStyle.FULL, locale))
-                .replace("{{month}}", date.month.getDisplayName(TextStyle.FULL, locale))
-                .replace("{{year}}", date.year.toString())
+                .replace("{{date}}", values.date)
+                .replace("{{isodate}}", values.isoDate)
+                .replace("{{time}}", values.time)
+                .replace("{{weekday}}", values.weekday)
+                .replace("{{month}}", values.month)
+                .replace("{{year}}", values.year)
 
         val defaults = listOf(
             "Daily journal" to "# {{weekday}} {{date}}\n\n**Grateful for**\n- \n\n**Today**\n- [ ] \n\n**Notes**\n\n#journal",

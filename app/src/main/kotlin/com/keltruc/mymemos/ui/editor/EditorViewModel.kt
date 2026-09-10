@@ -8,6 +8,7 @@ import androidx.navigation.toRoute
 import com.keltruc.mymemos.data.crypto.MemoCipher
 import com.keltruc.mymemos.data.crypto.PasswordSession
 import com.keltruc.mymemos.data.repository.AccountRepository
+import com.keltruc.mymemos.data.repository.JavaTimeTemplateValues
 import com.keltruc.mymemos.data.repository.MemoRepository
 import com.keltruc.mymemos.data.repository.TemplateRepository
 import com.keltruc.mymemos.model.Template
@@ -58,7 +59,8 @@ class EditorViewModel @Inject constructor(
     val templates: StateFlow<List<Template>> = templateRepository.templates
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun expand(template: Template): String = TemplateRepository.expand(template.body)
+    fun expand(template: Template): String =
+        TemplateRepository.expand(template.body, JavaTimeTemplateValues())
 
     private val route = savedStateHandle.toRoute<EditorRoute>()
     private var localId: String? = route.localId
