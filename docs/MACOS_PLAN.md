@@ -185,6 +185,21 @@ lands.
 
 ### Phase 4: the macOS core app, version 0.1
 
+**Started.** Credentials live in the Keychain, so a signed-in account survives a quit, and the
+app restores and syncs on launch without asking again. There is a check for whether the
+Keychain will take a write at all, because an application it cannot identify is refused and an
+unsigned build would otherwise forget everything on quit while looking like a bug elsewhere.
+
+Locked memos work. Kotlin/Native's CommonCrypto bindings expose PBKDF2 but no AES-GCM at all,
+so the cipher's primitives are handed in from Swift, where CryptoKit does it properly.
+`macos/app/check-cipher.sh` opens the same fixed vectors the Android instrumented test uses,
+so a memo locked on the phone demonstrably opens on the Mac, unicode and emoji passwords
+included.
+
+Still to do: the timeline's folding headers, the editor, memo detail, search, tags and tasks,
+plus the native shell the rest of this section describes.
+
+
 Sign in with multiple accounts and remembered servers, timeline with its folding date headers
 and compact mode, the Markdown editor with the toolbar, list continuation, tag completion and
 `@` due dates, memo detail with rendered Markdown and live checkboxes, offline search, tag

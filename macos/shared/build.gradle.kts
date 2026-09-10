@@ -12,6 +12,10 @@ kotlin {
         binaries.framework {
             baseName = "Shared"
             isStatic = true
+            // Without this the header carries only this module's own types, and the app
+            // cannot see the interfaces it is meant to implement.
+            export(project(":core-model"))
+            export(project(":core-data"))
         }
     }
 

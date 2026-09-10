@@ -26,6 +26,11 @@ final class SessionModel: ObservableObject {
 
     private let session = MemosSession()
 
+    init() {
+        // The shared cipher has no AES-GCM of its own on this platform; hand it CryptoKit's.
+        MacCrypto.shared.provider = AppleCrypto()
+    }
+
     /// Credentials live in the Keychain, so a signed-in account survives a quit.
     func restore() async {
         if !session.credentialStoreAvailable() {
