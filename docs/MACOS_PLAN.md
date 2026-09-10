@@ -118,16 +118,19 @@ Two more that are not `expect`/`actual` but still have to be solved:
 - The `am start` automation intent becomes a `mymemos://` URL scheme plus App Intents, which
   gets Shortcuts and Spotlight for free.
 
-## Two privacy deltas to decide on
+## Two privacy deltas, decided
 
-The Android app deliberately avoids Google Play Services, and map tiles are off by default.
-Carry both forward:
+Both settled the way Android already leans: **OpenStreetMap tiles, no Apple location services.**
 
-- Reverse geocoding on Android is done without Play Services. `CLGeocoder` sends coordinates to
-  Apple. Either accept that and say so in the settings copy, or call the same Nominatim style
-  endpoint the Android app uses.
-- Use OpenStreetMap tiles behind the same off-by-default setting rather than MapKit, so the
-  behaviour and the privacy note stay identical on both platforms.
+- Maps are drawn from tile.openstreetmap.org, not MapKit, behind the same off-by-default
+  setting, so the behaviour and the privacy note are the same on both platforms.
+- No `CLGeocoder` and no `CLLocationManager`. The macOS app draws the coordinates a memo
+  already carries and never asks the machine where it is. That rules out Nearby, which needs
+  the device's own position; Journey does not, and is built.
+- The setting is enforced in the tile loader itself rather than only at the call sites, since
+  that is the only code in the app that fetches a tile. `macos/app/check-tiles.sh` proves it,
+  with a control: if turning previews on does not fetch either, the check fails rather than
+  passing quietly.
 
 ## Phases
 

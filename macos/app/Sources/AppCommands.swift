@@ -131,6 +131,19 @@ struct SettingsView: View {
                 ))
             }
 
+            Section {
+                Toggle("Show map previews", isOn: Binding(
+                    get: { model.mapTiles },
+                    set: { enabled in Task { await model.setMapTiles(enabled) } }
+                ))
+            } header: {
+                Text("Places")
+            } footer: {
+                Text("Off by default. Drawing a map asks openstreetmap.org for the tiles around a memo, which tells them roughly where it was written. With this off nothing is drawn and nothing leaves this Mac. No Apple location service is used either way.")
+                    .font(Type.rowMeta)
+                    .foregroundStyle(Theme.inkSoft)
+            }
+
             Section("Locked memos") {
                 LabeledContent("Memo password") {
                     HStack {

@@ -6,12 +6,14 @@ import Shared
 struct ReviewView: View {
     @ObservedObject var model: SessionModel
     var openMemo: (String) -> Void
+    @State private var journeyDay = ""
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 streakCard
                 HeatmapView(activeDays: model.activeDays)
+                journey
                 onThisDay
             }
             .padding(24)
@@ -19,7 +21,10 @@ struct ReviewView: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .background(Theme.canvas)
-        .task { await model.loadReview() }
+        .task {
+            await model.loadReview()
+            await model.loadPlaces()
+        }
     }
 
     private var streakCard: some View {
@@ -44,6 +49,69 @@ struct ReviewView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cardRadius))
         .overlay(RoundedRectangle(cornerRadius: Theme.cardRadius).strokeBorder(Theme.hairline))
+    }
+
+    /// A day's located memos as a route. No device location is involved: these are the places
+    /// the memos already carry, drawn on OpenStreetMap tiles.
+    @ViewBuilder
+    private var journey: some View {
+        if !model.placed.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("JOURNEY")
+                        .font(.system(size: 9, weight: .semibold)).tracking(0.5)
+                        .foregroundStyle(Theme.inkSoft.opacity(0.8))
+                    Spacer()
+                    if model.journeyDays.count > 1 {
+                        Picker("", selection: $journeyDay) {
+                            ForEach(model.journeyDays, id: \.self) { Text($0).tag($0) }
+                        }
+                        .labelsHidden()
+                        .frame(width: 130)
+                    }
+                }
+
+                let day = journeyDay.isEmpty ? (model.journeyDays.first ?? "") : journeyDay
+                let stops = model.journey(for: day)
+
+                if !model.mapTiles {
+                    MapTilesOffNotice { Task { await model.setMapTiles(true) } }
+                } else if !stops.isEmpty {
+                    TileMapView(
+                        points: stops.map { MapPoint(latitude: $0.latitude, longitude: $0.longitude) },
+                        showsRoute: true,
+                        height: 240
+                    )
+                }
+
+                ForEach(Array(stops.enumerated()), id: \.element.row.localId) { index, stop in
+                    Button { openMemo(stop.row.localId) } label: {
+                        HStack(alignment: .top, spacing: 10) {
+                            Text("\(index + 1)")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 18, height: 18)
+                                .background(Circle().fill(Theme.accent))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(stop.row.locked ? "Locked memo" : stop.row.title)
+                                    .font(Type.rowTitle).foregroundStyle(Theme.ink).lineLimit(1)
+                                Text(stop.placeName.isEmpty ? "Somewhere unnamed" : stop.placeName)
+                                    .font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
+                            }
+                            Spacer()
+                            Text(stop.row.timeLabel)
+                                .font(Type.rowMeta.monospacedDigit()).foregroundStyle(Theme.inkSoft)
+                        }
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cardRadius))
+                        .overlay(RoundedRectangle(cornerRadius: Theme.cardRadius).strokeBorder(Theme.hairline))
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
     }
 
     @ViewBuilder

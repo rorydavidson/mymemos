@@ -35,6 +35,8 @@ struct MemoDetailView: View {
                     AttachmentStrip(model: model, memoLocalId: memo.localId, attachments: attachments)
                 }
 
+                if detail.hasPlace { place }
+
                 Divider().padding(.top, 4)
                 footer
             }
@@ -140,6 +142,31 @@ struct MemoDetailView: View {
             fact("Visibility", detail.visibility)
             if !memo.locked { fact("Words", "\(detail.wordCount)") }
             Spacer()
+        }
+    }
+
+    /// Where the memo was written. The coordinates are the memo's own; nothing asks this Mac
+    /// where it is, and no tile is fetched unless map previews are turned on.
+    @ViewBuilder
+    private var place: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "mappin.and.ellipse").font(.system(size: 11))
+                Text(detail.placeName?.isEmpty == false ? detail.placeName! : "Somewhere unnamed")
+                    .font(Type.rowMeta)
+            }
+            .foregroundStyle(Theme.inkSoft)
+
+            if model.mapTiles {
+                TileMapView(
+                    points: [MapPoint(latitude: detail.latitude, longitude: detail.longitude)],
+                    height: 170
+                )
+                .frame(maxWidth: Theme.readingWidth)
+            } else {
+                MapTilesOffNotice { Task { await model.setMapTiles(true) } }
+                    .frame(maxWidth: Theme.readingWidth)
+            }
         }
     }
 

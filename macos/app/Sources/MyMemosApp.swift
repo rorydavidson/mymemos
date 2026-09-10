@@ -37,6 +37,8 @@ final class SessionModel: ObservableObject {
     @Published var selection: String?
     @Published var editing: EditorTarget?
     @Published var sortByModified = false
+    @Published var mapTiles = false
+    @Published var placed: [PlacedMemo] = []
     @Published var taskGroups: [TaskGroup] = []
     @Published var throwbacks: [Throwback] = []
     @Published var activeDays: Set<String> = []
@@ -95,6 +97,30 @@ final class SessionModel: ObservableObject {
     func editSelected() {
         guard let selection, memo(selection)?.locked != true else { return }
         editing = EditorTarget(localId: selection)
+    }
+
+    // MARK: places
+
+    func loadPlaces() async {
+        mapTiles = ((try? await session.mapTilesEnabled()) as? Bool) ?? false
+        await TileLoader.shared.setEnabled(mapTiles)
+        placed = (try? await session.locatedMemos()) ?? []
+    }
+
+    /// Turning tiles on is the user's call, and it is the moment anything reaches OSM.
+    func setMapTiles(_ enabled: Bool) async {
+        try? await session.setMapTiles(enabled: enabled)
+        mapTiles = enabled
+        await TileLoader.shared.setEnabled(enabled)
+    }
+
+    /// A day's located memos, oldest first, which is the order they were written in.
+    func journey(for day: String) -> [PlacedMemo] {
+        placed.filter { $0.dayKey == day }.reversed()
+    }
+
+    var journeyDays: [String] {
+        Array(Set(placed.map(\.dayKey))).sorted(by: >)
     }
 
     // MARK: tasks and review
@@ -247,6 +273,8 @@ final class SessionModel: ObservableObject {
             credentialWarning = "The Keychain is not available, so this session will be forgotten on quit."
         }
         sortByModified = ((try? await session.sortByModified()) as? Bool) ?? false
+        mapTiles = ((try? await session.mapTilesEnabled()) as? Bool) ?? false
+        await TileLoader.shared.setEnabled(mapTiles)
         phase = .working("Looking for a saved account")
         guard let who = try? await session.signedInAs(), !who.isEmpty else {
             phase = .signedOut

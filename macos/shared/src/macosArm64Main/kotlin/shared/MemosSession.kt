@@ -120,6 +120,10 @@ class MemosSession {
             updated = memo.updateTime.friendly(),
             visibility = memo.visibility.name.lowercase().replaceFirstChar { it.uppercase() },
             wordCount = memo.displayContent.split(Regex("\\s+")).count { it.isNotBlank() },
+            placeName = memo.location?.placeholder,
+            latitude = memo.location?.latitude ?: 0.0,
+            longitude = memo.location?.longitude ?: 0.0,
+            hasPlace = memo.location != null,
         )
     }
 
@@ -231,6 +235,33 @@ class MemosSession {
                 )
             }
         }
+    }
+
+    // MARK: places
+
+    /**
+     * Whether map tiles may be drawn at all. Off by default and deliberately so: rendering a
+     * memo's location asks openstreetmap.org for the tiles around it, which tells them roughly
+     * where you are. With it off nothing is drawn and nothing leaves the device.
+     */
+    suspend fun mapTilesEnabled(): Boolean = MacStack.preferences.settings.first().mapTiles
+
+    suspend fun setMapTiles(enabled: Boolean) = MacStack.preferences.setMapTiles(enabled)
+
+    /** Every memo that carries a location, newest first, for the journey map. */
+    suspend fun locatedMemos(): List<PlacedMemo> {
+        val account = db.accountDao().getActive() ?: return emptyList()
+        return memos.memosWithLocation(account.id)
+            .mapNotNull { memo ->
+                val place = memo.location ?: return@mapNotNull null
+                PlacedMemo(
+                    row = memo.toRow(),
+                    placeName = place.placeholder,
+                    latitude = place.latitude,
+                    longitude = place.longitude,
+                    dayKey = memo.createTime.toLocalDateTime(TimeZone.currentSystemDefault()).date.toString(),
+                )
+            }
     }
 
     // MARK: attachments
@@ -438,6 +469,10 @@ data class MemoDetail(
     val updated: String,
     val visibility: String,
     val wordCount: Int,
+    val placeName: String?,
+    val latitude: Double,
+    val longitude: Double,
+    val hasPlace: Boolean,
 )
 
 /**
@@ -473,6 +508,16 @@ data class TaskGroup(
     val memoTitle: String,
     val tasks: List<TaskRow>,
     val earliestDue: Long,
+)
+
+/** A memo that knows where it was written. */
+data class PlacedMemo(
+    val row: MemoRow,
+    val placeName: String,
+    val latitude: Double,
+    val longitude: Double,
+    /** ISO date, so a day's memos can be grouped into one journey. */
+    val dayKey: String,
 )
 
 /** A memo resurfaced from the same date in an earlier month or year. */
