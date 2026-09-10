@@ -36,8 +36,7 @@ swiftc -O \
     -framework Shared \
     -lsqlite3 \
     -parse-as-library \
-    macos/app/Sources/AppleCrypto.swift \
-    macos/app/Sources/MyMemosApp.swift \
+    macos/app/Sources/*.swift \
     -o "$APP/Contents/MacOS/MyMemos"
 
 echo "built $APP"

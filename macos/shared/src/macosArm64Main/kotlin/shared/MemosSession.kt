@@ -4,9 +4,14 @@ import com.keltruc.mymemos.data.repository.AccountRepository
 import com.keltruc.mymemos.data.repository.MemoRepository
 import com.keltruc.mymemos.data.sync.SyncEngine
 import com.keltruc.mymemos.data.sync.SyncScheduler
+import com.keltruc.mymemos.data.text.MemoTitle
+import com.keltruc.mymemos.data.timeline.TimelineGrouping
 import com.keltruc.mymemos.model.Memo
 import kotlinx.coroutines.flow.first
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.todayIn
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
 
@@ -71,10 +76,56 @@ class MemosSession {
         }
     }
 
-    /** Reads from the local database, which is what the timeline shows. */
-    suspend fun memos(): List<MemoRow> {
+    /**
+     * The timeline, grouped the way the phone groups it: days this week, then whole weeks,
+     * then whole months. The grouping is shared code; only the words above each group are
+     * written here.
+     */
+    suspend fun timeline(): List<TimelineSection> {
         val account = db.accountDao().getActive() ?: return emptyList()
-        return memos.observeTimeline(account.id, byModified = false).first().map { it.toRow() }
+        val all = memos.observeTimeline(account.id, byModified = false).first()
+        return group(all)
+    }
+
+    /** Offline full-text search, straight off the local FTS index. */
+    suspend fun search(query: String): List<TimelineSection> {
+        val account = db.accountDao().getActive() ?: return emptyList()
+        if (query.isBlank()) return timeline()
+        return group(memos.search(account.id, query).first())
+    }
+
+    suspend fun tags(): List<String> {
+        val account = db.accountDao().getActive() ?: return emptyList()
+        return memos.observeTags(account.id).first()
+    }
+
+    suspend fun memo(localId: String): MemoDetail? {
+        val memo = memos.observeMemo(localId).first() ?: return null
+        return MemoDetail(
+            row = memo.toRow(),
+            created = memo.createTime.friendly(),
+            updated = memo.updateTime.friendly(),
+            visibility = memo.visibility.name.lowercase().replaceFirstChar { it.uppercase() },
+            wordCount = memo.displayContent.split(Regex("\\s+")).count { it.isNotBlank() },
+        )
+    }
+
+    private fun group(all: List<Memo>): List<TimelineSection> {
+        val zone = TimeZone.currentSystemDefault()
+        val today = Clock.System.todayIn(zone)
+        val labels = MacTimelineLabels()
+        return TimelineGrouping.group(
+            memos = all,
+            today = today,
+            zone = zone,
+            firstDayOfWeek = MacTimelineLabels.firstDayOfWeek(),
+        ).map { group ->
+            TimelineSection(
+                key = group.key,
+                label = labels.label(group.bucket, today),
+                memos = group.memos.map { it.toRow() },
+            )
+        }
     }
 
     suspend fun signedInAs(): String? = db.accountDao().getActive()?.let {
@@ -97,21 +148,49 @@ class MemosSession {
     }
 
     private fun Memo.toRow(): MemoRow = MemoRow(
-        name = localId,
-        content = content,
+        localId = localId,
+        title = MemoTitle.of(displayContent) ?: firstLine(),
+        body = if (isLocked) "" else displayContent,
+        tags = tags,
         pinned = pinned,
         locked = isLocked,
-        createdLabel = label(),
+        hasTasks = hasTaskList,
+        hasOpenTasks = hasIncompleteTasks,
+        attachmentCount = attachments.size,
+        colourHex = colour?.hex?.toLong() ?: -1L,
+        timeLabel = createTime.timeOfDay(),
+        dateLabel = createTime.friendly(),
     )
 
-    private fun Memo.label(): String {
-        val local = createTime.toLocalDateTime(TimeZone.currentSystemDefault())
+    /** A memo with no heading still needs something to show in a list. */
+    private fun Memo.firstLine(): String =
+        displayContent.lineSequence().firstOrNull { it.isNotBlank() }?.trim()?.take(80).orEmpty()
+
+    private fun Instant.timeOfDay(): String {
+        val local = toLocalDateTime(TimeZone.currentSystemDefault())
+        return "${local.hour.pad()}:${local.minute.pad()}"
+    }
+
+    private fun Instant.friendly(): String {
+        val local = toLocalDateTime(TimeZone.currentSystemDefault())
         val month = local.month.name.lowercase().replaceFirstChar { it.uppercase() }
-        return "${local.day} $month ${local.year}, ${local.hour.pad()}:${local.minute.pad()}"
+        return "${local.day} $month ${local.year} at ${local.hour.pad()}:${local.minute.pad()}"
     }
 
     private fun Int.pad() = toString().padStart(2, '0')
 }
+
+/** One header and the memos beneath it. */
+data class TimelineSection(val key: String, val label: String, val memos: List<MemoRow>)
+
+/** Everything the detail pane shows beyond the row itself. */
+data class MemoDetail(
+    val row: MemoRow,
+    val created: String,
+    val updated: String,
+    val visibility: String,
+    val wordCount: Int,
+)
 
 /** The memo password is not persisted on macOS yet; see MacStack. */
 private class InMemoryPassword : com.keltruc.mymemos.data.crypto.RememberedPassword {
@@ -123,9 +202,17 @@ private class InMemoryPassword : com.keltruc.mymemos.data.crypto.RememberedPassw
 
 /** One row on screen. A plain class so Swift sees plain properties. */
 data class MemoRow(
-    val name: String,
-    val content: String,
+    val localId: String,
+    val title: String,
+    val body: String,
+    val tags: List<String>,
     val pinned: Boolean,
     val locked: Boolean,
-    val createdLabel: String,
+    val hasTasks: Boolean,
+    val hasOpenTasks: Boolean,
+    val attachmentCount: Int,
+    /** The memo's tint as 0xRRGGBB, or -1 for none. */
+    val colourHex: Long,
+    val timeLabel: String,
+    val dateLabel: String,
 )
