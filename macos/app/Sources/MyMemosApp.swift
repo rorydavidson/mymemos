@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import Shared
 
 // The macOS client. Behind it is the same data layer the phone runs: the sync engine, the
@@ -50,6 +51,37 @@ final class SessionModel: ObservableObject {
     /// Goes through the one session: building another would open a second database.
     func detail(for localId: String) async -> MemoDetail? {
         try? await session.memo(localId: localId)
+    }
+
+    // MARK: attachments
+
+    func attachments(_ localId: String) async -> [AttachmentRow] {
+        (try? await session.attachments(localId: localId)) ?? []
+    }
+
+    /// Bytes for an attachment, local copy first, server second, then kept locally.
+    func attachmentData(_ memoLocalId: String, _ attachmentLocalId: String) async -> Data? {
+        guard let bytes = try? await session.attachmentBytes(
+            memoLocalId: memoLocalId,
+            attachmentLocalId: attachmentLocalId
+        ) else { return nil }
+        return bytes.toData()
+    }
+
+    /// Records picked files against a memo. The upload rides the outbox like any other change.
+    func attach(_ memoLocalId: String, urls: [URL]) async {
+        for url in urls {
+            let type = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType
+                ?? "application/octet-stream"
+            _ = try? await session.attach(
+                memoLocalId: memoLocalId,
+                sourcePath: url.path,
+                filename: url.lastPathComponent,
+                mimeType: type
+            )
+        }
+        await reload()
+        await sync()
     }
 
     // MARK: locked memos

@@ -77,7 +77,7 @@ private extension Data {
     }
 }
 
-private extension KotlinByteArray {
+extension KotlinByteArray {
     func toData() -> Data {
         var data = Data(capacity: Int(size))
         for i in 0..<size { data.append(UInt8(bitPattern: get(index: i))) }

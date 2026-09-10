@@ -3,6 +3,7 @@ package shared
 import com.keltruc.mymemos.data.crypto.MemoCipher
 import com.keltruc.mymemos.data.crypto.PasswordSession
 import com.keltruc.mymemos.data.crypto.RememberedPassword
+import com.keltruc.mymemos.data.mapper.remoteUrl
 import com.keltruc.mymemos.data.repository.AccountRepository
 import com.keltruc.mymemos.data.repository.MemoRepository
 import com.keltruc.mymemos.data.sync.SyncEngine
@@ -11,6 +12,8 @@ import com.keltruc.mymemos.data.text.MemoTitle
 import com.keltruc.mymemos.data.timeline.TimelineGrouping
 import com.keltruc.mymemos.model.Memo
 import com.keltruc.mymemos.model.Visibility
+import io.ktor.client.request.get
+import io.ktor.client.statement.readRawBytes
 import kotlinx.coroutines.flow.first
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -114,6 +117,55 @@ class MemosSession {
             visibility = memo.visibility.name.lowercase().replaceFirstChar { it.uppercase() },
             wordCount = memo.displayContent.split(Regex("\\s+")).count { it.isNotBlank() },
         )
+    }
+
+    // MARK: attachments
+
+    /** What a memo carries, for the strip under it. */
+    suspend fun attachments(localId: String): List<AttachmentRow> {
+        // observeMemoOnce reads the memo row alone; only the observing query joins the
+        // attachments, and without them this quietly returns an empty strip.
+        val memo = memos.observeMemo(localId).first() ?: return emptyList()
+        return memo.attachments.map {
+            AttachmentRow(
+                localId = it.localId,
+                filename = it.filename,
+                mimeType = it.mimeType,
+                sizeBytes = it.sizeBytes,
+                isImage = it.isImage,
+                uploaded = it.remoteName != null,
+            )
+        }
+    }
+
+    /**
+     * The bytes of an attachment, from the local copy when there is one and from the server
+     * otherwise, keeping what it downloads so the next look needs no network.
+     *
+     * Going through the account's own authenticated client matters: the file endpoint wants
+     * the bearer token, and sending it anywhere other than the account's own server would
+     * hand the credential to whoever controls an attachment's link.
+     */
+    suspend fun attachmentBytes(memoLocalId: String, attachmentLocalId: String): ByteArray? {
+        val store = MacStack.attachments
+        if (store.exists(attachmentLocalId)) return store.readBytes(attachmentLocalId)
+
+        val account = db.accountDao().getActive() ?: return null
+        val memo = memos.observeMemo(memoLocalId).first() ?: return null
+        val attachment = memo.attachments.firstOrNull { it.localId == attachmentLocalId } ?: return null
+        val url = attachment.remoteUrl(account.serverUrl) ?: return null
+
+        val client = registry.client(account.serverUrl, account.userResourceName)
+        val bytes = runCatching { client.get(url).readRawBytes() }.getOrNull() ?: return null
+        store.store(attachmentLocalId, bytes)
+        return bytes
+    }
+
+    /** Records a file the user picked. The upload rides the outbox like every other change. */
+    suspend fun attach(memoLocalId: String, sourcePath: String, filename: String, mimeType: String): Boolean {
+        val staged = MacStack.attachments.stage(sourcePath, filename, mimeType) ?: return false
+        memos.addAttachment(memoLocalId, staged)
+        return true
     }
 
     // MARK: locked memos
@@ -290,6 +342,16 @@ private class KeychainPassword : RememberedPassword {
         const val KEY = "memo_password"
     }
 }
+
+/** One attachment, as the strip under a memo shows it. */
+data class AttachmentRow(
+    val localId: String,
+    val filename: String,
+    val mimeType: String,
+    val sizeBytes: Long,
+    val isImage: Boolean,
+    val uploaded: Boolean,
+)
 
 /** What a locked memo looks like when asked to show itself. */
 data class Reveal(val text: String?, val needsPassword: Boolean, val wrongPassword: Boolean)

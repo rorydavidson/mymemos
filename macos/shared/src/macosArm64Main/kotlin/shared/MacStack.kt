@@ -30,7 +30,7 @@ import platform.Foundation.NSUserDomainMask
 @OptIn(ExperimentalForeignApi::class)
 internal object MacStack {
 
-    private val supportDirectory: String by lazy {
+    val supportDirectory: String by lazy {
         val base = NSFileManager.defaultManager.URLForDirectory(
             directory = NSApplicationSupportDirectory,
             inDomain = NSUserDomainMask,
@@ -116,12 +116,7 @@ internal object MacStack {
         )
     }
 
-    /** Attachments are not downloaded on macOS yet, so nothing is in the store to find. */
-    val attachments: AttachmentStore = object : AttachmentStore {
-        override suspend fun exists(localId: String) = false
-        override suspend fun readBytes(localId: String) = ByteArray(0)
-        override suspend fun delete(localId: String) = Unit
-    }
+    val attachments: MacAttachmentStore by lazy { MacAttachmentStore(supportDirectory) }
 
     /** No background scheduling yet: the app syncs while it is open. */
     val background: BackgroundSync = object : BackgroundSync {

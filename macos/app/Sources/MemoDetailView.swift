@@ -7,6 +7,7 @@ struct MemoDetailView: View {
     @ObservedObject var model: SessionModel
     var edit: () -> Void = {}
     @Environment(\.colorScheme) private var scheme
+    @State private var attachments: [AttachmentRow] = []
 
     private var memo: MemoRow { detail.row }
 
@@ -30,6 +31,10 @@ struct MemoDetailView: View {
                     FlowTags(tags: memo.tags)
                 }
 
+                if !attachments.isEmpty {
+                    AttachmentStrip(model: model, memoLocalId: memo.localId, attachments: attachments)
+                }
+
                 Divider().padding(.top, 4)
                 footer
             }
@@ -40,6 +45,7 @@ struct MemoDetailView: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .background(Theme.canvas)
+        .task(id: detail.row.localId) { attachments = await model.attachments(detail.row.localId) }
     }
 
     private var header: some View {
@@ -73,6 +79,9 @@ struct MemoDetailView: View {
                         Button("Encrypt", systemImage: "lock") {
                             Task { await model.lock(memo.localId) }
                         }
+                    }
+                    Button("Attach a file…", systemImage: "paperclip") {
+                        Task { await attachFiles() }
                     }
                     Divider()
                     Button("Delete", systemImage: "trash", role: .destructive) {
@@ -132,6 +141,17 @@ struct MemoDetailView: View {
             if !memo.locked { fact("Words", "\(detail.wordCount)") }
             Spacer()
         }
+    }
+
+    /// The standard open panel: the app never reaches for a file the user has not chosen.
+    private func attachFiles() async {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.message = "Choose files to attach to this memo"
+        guard panel.runModal() == .OK else { return }
+        await model.attach(memo.localId, urls: panel.urls)
+        attachments = await model.attachments(memo.localId)
     }
 
     private func fact(_ name: String, _ value: String) -> some View {
