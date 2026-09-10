@@ -6,6 +6,7 @@ import android.content.Intent
 import com.keltruc.mymemos.R
 import com.keltruc.mymemos.data.config.ConfigRepository
 import com.keltruc.mymemos.data.repository.AccountRepository
+import com.keltruc.mymemos.data.repository.JavaTimeTemplateValues
 import com.keltruc.mymemos.data.repository.MemoRepository
 import com.keltruc.mymemos.data.repository.TemplateRepository
 import com.keltruc.mymemos.model.Visibility
@@ -13,11 +14,14 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import kotlin.time.Clock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.time.LocalDate
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.todayIn
 
 @EntryPoint
 @InstallIn(SingletonComponent::class)
@@ -67,9 +71,9 @@ class AlarmReceiver : BroadcastReceiver() {
     private suspend fun fireRecurring(context: Context, entry: AlarmEntryPoint, templateTitle: String) {
         val account = entry.accounts().activeAccountOrNull() ?: return
         val template = entry.templates().templates.first().firstOrNull { it.title == templateTitle } ?: return
-        val body = TemplateRepository.expand(template.body)
+        val body = TemplateRepository.expand(template.body, JavaTimeTemplateValues())
         val firstLine = body.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty()
-        val today = entry.memos().observeCreatedOn(account.id, LocalDate.now()).first()
+        val today = entry.memos().observeCreatedOn(account.id, Clock.System.todayIn(TimeZone.currentSystemDefault())).first()
         if (firstLine.isNotEmpty() && today.any { it.content.lineSequence().firstOrNull { l -> l.isNotBlank() } == firstLine }) return
         val localId = entry.memos().create(account.id, body, Visibility.PRIVATE)
         entry.notifier().post(Notifier.Channel.RECURRING, templateTitle.hashCode(), context.getString(R.string.recurring_created, templateTitle), firstLine, localId)

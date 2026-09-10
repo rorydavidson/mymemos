@@ -75,6 +75,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.keltruc.mymemos.R
+import com.keltruc.mymemos.data.timeline.JavaTimeTimelineLabels
 import com.keltruc.mymemos.data.timeline.TimelineGrouping
 import com.keltruc.mymemos.model.Memo
 import com.keltruc.mymemos.model.Shortcut
@@ -92,6 +93,9 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import kotlin.time.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.todayIn
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -137,7 +141,19 @@ fun TimelineScreen(
     val collapsedGroups by viewModel.collapsedGroups.collectAsStateWithLifecycle()
     val compactList by viewModel.compactList.collectAsStateWithLifecycle()
     val sortByModified by viewModel.sortByModified.collectAsStateWithLifecycle()
-    val grouped = remember(state.memos, sortByModified) { TimelineGrouping.group(state.memos, byModified = sortByModified) }
+    // Grouping is date arithmetic and lives in core-data; the words above each group are
+    // written here, where the locale is.
+    val labels = remember { JavaTimeTimelineLabels() }
+    val today = remember { Clock.System.todayIn(TimeZone.currentSystemDefault()) }
+    val grouped = remember(state.memos, sortByModified) {
+        TimelineGrouping.group(
+            memos = state.memos,
+            today = today,
+            zone = TimeZone.currentSystemDefault(),
+            firstDayOfWeek = JavaTimeTimelineLabels.firstDayOfWeek(),
+            byModified = sortByModified,
+        )
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -206,7 +222,7 @@ fun TimelineScreen(
                     val collapsed = group.key in collapsedGroups
                     stickyHeader(key = "day-${group.key}") {
                         DayHeader(
-                            label = group.label,
+                            label = labels.label(group.bucket, today),
                             count = group.memos.size,
                             collapsed = collapsed,
                             onToggle = { viewModel.toggleGroup(group.key) },

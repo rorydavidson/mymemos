@@ -141,8 +141,8 @@ nothing is collected along the way. Thank you.
 
 ## Building
 
-Requires JDK 17+ and the Android SDK (platform 37, build-tools 36+). Point `local.properties`
-at your SDK:
+Requires JDK 17+ and the Android SDK (`platforms;android-37.0`, `build-tools;37.0.0`).
+Point `local.properties` at your SDK:
 
 ```
 sdk.dir=/path/to/android-sdk
@@ -155,14 +155,37 @@ Then:
 ./gradlew test
 ```
 
+Every module except `app` is Kotlin Multiplatform, built for `macosArm64` alongside its usual
+target for a macOS client (see `docs/MACOS_PLAN.md`). `./gradlew test` covers everything that
+runs on any machine; the native tests need a Mac:
+
+```bash
+./gradlew :core-data:macosArm64Test :core-network:macosArm64Test :core-database:macosArm64Test
+```
+
+There is an early macOS app under `macos/`. It signs in, syncs into a local Room database and
+lists what is there, using the same sync engine as the phone. It has no Keychain, attachments,
+export or backup yet.
+
+```bash
+macos/app/build.sh && open macos/app/build/MyMemos.app
+```
+
+The cipher's cross-platform byte compatibility is checked on a real Android runtime, which
+needs an emulator or device attached:
+
+```bash
+./gradlew :core-data:connectedDebugAndroidTest
+```
+
 ## Layout
 
 | Module          | Purpose                                                              |
 |-----------------|----------------------------------------------------------------------|
-| `core-model`    | Plain Kotlin domain types, no Android or framework dependencies.     |
-| `core-network`  | Retrofit/OkHttp client for the Memos API, bearer auth, token refresh, persistent cookie jar. Pure JVM, tested with MockWebServer. |
-| `core-database` | Room schema: accounts, memos (with FTS index), attachments, outbox, relations, reactions, shortcuts, templates. |
-| `core-data`     | Repositories, sync engine and three-way merge, mappers, encrypted credential store, memo cipher, config memo, Hilt wiring. |
+| `core-model`    | Plain Kotlin domain types, no Android or framework dependencies. Multiplatform. |
+| `core-network`  | Ktor client for the Memos API, bearer auth, token refresh, persistent cookie storage. Multiplatform (JVM and macOS), tested with Ktor's MockEngine. |
+| `core-database` | Room schema: accounts, memos (with FTS index), attachments, outbox, relations, reactions, shortcuts, templates. Multiplatform (Android and macOS); Android keeps the platform's SQLite, macOS uses Room's bundled driver. |
+| `core-data`     | Repositories, sync engine and three-way merge, mappers, credential store, memo cipher, config memo. Multiplatform; the Android half holds the Keystore store, the java.time formatting, and export, import and backup. |
 | `app`           | Jetpack Compose UI (Material 3), navigation, widgets, notifications, view models. |
 
 ## Fonts and licences

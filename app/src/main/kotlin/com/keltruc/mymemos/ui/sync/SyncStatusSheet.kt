@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.keltruc.mymemos.R
 import com.keltruc.mymemos.data.sync.FailedOp
 import com.keltruc.mymemos.data.sync.SyncState
+import com.keltruc.mymemos.ui.format.atZone
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 

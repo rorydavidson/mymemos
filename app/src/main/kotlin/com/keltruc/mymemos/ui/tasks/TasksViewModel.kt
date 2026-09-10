@@ -8,6 +8,7 @@ import com.keltruc.mymemos.data.text.DueDateParser
 import com.keltruc.mymemos.model.Memo
 import com.keltruc.mymemos.ui.components.toggleTaskLine
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlin.time.Clock
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -16,8 +17,10 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.time.LocalDate
+import kotlinx.datetime.LocalDate
 import javax.inject.Inject
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.todayIn
 
 data class OpenTask(val memo: Memo, val lineIndex: Int, val text: String, val due: LocalDate?)
 
@@ -36,7 +39,7 @@ class TasksViewModel @Inject constructor(
     val groups: StateFlow<List<TaskGroup>> = accountRepository.activeAccount.filterNotNull()
         .flatMapLatest { memoRepository.observeMemosWithOpenTasks(it.id) }
         .map { memos ->
-            val today = LocalDate.now()
+            val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
             memos.filter { !it.isLocked }.map { memo ->
                 val tasks = memo.displayContent.lines().mapIndexedNotNull { i, line ->
                     taskLine.matchEntire(line)?.let { m ->

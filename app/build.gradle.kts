@@ -67,6 +67,9 @@ dependencies {
     implementation(project(":core-model"))
     implementation(project(":core-data"))
     implementation(project(":core-database"))
+    // The app wires core-data's plain constructors together itself now, so it names the
+    // network types directly rather than getting them transitively.
+    implementation(project(":core-network"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
@@ -79,6 +82,9 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.material.icons.extended)
     debugImplementation(libs.compose.ui.tooling)
+
+    // The Keystore-backed credential store lives here now, behind core-data's interfaces.
+    implementation(libs.security.crypto)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
@@ -98,6 +104,7 @@ dependencies {
     implementation(libs.glance.material3)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    implementation(libs.kotlinx.datetime)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
 

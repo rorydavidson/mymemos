@@ -14,17 +14,22 @@ import com.keltruc.mymemos.data.repository.MemoRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlin.time.Clock
 import kotlinx.coroutines.flow.first
 import java.time.DayOfWeek
 import java.time.Duration
-import java.time.LocalDate
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
 import java.time.LocalTime
-import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.TemporalAdjusters
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.todayIn
 
 /** Sunday evening summary. Everything is computed from the local database. */
 @HiltWorker
@@ -40,17 +45,17 @@ class DigestWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         if (!config.current().weeklyDigest) return Result.success()
         val account = accounts.activeAccountOrNull() ?: return Result.success()
-        val zone = ZoneId.systemDefault()
-        val today = LocalDate.now(zone)
-        val weekAgo = today.minusDays(7)
+        val zone = TimeZone.currentSystemDefault()
+        val today = Clock.System.todayIn(zone)
+        val weekAgo = today.minus(7, DateTimeUnit.DAY)
         val all = memos.allForDigest(account.id)
-        val thisWeek = all.filter { it.createTime.atZone(zone).toLocalDate() > weekAgo }
-        val closed = all.filter { it.updateTime.atZone(zone).toLocalDate() > weekAgo }.sumOf { m -> m.content.lines().count { it.trimStart().startsWith("- [x]", true) } }
+        val thisWeek = all.filter { it.createTime.toLocalDateTime(zone).date > weekAgo }
+        val closed = all.filter { it.updateTime.toLocalDateTime(zone).date > weekAgo }.sumOf { m -> m.content.lines().count { it.trimStart().startsWith("- [x]", true) } }
         val days = memos.observeActiveDays(account.id).first()
         var streak = 0
-        var d = if (today in days) today else today.minusDays(1)
-        while (d in days) { streak++; d = d.minusDays(1) }
-        val old = all.filter { it.createTime.atZone(zone).toLocalDate() < today.minusDays(30) && !it.isLocked }.shuffled().take(3)
+        var d = if (today in days) today else today.minus(1, DateTimeUnit.DAY)
+        while (d in days) { streak++; d = d.minus(1, DateTimeUnit.DAY) }
+        val old = all.filter { it.createTime.toLocalDateTime(zone).date < today.minus(30, DateTimeUnit.DAY) && !it.isLocked }.shuffled().take(3)
 
         val ctx = applicationContext
         val text = buildString {

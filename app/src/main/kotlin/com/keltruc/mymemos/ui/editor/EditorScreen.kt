@@ -69,11 +69,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.keltruc.mymemos.R
 import com.keltruc.mymemos.data.text.DueDateParser
+import com.keltruc.mymemos.data.text.JavaTimeDueDateLabels
 import com.keltruc.mymemos.data.text.MarkdownContinuation
 import com.keltruc.mymemos.model.Visibility
 import com.keltruc.mymemos.ui.components.AttachmentStrip
 import com.keltruc.mymemos.ui.components.DueDatePickerDialog
 import com.keltruc.mymemos.ui.components.MemoPasswordDialog
+import kotlin.time.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.todayIn
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,8 +148,10 @@ fun EditorScreen(onDone: () -> Unit, viewModel: EditorViewModel = hiltViewModel(
         val word = upto.takeLastWhile { !it.isWhitespace() }
         if (word.startsWith("@")) word.drop(1) else null
     }
+    val today = remember { Clock.System.todayIn(TimeZone.currentSystemDefault()) }
+    val dueDateLabels = remember { JavaTimeDueDateLabels() }
     val dateSuggestions = remember(currentDatePrefix) {
-        currentDatePrefix?.let { DueDateParser.suggest(it) }.orEmpty()
+        currentDatePrefix?.let { DueDateParser.suggest(it, today) }.orEmpty()
     }
 
     /**
@@ -294,7 +300,7 @@ fun EditorScreen(onDone: () -> Unit, viewModel: EditorViewModel = hiltViewModel(
                         FilterChip(
                             selected = false,
                             onClick = { completeToken(currentDatePrefix!!.length + 1, "@${s.token}") },
-                            label = { Text(if (s.hint.isEmpty()) "@${s.token}" else "@${s.token} · ${s.hint}") },
+                            label = { Text(if (!s.showsDate) "@${s.token}" else "@${s.token} · ${dueDateLabels.hint(s.date)}") },
                         )
                     }
                     if (currentDatePrefix != null) {
