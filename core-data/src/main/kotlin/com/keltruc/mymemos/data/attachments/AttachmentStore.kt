@@ -6,7 +6,7 @@ import android.provider.OpenableColumns
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.UUID
+import kotlin.uuid.Uuid
 
 /** Local copies of attachment files, in app-private storage, named by attachment localId. */
 class AttachmentStore constructor(private val context: Context) {
@@ -23,7 +23,7 @@ class AttachmentStore constructor(private val context: Context) {
         resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
             if (c.moveToFirst()) c.getString(0)?.let { displayName = it }
         }
-        val localId = UUID.randomUUID().toString()
+        val localId = Uuid.random().toString()
         val target = File(dir, localId)
         resolver.openInputStream(uri)!!.use { input -> target.outputStream().use { input.copyTo(it) } }
         Staged(localId, target, displayName, mime, target.length())

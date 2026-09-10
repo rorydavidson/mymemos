@@ -22,6 +22,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -31,13 +32,17 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.keltruc.mymemos.R
 import com.keltruc.mymemos.data.text.DueDateParser
-import java.time.LocalDate
+import com.keltruc.mymemos.data.text.JavaTimeDueDateLabels
+import kotlin.time.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.todayIn
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TasksScreen(onOpenMemo: (String) -> Unit, viewModel: TasksViewModel = hiltViewModel()) {
     val groups by viewModel.groups.collectAsStateWithLifecycle()
-    val today = LocalDate.now()
+    val today = remember { Clock.System.todayIn(TimeZone.currentSystemDefault()) }
+    val dueDateLabels = remember { JavaTimeDueDateLabels() }
     val total = groups.sumOf { it.tasks.size }
 
     Scaffold(
@@ -81,13 +86,13 @@ fun TasksScreen(onOpenMemo: (String) -> Unit, viewModel: TasksViewModel = hiltVi
                                 Checkbox(checked = false, onCheckedChange = { viewModel.complete(task) }, modifier = Modifier.size(40.dp))
                                 Text(task.text, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 task.due?.let { due ->
-                                    val overdue = due.isBefore(today)
+                                    val overdue = due < today
                                     Surface(
                                         shape = MaterialTheme.shapes.small,
                                         color = if (overdue) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
                                     ) {
                                         Text(
-                                            DueDateParser.label(due, today),
+                                            dueDateLabels.label(due, today),
                                             style = MaterialTheme.typography.labelMedium,
                                             color = if (overdue) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer,
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),

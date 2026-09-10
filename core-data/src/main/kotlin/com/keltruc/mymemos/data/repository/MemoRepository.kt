@@ -48,7 +48,7 @@ import kotlinx.serialization.json.Json
 import kotlin.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.util.UUID
+import kotlin.uuid.Uuid
 import com.keltruc.mymemos.model.NoteColour
 
 /**
@@ -140,7 +140,7 @@ class MemoRepository constructor(
         val clock = System.currentTimeMillis()
         val created = createdAtEpochMs ?: clock
         val updated = updatedAtEpochMs ?: created
-        val localId = UUID.randomUUID().toString()
+        val localId = Uuid.random().toString()
         val entity = MemoEntity(
             localId = localId,
             accountId = accountId,
@@ -371,7 +371,7 @@ class MemoRepository constructor(
 
     suspend fun addComment(accountId: Long, parentRemoteName: String, content: String, visibility: Visibility) {
         val now = System.currentTimeMillis()
-        val localId = UUID.randomUUID().toString()
+        val localId = Uuid.random().toString()
         db.withTransaction {
             memoDao.upsert(
                 MemoEntity(
@@ -410,7 +410,7 @@ class MemoRepository constructor(
                     )
                 }
             } else {
-                val localId = UUID.randomUUID().toString()
+                val localId = Uuid.random().toString()
                 reactionDao.upsertAll(
                     listOf(ReactionEntity(localId, memoLocalId, null, userResourceName, reactionType, System.currentTimeMillis())),
                 )

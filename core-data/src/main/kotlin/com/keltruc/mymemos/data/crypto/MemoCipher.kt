@@ -1,7 +1,7 @@
 package com.keltruc.mymemos.data.crypto
 
 import java.security.SecureRandom
-import java.util.Base64
+import kotlin.io.encoding.Base64
 import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
@@ -32,11 +32,11 @@ object MemoCipher {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, key(password, salt), GCMParameterSpec(128, nonce))
         val body = cipher.doFinal(plain.toByteArray(Charsets.UTF_8))
-        return PREFIX + Base64.getEncoder().encodeToString(salt + nonce + body)
+        return PREFIX + Base64.Default.encode(salt + nonce + body)
     }
 
     fun decrypt(content: String, password: CharArray): String {
-        val blob = runCatching { Base64.getDecoder().decode(content.trim().lineSequence().first().removePrefix(PREFIX)) }.getOrNull()
+        val blob = runCatching { Base64.Default.decode(content.trim().lineSequence().first().removePrefix(PREFIX)) }.getOrNull()
             ?: throw WrongPassword()
         if (blob.size < 29) throw WrongPassword()
         val salt = blob.copyOfRange(0, 16)

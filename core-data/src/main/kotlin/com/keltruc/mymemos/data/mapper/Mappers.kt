@@ -32,7 +32,7 @@ import com.keltruc.mymemos.network.dto.ReactionDto
 import com.keltruc.mymemos.network.dto.ShortcutDto
 import com.keltruc.mymemos.network.dto.UserDto
 import kotlin.time.Instant
-import java.util.UUID
+import kotlin.uuid.Uuid
 
 fun parseInstant(rfc3339: String?): Instant =
     rfc3339?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: Instant.fromEpochMilliseconds(0)
@@ -68,7 +68,7 @@ fun AccountEntity.toModel() = Account(
 fun MemoDto.toEntity(accountId: Long, existingLocalId: String? = null, existingColour: String? = null): MemoEntity {
     val update = parseInstant(updateTime)
     return MemoEntity(
-        localId = existingLocalId ?: UUID.randomUUID().toString(),
+        localId = existingLocalId ?: Uuid.random().toString(),
         accountId = accountId,
         remoteName = name,
         creator = creator,
@@ -99,7 +99,7 @@ fun MemoDto.relationEntities(memoLocalId: String): List<MemoRelationEntity> = re
     .map { MemoRelationEntity(memoLocalId, it.relatedMemo.name, it.relatedMemo.snippet, it.type) }
 
 fun ReactionDto.toEntity(memoLocalId: String, existingLocalId: String? = null) = ReactionEntity(
-    localId = existingLocalId ?: UUID.randomUUID().toString(),
+    localId = existingLocalId ?: Uuid.random().toString(),
     memoLocalId = memoLocalId,
     remoteName = name,
     creator = creator,
@@ -120,7 +120,7 @@ fun MemoShareDto.toModel(serverUrl: String) = MemoShare(
 )
 
 fun AttachmentDto.toEntity(memoLocalId: String, existingLocalId: String? = null) = AttachmentEntity(
-    localId = existingLocalId ?: UUID.randomUUID().toString(),
+    localId = existingLocalId ?: Uuid.random().toString(),
     memoLocalId = memoLocalId,
     remoteName = name,
     filename = filename,

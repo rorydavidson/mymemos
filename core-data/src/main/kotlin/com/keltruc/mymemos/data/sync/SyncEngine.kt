@@ -1,6 +1,6 @@
 package com.keltruc.mymemos.data.sync
 
-import android.util.Base64
+import kotlin.io.encoding.Base64
 import androidx.room.withTransaction
 import com.keltruc.mymemos.data.attachments.AttachmentStore
 import com.keltruc.mymemos.data.auth.ApiClientRegistry
@@ -46,7 +46,7 @@ import kotlinx.serialization.json.Json
 import java.io.IOException
 import kotlin.time.Clock
 import kotlin.time.Instant
-import java.util.UUID
+import kotlin.uuid.Uuid
 
 /**
  * Push the outbox, then pull changes, then reconcile. Safe to call from a worker and from
@@ -236,7 +236,7 @@ class SyncEngine constructor(
                         AttachmentCreateDto(
                             filename = local.filename,
                             type = local.mimeType,
-                            content = Base64.encodeToString(bytes, Base64.NO_WRAP),
+                            content = Base64.Default.encode(bytes),
                             memo = name,
                         ),
                     )
@@ -324,7 +324,7 @@ class SyncEngine constructor(
      */
     private suspend fun forkConflict(account: AccountEntity, local: MemoEntity, server: MemoDto) {
         db.withTransaction {
-            val forkId = UUID.randomUUID().toString()
+            val forkId = Uuid.random().toString()
             val fork = local.copy(
                 localId = forkId,
                 remoteName = null,

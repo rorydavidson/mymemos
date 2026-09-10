@@ -1,9 +1,10 @@
 package com.keltruc.mymemos.data.text
 
-import java.time.DayOfWeek
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.plus
 import java.util.Locale
 
 /**
@@ -23,9 +24,9 @@ object DueDateParser {
      * A completion the editor can offer after the user types "@". [token] is what gets inserted,
      * without the "@"; [hint] is a human date for the ones whose name does not give it away.
      */
-    data class Suggestion(val token: String, val date: LocalDate, val hint: String)
+    data class Suggestion(val token: String, val date: LocalDate, val showsDate: Boolean)
 
-    fun parse(line: String, today: LocalDate = LocalDate.now()): Match? {
+    fun parse(line: String, today: LocalDate): Match? {
         for (m in token.findAll(line)) {
             val raw = m.groupValues[1]
             val date = resolve(raw.lowercase(), today) ?: continue
@@ -37,24 +38,24 @@ object DueDateParser {
     private fun resolve(word: String, today: LocalDate): LocalDate? {
         when (word) {
             "today", "tod" -> return today
-            "tomorrow", "tmr", "tmrw" -> return today.plusDays(1)
-            "nextweek" -> return today.plusWeeks(1)
+            "tomorrow", "tmr", "tmrw" -> return today.plus(1, DateTimeUnit.DAY)
+            "nextweek" -> return today.plus(1, DateTimeUnit.WEEK)
         }
         weekdays.entries.firstOrNull { word.startsWith(it.key) }?.let { (_, dow) ->
             var d = today
-            while (d.dayOfWeek != dow) d = d.plusDays(1)
+            while (d.dayOfWeek != dow) d = d.plus(1, DateTimeUnit.DAY)
             return d
         }
         Regex("(\\d{4})-(\\d{2})-(\\d{2})").matchEntire(word)?.let { m ->
             val (y, mo, d) = m.destructured
-            return runCatching { LocalDate.of(y.toInt(), mo.toInt(), d.toInt()) }.getOrNull()
+            return runCatching { LocalDate(y.toInt(), mo.toInt(), d.toInt()) }.getOrNull()
         }
         Regex("(\\d{1,2})/(\\d{1,2})(?:/(\\d{2,4}))?").matchEntire(word)?.let { m ->
             val d = m.groupValues[1].toInt(); val mo = m.groupValues[2].toInt()
             val y = m.groupValues[3].let { if (it.isEmpty()) today.year else if (it.length == 2) 2000 + it.toInt() else it.toInt() }
-            val date = runCatching { LocalDate.of(y, mo, d) }.getOrNull() ?: return null
+            val date = runCatching { LocalDate(y, mo, d) }.getOrNull() ?: return null
             // A day/month without a year that has already passed means next year.
-            return if (m.groupValues[3].isEmpty() && date.isBefore(today)) date.plusYears(1) else date
+            return if (m.groupValues[3].isEmpty() && date < today) date.plus(1, DateTimeUnit.YEAR) else date
         }
         return null
     }
@@ -63,29 +64,41 @@ object DueDateParser {
      * Completions for a partly typed "@" token, in date order. An empty [prefix] offers the lot.
      *
      * Tokens are deliberately the English weekday names rather than localised ones, because
-     * [parse] only knows the English forms; the localised date goes in the hint instead.
+     * [parse] only knows the English forms. Whether a suggestion also shows a date, and how that
+     * date reads, is the caller's business: see [Labels].
      */
-    fun suggest(prefix: String, today: LocalDate = LocalDate.now(), locale: Locale = Locale.getDefault()): List<Suggestion> {
-        val hintFormat = DateTimeFormatter.ofPattern("d MMM", locale)
+    fun suggest(prefix: String, today: LocalDate): List<Suggestion> {
         val all = buildList {
-            add(Suggestion("today", today, ""))
-            add(Suggestion("tomorrow", today.plusDays(1), ""))
+            add(Suggestion("today", today, showsDate = false))
+            add(Suggestion("tomorrow", today.plus(1, DateTimeUnit.DAY), showsDate = false))
             // From two days out a weekday name reads better than a date. It stops at six days
             // because the seventh wraps back to today's weekday, which [resolve] would then read
             // as today rather than a week away.
-            for (ahead in 2L..6L) {
-                val date = today.plusDays(ahead)
-                add(Suggestion(date.dayOfWeek.name.lowercase(Locale.ROOT), date, hintFormat.format(date)))
+            for (ahead in 2..6) {
+                val date = today.plus(ahead, DateTimeUnit.DAY)
+                add(Suggestion(date.dayOfWeek.name.lowercase(), date, showsDate = true))
             }
         }
         return all.filter { it.token.startsWith(prefix, ignoreCase = true) }
     }
 
-    fun label(date: LocalDate, today: LocalDate = LocalDate.now(), locale: Locale = Locale.getDefault()): String = when {
-        date == today -> "Today"
-        date == today.plusDays(1) -> "Tomorrow"
-        date.isBefore(today) -> "Overdue"
-        date.isBefore(today.plusDays(7)) -> date.dayOfWeek.getDisplayName(TextStyle.FULL, locale)
-        else -> "${date.dayOfMonth} ${date.month.getDisplayName(TextStyle.SHORT, locale)}"
+    /** How a due date stands relative to today. Naming it is [Labels]' job. */
+    enum class Relative { TODAY, TOMORROW, OVERDUE, THIS_WEEK, LATER }
+
+    fun relative(date: LocalDate, today: LocalDate): Relative = when {
+        date == today -> Relative.TODAY
+        date == today.plus(1, DateTimeUnit.DAY) -> Relative.TOMORROW
+        date < today -> Relative.OVERDUE
+        date < today.plus(7, DateTimeUnit.DAY) -> Relative.THIS_WEEK
+        else -> Relative.LATER
+    }
+
+    /** Words for a due date, in the reader's language. Implemented per platform. */
+    interface Labels {
+        /** The short date beside a suggestion, e.g. "12 Sep". */
+        fun hint(date: LocalDate): String
+
+        /** How a due date reads on a task, e.g. "Overdue" or "Thursday". */
+        fun label(date: LocalDate, today: LocalDate): String
     }
 }
