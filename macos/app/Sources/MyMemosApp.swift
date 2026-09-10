@@ -41,6 +41,16 @@ final class SessionModel: ObservableObject {
     @Published var editing: EditorTarget?
     @Published var sortByModified = false
     @Published var compactList = false
+    @Published var templates: [TemplateRow] = []
+    @Published var reminders: [ReminderRow] = []
+    @Published var recurring: [RecurringRow] = []
+    @Published var weeklyDigest = false
+    @Published var digestNext = ""
+    @Published var notificationsAllowed = false
+    @Published var notificationsDenied = false
+    /// Set by the menu bar, which has no view of its own to present a sheet from.
+    @Published var settingReminderFor: String?
+    let notifications = Notifications()
     @Published var mapTiles = false
     @Published var placed: [PlacedMemo] = []
     @Published var taskGroups: [TaskGroup] = []
@@ -57,7 +67,7 @@ final class SessionModel: ObservableObject {
         }
     }
 
-    enum Pane: Hashable { case memos, tasks, review }
+    enum Pane: Hashable { case memos, tasks, review, reminders, templates }
 
     /// The editor needs it directly for list continuation, which happens per keystroke and
     /// should not go through the model.
@@ -318,6 +328,121 @@ final class SessionModel: ObservableObject {
         await sync()
     }
 
+    // MARK: reminders, templates and the digest
+
+    func loadTemplates() async {
+        templates = (try? await session.templates()) ?? []
+    }
+
+    func saveTemplate(id: Int64, title: String, body: String) async {
+        try? await session.saveTemplate(id: id, title: title, body: body)
+        await loadTemplates()
+        await loadSchedules()
+    }
+
+    func deleteTemplate(_ id: Int64) async {
+        try? await session.deleteTemplate(id: id)
+        await loadTemplates()
+        await loadSchedules()
+    }
+
+    /// A template's body with today's date written in, opened as a new memo ready to edit.
+    func newFromTemplate(_ template: TemplateRow) {
+        editing = EditorTarget(localId: nil, initialText: session.expandTemplate(body: template.body))
+    }
+
+    /// Notifications is its own object; a nested one does not republish, so what the views
+    /// read lives here.
+    func refreshNotificationPermission() async {
+        await notifications.refreshPermission()
+        notificationsAllowed = notifications.permission == .allowed
+        notificationsDenied = notifications.permission == .denied
+    }
+
+    func requestNotificationPermission() async {
+        await notifications.requestPermission()
+        notificationsAllowed = notifications.permission == .allowed
+        notificationsDenied = notifications.permission == .denied
+        await loadSchedules()
+    }
+
+    func loadSchedules() async {
+        reminders = (try? await session.reminders()) ?? []
+        recurring = (try? await session.recurring()) ?? []
+        weeklyDigest = ((try? await session.weeklyDigest()) as? Bool) ?? false
+        digestNext = (try? await session.digestNextLabel()) ?? ""
+        await applySchedules()
+    }
+
+    private func applySchedules() async {
+        await notifications.sync(
+            reminders: reminders,
+            recurring: recurring,
+            digest: weeklyDigest,
+            digestHour: Int(session.digestHour)
+        )
+    }
+
+    /// Returns false when the memo is not on the server yet, which is the one case that fails.
+    func addReminder(_ memoLocalId: String, at date: Date, note: String) async -> Bool {
+        let ok = ((try? await session.addReminder(
+            memoLocalId: memoLocalId,
+            atEpochMs: Int64(date.timeIntervalSince1970 * 1000),
+            note: note
+        )) as? Bool) ?? false
+        if ok {
+            await loadSchedules()
+            await sync()
+        }
+        return ok
+    }
+
+    func removeReminder(_ id: String) async {
+        _ = try? await session.removeReminder(id: id)
+        await loadSchedules()
+        await sync()
+    }
+
+    func setRecurring(_ title: String, hour: Int, minute: Int, enabled: Bool) async {
+        try? await session.setRecurring(templateTitle: title, hour: Int32(hour), minute: Int32(minute), enabled: enabled)
+        await loadSchedules()
+        await sync()
+    }
+
+    func setWeeklyDigest(_ enabled: Bool) async {
+        _ = try? await session.setWeeklyDigest(enabled: enabled)
+        await loadSchedules()
+        await sync()
+    }
+
+    /// The catching up a Mac has to do, because the system fires the alarm but only the app
+    /// can write the memo. Run at launch, after the first sync, so it sees what the phone did.
+    func catchUp() async {
+        let created = (try? await session.runDueRecurring()) ?? []
+        if !created.isEmpty {
+            await reload()
+            await sync()
+            for title in created {
+                notifications.postNow(
+                    id: "created.\(title).\(Date().timeIntervalSince1970)",
+                    title: "Created from template",
+                    body: title
+                )
+            }
+        }
+        // A reminder whose moment passed while the app was shut is shown now and cleared, the
+        // same as the phone does when its alarm fires.
+        let now = Date().timeIntervalSince1970 * 1000
+        for reminder in reminders where Double(reminder.atEpochMs) <= now {
+            notifications.postNow(
+                id: "reminder.late.\(reminder.id)",
+                title: "Memo reminder",
+                body: reminder.note.isEmpty ? reminder.memoTitle : reminder.note
+            )
+            await removeReminder(reminder.id)
+        }
+    }
+
     // MARK: Lifecycle
 
     /// Credentials live in the Keychain, so a signed-in account survives a quit.
@@ -339,6 +464,10 @@ final class SessionModel: ObservableObject {
         Task { await loadAvatar() }
         await reload()
         await sync()
+        await refreshNotificationPermission()
+        await loadTemplates()
+        await loadSchedules()
+        await catchUp()
     }
 
     func signIn() async {
@@ -427,10 +556,16 @@ struct RootView: View {
             await model.restore()
         }
         .sheet(item: $model.editing) { target in
-            EditorView(model: model, editing: target.localId)
+            EditorView(model: model, editing: target.localId, initialText: target.initialText)
         }
         .sheet(item: $model.passwordRequest) { request in
             PasswordSheet(model: model, request: request)
+        }
+        .sheet(item: Binding(
+            get: { model.settingReminderFor.map(ReminderTarget.init) },
+            set: { if $0 == nil { model.settingReminderFor = nil } }
+        )) { target in
+            ReminderSheet(model: model, memoLocalId: target.id)
         }
     }
 
@@ -487,6 +622,10 @@ struct RootView: View {
             TasksView(model: model) { model.open($0) }
         case .review:
             ReviewView(model: model) { model.open($0) }
+        case .reminders:
+            RemindersView(model: model) { model.open($0) }
+        case .templates:
+            TemplatesView(model: model)
         }
     }
 
@@ -495,6 +634,8 @@ struct RootView: View {
         case .memos: return model.activeTag.map { "#\($0)" } ?? "Memos"
         case .tasks: return "Tasks"
         case .review: return "Review"
+        case .reminders: return "Reminders"
+        case .templates: return "Templates"
         }
     }
 
@@ -507,6 +648,12 @@ struct RootView: View {
             let count = model.taskGroups.reduce(0) { $0 + $1.tasks.count }
             return "\(count) open across \(model.taskGroups.count) memos"
         case .review: return model.streak == 1 ? "1 day in a row" : "\(model.streak) days in a row"
+        case .reminders:
+            let count = model.reminders.count
+            return count == 1 ? "1 waiting" : "\(count) waiting"
+        case .templates:
+            let daily = model.recurring.filter(\.enabled).count
+            return daily == 0 ? "\(model.templates.count) saved" : "\(model.templates.count) saved, \(daily) daily"
         }
     }
 }
@@ -527,9 +674,18 @@ struct PasswordRequest: Identifiable {
     var id: String { "\(localId)-\(purpose)" }
 }
 
+/// A memo the menu bar asked to set a reminder on.
+struct ReminderTarget: Identifiable {
+    let id: String
+}
+
 /// Identifiable so a sheet can be driven by it; nil localId means a new memo.
+///
+/// [initialText] is how a template arrives: already expanded, so the editor does not have to
+/// know that templates exist.
 struct EditorTarget: Identifiable {
     let localId: String?
+    var initialText: String? = nil
     var id: String { localId ?? "new" }
 }
 

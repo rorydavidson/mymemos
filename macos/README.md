@@ -18,19 +18,29 @@ of files and one less thing to keep in step is worth having.
 
 ## Checks
 
-Two things are checked rather than asserted, both because getting them wrong is quiet:
+These are checked rather than asserted, because getting any of them wrong is quiet:
 
 ```bash
-macos/app/check-cipher.sh   # a memo locked on Android opens here, and back again
-macos/app/check-tiles.sh    # no map tile is fetched while previews are off
-macos/app/check-font.sh     # the bundled font is present, licensed and resolvable
-macos/app/check-appearance.sh   # light, dark and system map and persist correctly
+macos/app/check-cipher.sh        # a memo locked on Android opens here, and back again
+macos/app/check-tiles.sh         # no map tile is fetched while previews are off
+macos/app/check-font.sh          # the bundled font is present, licensed and resolvable
+macos/app/check-appearance.sh    # light, dark and system map and persist correctly
+macos/app/check-editor.sh        # Return inside a list continues it
+macos/app/check-notifications.sh # the notification centre is reachable from a signed bundle
 ```
 
 `check-tiles.sh` has a control line: it turns previews on and expects a fetch, so a broken
 check fails rather than passing quietly. `check-font.sh` has one too: it confirms the family
 is not already installed system-wide before registering it, otherwise a machine that happened
 to have Google Sans would make the check pass while proving nothing about the bundle.
+
+`check-notifications.sh` builds its own throwaway bundle, because
+`UNUserNotificationCenter.current()` traps on a loose binary rather than returning nil, and a
+failure for that reason would say nothing about the app. It does not ask for permission: a
+check that popped a system prompt is one nobody could run twice.
+
+CI runs the first, third, fourth and fifth of these. `check-tiles.sh` needs the network and
+`check-notifications.sh` needs a user session, neither of which a build runner has.
 
 ## The icon
 
@@ -122,9 +132,22 @@ for openstreetmap.org when map previews are on, and read access to files chosen 
 open panel. Nothing else, because an entitlement list that asks for everything tells the
 reader nothing.
 
+## Reminders, recurring templates and the digest
+
+All three live in the config memo, which syncs, so a reminder set on the phone is here on the
+next pull and one set here reaches the phone the same way. When each one fires, and what the
+digest says, are worked out by shared code in `core-data/.../data/notify` rather than twice.
+
+One thing is genuinely different on a Mac, and the app says so rather than pretending
+otherwise: the system delivers a notification scheduled earlier whether or not the app is
+running, but nothing can write a memo while the app is closed. So a recurring template uses a
+repeating alarm, which keeps telling you, and the memo itself is written on the next launch
+after its time. `runDueRecurring()` is that catch-up, and it will not write a template twice
+because it compares first lines against what was already written today, phone included.
+
 ## What is not built yet
 
-Comments and reactions, the account and admin screens, reminders and recurring templates, and
-export, import and encrypted backup, which need a multiplatform zip that nothing provides
-well. Nearby is deliberately absent: it ranks memos by distance from where you are, and this
-app does not ask the machine where it is.
+Comments and reactions, the account and admin screens, and export, import and encrypted
+backup, which need a multiplatform zip that nothing provides well. Nearby is deliberately
+absent: it ranks memos by distance from where you are, and this app does not ask the machine
+where it is.

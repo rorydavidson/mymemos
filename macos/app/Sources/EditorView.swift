@@ -11,6 +11,7 @@ struct EditorView: View {
     @Environment(\.dismiss) private var dismiss
 
     let editing: String?
+    var initialText: String? = nil
 
     @State private var text = ""
     @State private var visibility = "PRIVATE"
@@ -121,6 +122,8 @@ struct EditorView: View {
         if let editing {
             text = await model.rawContent(editing) ?? ""
             pinned = model.memo(editing)?.pinned ?? false
+        } else if let initialText {
+            text = initialText
         }
     }
 

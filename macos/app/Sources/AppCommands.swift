@@ -18,6 +18,17 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(after: .newItem) {
+            Menu("New from Template") {
+                if model.templates.isEmpty {
+                    Text("No templates")
+                } else {
+                    ForEach(model.templates, id: \.id) { template in
+                        Button(template.title) { model.newFromTemplate(template) }
+                    }
+                }
+            }
+            .disabled(model.phase == .signedOut)
+
             Divider()
             Button("Sync Now") { Task { await model.sync() } }
                 .keyboardShortcut("r")
@@ -40,6 +51,9 @@ struct AppCommands: Commands {
             Divider()
 
             Button("Attach a File…") { Task { await attach() } }
+                .disabled(model.selectedMemo == nil)
+
+            Button("Remind Me…") { model.settingReminderFor = model.selectedMemo?.localId }
                 .disabled(model.selectedMemo == nil)
 
             Divider()
@@ -90,6 +104,10 @@ struct AppCommands: Commands {
                 .keyboardShortcut("2", modifiers: .command)
             Button("Review") { model.pane = .review }
                 .keyboardShortcut("3", modifiers: .command)
+            Button("Reminders") { model.pane = .reminders }
+                .keyboardShortcut("4", modifiers: .command)
+            Button("Templates") { model.pane = .templates }
+                .keyboardShortcut("5", modifiers: .command)
 
             Divider()
 
@@ -174,6 +192,26 @@ struct SettingsView: View {
                 Text("Places")
             } footer: {
                 Text("Off by default. Drawing a map asks openstreetmap.org for the tiles around a memo, which tells them roughly where it was written. With this off nothing is drawn and nothing leaves this Mac. No Apple location service is used either way.")
+                    .font(Type.rowMeta)
+                    .foregroundStyle(Theme.inkSoft)
+            }
+
+            Section {
+                Toggle("Sunday evening digest", isOn: Binding(
+                    get: { model.weeklyDigest },
+                    set: { enabled in Task { await model.setWeeklyDigest(enabled) } }
+                ))
+                if model.notificationsDenied {
+                    Text("Notifications are turned off for MyMemos in System Settings, so reminders and the digest only appear when the app is open.")
+                        .font(Type.rowMeta)
+                        .foregroundStyle(Theme.warm)
+                } else if !model.notificationsAllowed {
+                    Button("Allow Notifications") { Task { await model.requestNotificationPermission() } }
+                }
+            } header: {
+                Text("Reminders")
+            } footer: {
+                Text("Reminders and recurring templates are kept with your account, so they are the same here and on your phone. A recurring memo is written the next time this Mac is open after its time.")
                     .font(Type.rowMeta)
                     .foregroundStyle(Theme.inkSoft)
             }
