@@ -92,3 +92,36 @@ struct ToolbarIcon: View {
         .help(help)
     }
 }
+
+/// A menu that looks like the icons beside it.
+///
+/// SwiftUI draws a disclosure chevron on a `Menu` by default, which next to a plain symbol
+/// button reads as a different kind of control and, at toolbar sizes, sits on top of the icon
+/// rather than beside it. Hiding the indicator and using the same frame as `ToolbarIcon` keeps
+/// the row consistent.
+struct ToolbarMenu<Content: View>: View {
+    let symbol: String
+    let help: String
+    @ViewBuilder var content: () -> Content
+
+    @State private var hovering = false
+
+    var body: some View {
+        Menu {
+            content()
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.ink)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .frame(width: 26, height: 22)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(hovering ? Theme.hairline.opacity(0.6) : .clear)
+        )
+        .onHover { hovering = $0 }
+        .help(help)
+    }
+}

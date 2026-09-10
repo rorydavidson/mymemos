@@ -430,8 +430,6 @@ struct RootView: View {
             ToolbarItemGroup(placement: .primaryAction) {
                 SyncStatusButton(model: model)
 
-                Divider().frame(height: 14)
-
                 // No keyboard shortcuts here: those belong in the menu bar, where they are
                 // discoverable and where the system can show them.
                 ToolbarIcon(symbol: "pencil", help: "Edit this memo",
@@ -440,19 +438,14 @@ struct RootView: View {
                 }
                 ToolbarIcon(symbol: "square.and.pencil", help: "New memo") { model.newMemo() }
 
-                Menu {
+                ToolbarMenu(symbol: model.appearance.symbol, help: "Light or dark") {
                     Picker("Appearance", selection: $model.appearance) {
                         ForEach(Appearance.allCases) { option in
                             Label(option.title, systemImage: option.symbol).tag(option)
                         }
                     }
                     .pickerStyle(.inline)
-                } label: {
-                    Image(systemName: model.appearance.symbol)
                 }
-                .menuStyle(.borderlessButton)
-                .help("Light or dark")
-                .frame(width: 30)
             }
         }
     }

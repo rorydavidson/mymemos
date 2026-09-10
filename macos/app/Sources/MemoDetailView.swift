@@ -23,7 +23,7 @@ struct MemoDetailView: View {
                 } else if memo.locked {
                     lockedNotice
                 } else {
-                    MarkdownView(text: memo.body)
+                    MarkdownView(text: bodyBelowTitle)
                         .frame(maxWidth: Theme.readingWidth, alignment: .leading)
                 }
 
@@ -50,6 +50,26 @@ struct MemoDetailView: View {
         .task(id: detail.row.localId) { attachments = await model.attachments(detail.row.localId) }
     }
 
+    /// The memo without the line already shown as the title.
+    ///
+    /// A memo that opens with a heading would otherwise show it twice: once as the title at
+    /// the top and again as the first thing in the text.
+    private var bodyBelowTitle: String {
+        var lines = memo.body.components(separatedBy: "\n")
+        guard let first = lines.firstIndex(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
+        else { return memo.body }
+        let stripped = lines[first]
+            .trimmingCharacters(in: .whitespaces)
+            .drop { $0 == "#" }
+            .trimmingCharacters(in: .whitespaces)
+        guard stripped == memo.title else { return memo.body }
+        lines.removeSubrange(lines.startIndex...first)
+        while let next = lines.first, next.trimmingCharacters(in: .whitespaces).isEmpty {
+            lines.removeFirst()
+        }
+        return lines.joined(separator: "\n")
+    }
+
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
@@ -63,7 +83,7 @@ struct MemoDetailView: View {
                     .textSelection(.enabled)
                 Spacer(minLength: 8)
                 MemoBadges(memo: memo)
-                Menu {
+                ToolbarMenu(symbol: "ellipsis", help: "More actions") {
                     Button("Edit", systemImage: "pencil", action: edit)
                         .disabled(memo.locked)
                     Button(memo.pinned ? "Unpin" : "Pin", systemImage: memo.pinned ? "pin.slash" : "pin") {
@@ -89,11 +109,7 @@ struct MemoDetailView: View {
                     Button("Delete", systemImage: "trash", role: .destructive) {
                         Task { await model.delete(memo.localId) }
                     }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
                 }
-                .menuStyle(.borderlessButton)
-                .frame(width: 22)
             }
             Text(memo.dateLabel)
                 .font(Type.rowMeta)
