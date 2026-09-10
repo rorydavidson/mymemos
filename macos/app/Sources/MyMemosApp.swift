@@ -1,9 +1,10 @@
 import SwiftUI
 import Shared
 
-// A first vertical slice of the macOS client: sign in through the shared Ktor client and
-// list what comes back. The sync engine and the local database are still Android-only until
-// core-data is ported, so nothing here is offline yet.
+// A first vertical slice of the macOS client. Behind it is the real data layer: the same
+// sync engine, outbox, three-way merge and Room database the Android app uses, shared rather
+// than reimplemented. What it does not have yet is a Keychain, so it asks for a password each
+// launch, and no attachments, export or backup.
 
 @MainActor
 final class SessionModel: ObservableObject {
@@ -44,6 +45,21 @@ final class SessionModel: ObservableObject {
             try await session.signIn(serverUrl: server, username: username, password: password)
             displayName = session.displayName
             password = ""
+            await sync()
+        } catch {
+            phase = .failed(readable(error))
+        }
+    }
+
+    /// Pulls from the server into the local database, then reads the database back.
+    func sync() async {
+        phase = .working("Syncing")
+        do {
+            let outcome = try await session.sync()
+            if outcome != "ok" {
+                phase = .failed("Sync said: \(outcome)")
+                return
+            }
             await load()
         } catch {
             phase = .failed(readable(error))
@@ -51,7 +67,7 @@ final class SessionModel: ObservableObject {
     }
 
     func load() async {
-        phase = .working("Loading memos")
+        phase = .working("Reading the local database")
         do {
             memos = try await session.memos()
             phase = .signedIn
@@ -118,11 +134,11 @@ struct MemoListView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Memos").font(.title2.bold())
-                    Text("\(model.displayName) · \(model.memos.count) memos · Memos \(model.serverVersion)")
+                    Text("\(model.displayName) · \(model.memos.count) memos, stored locally · Memos \(model.serverVersion)")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button { Task { await model.load() } } label: { Image(systemName: "arrow.clockwise") }
+                Button { Task { await model.sync() } } label: { Image(systemName: "arrow.clockwise") }
                     .disabled({ if case .working = model.phase { return true } else { return false } }())
             }
             .padding()

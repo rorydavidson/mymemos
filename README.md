@@ -155,12 +155,20 @@ Then:
 ./gradlew test
 ```
 
-`core-network` and `core-database` are Kotlin Multiplatform modules, built for `macosArm64`
-alongside their usual target in preparation for a macOS client (see `docs/MACOS_PLAN.md`).
-`./gradlew test` covers everything that runs on any machine; the native tests need a Mac:
+Every module except `app` is Kotlin Multiplatform, built for `macosArm64` alongside its usual
+target for a macOS client (see `docs/MACOS_PLAN.md`). `./gradlew test` covers everything that
+runs on any machine; the native tests need a Mac:
 
 ```bash
-./gradlew :core-network:macosArm64Test :core-database:macosArm64Test
+./gradlew :core-data:macosArm64Test :core-network:macosArm64Test :core-database:macosArm64Test
+```
+
+There is an early macOS app under `macos/`. It signs in, syncs into a local Room database and
+lists what is there, using the same sync engine as the phone. It has no Keychain, attachments,
+export or backup yet.
+
+```bash
+macos/app/build.sh && open macos/app/build/MyMemos.app
 ```
 
 The cipher's cross-platform byte compatibility is checked on a real Android runtime, which
@@ -174,10 +182,10 @@ needs an emulator or device attached:
 
 | Module          | Purpose                                                              |
 |-----------------|----------------------------------------------------------------------|
-| `core-model`    | Plain Kotlin domain types, no Android or framework dependencies.     |
+| `core-model`    | Plain Kotlin domain types, no Android or framework dependencies. Multiplatform. |
 | `core-network`  | Ktor client for the Memos API, bearer auth, token refresh, persistent cookie storage. Multiplatform (JVM and macOS), tested with Ktor's MockEngine. |
 | `core-database` | Room schema: accounts, memos (with FTS index), attachments, outbox, relations, reactions, shortcuts, templates. Multiplatform (Android and macOS); Android keeps the platform's SQLite, macOS uses Room's bundled driver. |
-| `core-data`     | Repositories, sync engine and three-way merge, mappers, encrypted credential store, memo cipher, config memo, Hilt wiring. |
+| `core-data`     | Repositories, sync engine and three-way merge, mappers, credential store, memo cipher, config memo. Multiplatform; the Android half holds the Keystore store, the java.time formatting, and export, import and backup. |
 | `app`           | Jetpack Compose UI (Material 3), navigation, widgets, notifications, view models. |
 
 ## Fonts and licences

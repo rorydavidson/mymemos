@@ -1,39 +1,48 @@
 package shared
 
-import com.keltruc.mymemos.network.MemosApiFactory
-import com.keltruc.mymemos.network.api.MemosApi
-import com.keltruc.mymemos.network.auth.TokenStore
-import com.keltruc.mymemos.network.dto.PasswordCredentialsDto
-import com.keltruc.mymemos.network.dto.SignInRequestDto
+import com.keltruc.mymemos.data.repository.AccountRepository
+import com.keltruc.mymemos.data.repository.MemoRepository
+import com.keltruc.mymemos.data.sync.SyncEngine
+import com.keltruc.mymemos.data.sync.SyncScheduler
+import com.keltruc.mymemos.model.Memo
+import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import kotlin.time.Instant
+import kotlinx.serialization.json.Json
 
 /**
  * What the macOS app talks to. Deliberately small and concrete: Swift gets suspend functions
  * as `async` for free, but only off a plain class, and it cannot extend a generic Kotlin type,
  * so everything crossing over is a plain class or a list of them.
  *
- * This is a vertical slice over core-network and core-model. The sync engine and the local
- * database are still Android-only until core-data is ported, so there is no offline store
- * behind this yet: it reads from the server and shows what comes back.
+ * Behind it is the real data layer: the same sync engine, outbox, three-way merge and Room
+ * database the Android app uses, none of it reimplemented.
  */
 class MemosSession {
 
-    /** In memory only. The Keychain-backed store lands with the rest of core-data. */
-    private class MemoryTokenStore : TokenStore {
-        var token: String? = null
-        var cookieBlob: String? = null
-        override suspend fun accessToken() = token
-        override suspend fun updateAccessToken(token: String, expiresAt: String?) { this.token = token }
-        override suspend fun isPersonalAccessToken() = false
-        override suspend fun cookies() = cookieBlob
-        override suspend fun saveCookies(serialised: String) { cookieBlob = serialised }
-    }
+    private val json = Json { ignoreUnknownKeys = true; explicitNulls = false; encodeDefaults = false }
+    private val db = MacStack.database
+    private val registry = MacStack.registry
 
-    private val store = MemoryTokenStore()
-    private val factory = MemosApiFactory()
-    private var api: MemosApi? = null
+    private val engine = SyncEngine(
+        db, db.accountDao(), db.memoDao(), db.attachmentDao(), db.pendingOpDao(),
+        db.relationDao(), db.reactionDao(), db.shortcutDao(), registry, MacStack.attachments,
+        MacStack.widgets, MacStack.preferences, json,
+    )
+
+    private val scheduler = SyncScheduler(engine, db.accountDao(), MacStack.background)
+
+    private val memos = MemoRepository(
+        db, db.memoDao(), db.attachmentDao(), db.pendingOpDao(), db.relationDao(),
+        db.reactionDao(), registry, MacStack.attachments, engine, scheduler,
+        MacStack.preferences, MacStack.widgets, json,
+    )
+
+    private val accounts = AccountRepository(
+        db.accountDao(), db.memoDao(), db.attachmentDao(), MacStack.attachments,
+        com.keltruc.mymemos.data.crypto.PasswordSession(InMemoryPassword()),
+        registry, json,
+    )
 
     var serverVersion: String = ""
         private set
@@ -42,44 +51,59 @@ class MemosSession {
 
     /** Confirms the address really is a Memos server before anyone types a password at it. */
     suspend fun probe(serverUrl: String): String {
-        val version = factory.createAnonymous(serverUrl).getInstanceProfile().version
+        val version = registry.anonymousApi(serverUrl).getInstanceProfile().version
         serverVersion = version
         return version
     }
 
     suspend fun signIn(serverUrl: String, username: String, password: String) {
-        val built = factory.create(serverUrl, store)
-        val response = built.api.signIn(SignInRequestDto(PasswordCredentialsDto(username, password)))
-        store.token = response.accessToken
-        displayName = response.user.displayName.ifEmpty { response.user.username }
-        api = built.api
+        val account = accounts.signInWithPassword(serverUrl, username, password)
+        displayName = account.displayName.ifEmpty { account.username }
     }
 
-    suspend fun memos(): List<MemoRow> {
-        val current = api ?: error("not signed in")
-        return current.listMemos(pageSize = 50, state = "NORMAL").memos.map { dto ->
-            MemoRow(
-                name = dto.name,
-                content = dto.content,
-                pinned = dto.pinned,
-                locked = dto.content.trimStart().startsWith(LOCKED_PREFIX),
-                createdLabel = label(dto.createTime),
-            )
+    /** Pulls from the server into the local database, exactly as the phone does. */
+    suspend fun sync(): String {
+        val account = db.accountDao().getActive() ?: return "not signed in"
+        return when (engine.sync(account.id, fullPull = true)) {
+            SyncEngine.Outcome.Success -> "ok"
+            is SyncEngine.Outcome.AuthFailed -> "sign in again"
+            is SyncEngine.Outcome.Retry -> "will retry"
         }
     }
 
-    private fun label(rfc3339: String?): String {
-        val instant = rfc3339?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return ""
-        val local = instant.toLocalDateTime(TimeZone.currentSystemDefault())
-        return "${local.dayOfMonth} ${local.month.name.lowercase().replaceFirstChar { it.uppercase() }} " +
-            "${local.year}, ${local.hour.pad()}:${local.minute.pad()}"
+    /** Reads from the local database, which is what the timeline shows. */
+    suspend fun memos(): List<MemoRow> {
+        val account = db.accountDao().getActive() ?: return emptyList()
+        return memos.observeTimeline(account.id, byModified = false).first().map { it.toRow() }
+    }
+
+    suspend fun signedInAs(): String? = db.accountDao().getActive()?.let {
+        it.displayName.ifEmpty { it.username }
+    }
+
+    private fun Memo.toRow(): MemoRow = MemoRow(
+        name = localId,
+        content = content,
+        pinned = pinned,
+        locked = isLocked,
+        createdLabel = label(),
+    )
+
+    private fun Memo.label(): String {
+        val local = createTime.toLocalDateTime(TimeZone.currentSystemDefault())
+        val month = local.month.name.lowercase().replaceFirstChar { it.uppercase() }
+        return "${local.day} $month ${local.year}, ${local.hour.pad()}:${local.minute.pad()}"
     }
 
     private fun Int.pad() = toString().padStart(2, '0')
+}
 
-    private companion object {
-        const val LOCKED_PREFIX = "mymemos-enc:v1:"
-    }
+/** The memo password is not persisted on macOS yet; see MacStack. */
+private class InMemoryPassword : com.keltruc.mymemos.data.crypto.RememberedPassword {
+    override fun read(): CharArray? = null
+    override fun write(password: CharArray) = Unit
+    override fun forget() = Unit
+    override fun isRemembered() = false
 }
 
 /** One row on screen. A plain class so Swift sees plain properties. */

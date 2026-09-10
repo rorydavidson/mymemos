@@ -34,6 +34,7 @@ swiftc -O \
     -target arm64-apple-macos15.0 \
     -F "$FRAMEWORK_DIR" \
     -framework Shared \
+    -lsqlite3 \
     -parse-as-library \
     macos/app/Sources/MyMemosApp.swift \
     -o "$APP/Contents/MacOS/MyMemos"

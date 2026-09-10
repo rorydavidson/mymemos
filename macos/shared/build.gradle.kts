@@ -19,8 +19,13 @@ kotlin {
         macosArm64Main.dependencies {
             api(project(":core-model"))
             api(project(":core-network"))
+            api(project(":core-data"))
+            api(project(":core-database"))
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.datetime)
+            implementation(libs.room.runtime)
+            implementation(libs.sqlite.bundled)
+            implementation(libs.datastore.preferences.core)
         }
         all { languageSettings.optIn("kotlin.time.ExperimentalTime") }
     }
