@@ -28,7 +28,10 @@ final class SessionModel: ObservableObject {
     @Published var displayName = ""
     @Published var credentialWarning: String?
     @Published var lastSynced: Date?
-    @Published var askingForPassword = false
+    /// Why the password is being asked for, so that supplying it finishes the job rather than
+    /// just being remembered. Without this, asking and acting were two unconnected steps and
+    /// anything that was not a reveal quietly did nothing.
+    @Published var passwordRequest: PasswordRequest?
     @Published var wrongPassword = false
     /// Revealed text for locked memos, by localId. Display only: nothing stored changes.
     @Published var revealed: [String: String] = [:]
@@ -193,10 +196,17 @@ final class SessionModel: ObservableObject {
 
     var passwordRemembered: Bool { session.passwordRemembered }
 
-    func usePassword(_ password: String, remember: Bool) {
+    /// Takes the password, then carries out whatever was waiting on it.
+    func usePassword(_ password: String, remember: Bool) async {
         session.usePassword(password: password, remember: remember)
         wrongPassword = false
-        Task { await revealAll() }
+        let pending = passwordRequest
+        passwordRequest = nil
+        switch pending?.purpose {
+        case .encrypt: await lock(pending!.localId, asking: false)
+        case .removeEncryption: await unlockForGood(pending!.localId, asking: false)
+        case .reveal, .none: await revealAll()
+        }
     }
 
     func forgetPassword() {
@@ -213,7 +223,9 @@ final class SessionModel: ObservableObject {
             return
         }
         wrongPassword = result.wrongPassword
-        if result.needsPassword { askingForPassword = true }
+        if result.needsPassword {
+            passwordRequest = PasswordRequest(localId: localId, purpose: .reveal)
+        }
     }
 
     /// After a password arrives, open everything already on screen that was waiting on it.
@@ -224,9 +236,13 @@ final class SessionModel: ObservableObject {
     }
 
     /// Removes the encryption for good, so the server sees the text again.
-    func unlockForGood(_ localId: String) async {
+    ///
+    /// [asking] is false when this is the retry after a password has just been given, so a
+    /// wrong password reopens the sheet rather than looping straight back into it.
+    func unlockForGood(_ localId: String, asking: Bool = true) async {
         guard (try? await session.unlockForGood(localId: localId)) == true else {
-            askingForPassword = true
+            wrongPassword = !asking
+            passwordRequest = PasswordRequest(localId: localId, purpose: .removeEncryption)
             return
         }
         revealed.removeValue(forKey: localId)
@@ -234,9 +250,10 @@ final class SessionModel: ObservableObject {
         await sync()
     }
 
-    func lock(_ localId: String) async {
+    func lock(_ localId: String, asking: Bool = true) async {
         guard (try? await session.lock(localId: localId)) == true else {
-            askingForPassword = true
+            wrongPassword = !asking
+            passwordRequest = PasswordRequest(localId: localId, purpose: .encrypt)
             return
         }
         revealed.removeValue(forKey: localId)
@@ -389,8 +406,8 @@ struct RootView: View {
         .sheet(item: $model.editing) { target in
             EditorView(model: model, editing: target.localId)
         }
-        .sheet(isPresented: $model.askingForPassword) {
-            PasswordSheet(model: model)
+        .sheet(item: $model.passwordRequest) { request in
+            PasswordSheet(model: model, request: request)
         }
     }
 
@@ -400,7 +417,7 @@ struct RootView: View {
                 .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
         } content: {
             content
-                .navigationSplitViewColumnWidth(min: 280, ideal: 350, max: 520)
+                .navigationSplitViewColumnWidth(min: 300, ideal: 340, max: 480)
                 .navigationTitle(title)
                 .navigationSubtitle(subtitle)
         } detail: {
@@ -410,10 +427,11 @@ struct RootView: View {
         .onChange(of: model.query) { _, _ in Task { await model.reload() } }
         .onChange(of: model.activeTag) { _, _ in Task { await model.reload() } }
         .toolbar {
-            ToolbarItemGroup(placement: .navigation) {
-                SyncStatusButton(model: model)
-            }
             ToolbarItemGroup(placement: .primaryAction) {
+                SyncStatusButton(model: model)
+
+                Divider().frame(height: 14)
+
                 // No keyboard shortcuts here: those belong in the menu bar, where they are
                 // discoverable and where the system can show them.
                 ToolbarIcon(symbol: "pencil", help: "Edit this memo",
@@ -473,6 +491,20 @@ struct RootView: View {
 }
 
 // MARK: - Detail
+
+/// What the memo password is being asked for.
+struct PasswordRequest: Identifiable {
+    enum Purpose {
+        case reveal
+        case encrypt
+        case removeEncryption
+    }
+
+    let localId: String
+    let purpose: Purpose
+
+    var id: String { "\(localId)-\(purpose)" }
+}
 
 /// Identifiable so a sheet can be driven by it; nil localId means a new memo.
 struct EditorTarget: Identifiable {
