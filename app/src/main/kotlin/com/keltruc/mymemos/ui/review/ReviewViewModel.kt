@@ -9,6 +9,7 @@ import com.keltruc.mymemos.model.Account
 import com.keltruc.mymemos.model.Memo
 import com.keltruc.mymemos.model.MemoState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlin.time.Clock
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,9 +22,14 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.time.LocalDate
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
+import kotlinx.datetime.todayIn
 
 data class NearbyMemo(val memo: Memo, val metres: Double)
 
@@ -38,7 +44,7 @@ class ReviewViewModel @Inject constructor(
     private val locationProvider: LocationProvider,
 ) : ViewModel() {
     private val account = accountRepository.activeAccount.filterNotNull()
-    val day = MutableStateFlow(LocalDate.now().minusDays(1))
+    val day = MutableStateFlow(Clock.System.todayIn(TimeZone.currentSystemDefault()).minus(1, DateTimeUnit.DAY))
     val account_: StateFlow<Account?> = accountRepository.activeAccount.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     val dayMemos: StateFlow<List<Memo>> = combine(account, day) { acc, d -> acc to d }
@@ -47,15 +53,15 @@ class ReviewViewModel @Inject constructor(
 
     val throwbacks: StateFlow<List<Throwback>> = account.flatMapLatest { acc ->
         memoRepository.observeActiveDays(acc.id).flatMapLatest { days ->
-            val today = LocalDate.now()
-            val matches = days.filter { it != today && it.dayOfMonth == today.dayOfMonth && it.isBefore(today) }.sortedDescending()
+            val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
+            val matches = days.filter { it != today && it.day == today.day && it < today }.sortedDescending()
             if (matches.isEmpty()) {
                 flowOf(emptyList())
             } else {
                 combine(matches.map { d -> memoRepository.observeCreatedOn(acc.id, d).map { list -> d to list } }) { arrays ->
                     arrays.flatMap { (d, list) ->
                         val years = today.year - d.year
-                        val months = years * 12 + (today.monthValue - d.monthValue)
+                        val months = years * 12 + (today.month.ordinal - d.month.ordinal)
                         list.map { Throwback(it, years, months) }
                     }
                 }
@@ -69,8 +75,11 @@ class ReviewViewModel @Inject constructor(
     val nearby = MutableStateFlow<List<NearbyMemo>?>(null)
     val nearbyError = MutableStateFlow<String?>(null)
 
-    fun previousDay() { day.value = day.value.minusDays(1) }
-    fun nextDay() { if (day.value.isBefore(LocalDate.now())) day.value = day.value.plusDays(1) }
+    fun previousDay() { day.value = day.value.minus(1, DateTimeUnit.DAY) }
+    fun nextDay() {
+        val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
+        if (day.value < today) day.value = day.value.plus(1, DateTimeUnit.DAY)
+    }
 
     fun loadNearby() = viewModelScope.launch {
         val acc = account.first()

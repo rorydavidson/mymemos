@@ -17,6 +17,7 @@ import com.keltruc.mymemos.model.MemoState
 import com.keltruc.mymemos.model.NoteColour
 import com.keltruc.mymemos.ui.components.toggleTaskLine
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlin.time.Clock
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +33,10 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.todayIn
 
 data class TimelineUiState(
     val account: Account? = null,
@@ -130,10 +135,10 @@ class TimelineViewModel @Inject constructor(
     private val shortcuts = account.flatMapLatest { shortcutRepository.observe(it.id) }
     private val streak = account.flatMapLatest { memoRepository.observeActiveDays(it.id) }.map { days ->
         // Consecutive days ending today, or yesterday if nothing written yet today.
-        var day = java.time.LocalDate.now()
-        if (day !in days) day = day.minusDays(1)
+        var day = Clock.System.todayIn(TimeZone.currentSystemDefault())
+        if (day !in days) day = day.minus(1, DateTimeUnit.DAY)
         var n = 0
-        while (day in days) { n++; day = day.minusDays(1) }
+        while (day in days) { n++; day = day.minus(1, DateTimeUnit.DAY) }
         n
     }
 

@@ -3,7 +3,11 @@ package com.keltruc.mymemos.di
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import androidx.room.Room
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
 import com.keltruc.mymemos.data.attachments.AttachmentStore
+import com.keltruc.mymemos.data.attachments.FileAttachmentStore
 import com.keltruc.mymemos.data.auth.ActiveSession
 import com.keltruc.mymemos.data.auth.AccountSecretsFactory
 import com.keltruc.mymemos.data.auth.ApiClientRegistry
@@ -78,9 +82,15 @@ object CoreDataModule {
     @Singleton
     fun json(factory: MemosApiFactory): Json = factory.json
 
+    /** DataStore knows how to be multiplatform; where the file goes is still ours to say. */
     @Provides
     @Singleton
-    fun preferences(@ApplicationContext context: Context) = AppPreferences(context)
+    fun preferencesDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
+        PreferenceDataStoreFactory.create { context.filesDir.resolve("datastore/settings.preferences_pb") }
+
+    @Provides
+    @Singleton
+    fun preferences(dataStore: DataStore<Preferences>) = AppPreferences(dataStore)
 
     @Provides
     @Singleton
@@ -99,7 +109,10 @@ object CoreDataModule {
 
     @Provides
     @Singleton
-    fun attachmentStore(@ApplicationContext context: Context) = AttachmentStore(context)
+    fun fileAttachmentStore(@ApplicationContext context: Context) = FileAttachmentStore(context)
+
+    @Provides
+    fun attachmentStore(store: FileAttachmentStore): AttachmentStore = store
 
     @Provides
     @Singleton
@@ -210,7 +223,7 @@ object CoreDataModule {
 
     @Provides
     @Singleton
-    fun markdownExporter(memoDao: MemoDao, attachmentStore: AttachmentStore) =
+    fun markdownExporter(memoDao: MemoDao, attachmentStore: FileAttachmentStore) =
         MarkdownExporter(memoDao, attachmentStore)
 
     @Provides

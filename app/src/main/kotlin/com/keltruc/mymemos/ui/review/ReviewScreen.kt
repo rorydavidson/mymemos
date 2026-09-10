@@ -42,10 +42,19 @@ import com.keltruc.mymemos.R
 import com.keltruc.mymemos.model.Memo
 import com.keltruc.mymemos.ui.components.MemoCard
 import com.keltruc.mymemos.ui.components.RouteMap
-import java.time.LocalDate
+import kotlin.time.Clock
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.toJavaLocalDate
+import kotlinx.datetime.todayIn
 
 private val dayFmt: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM yyyy")
+
+/** Recomputed per composition rather than held: the app can be open across midnight. */
+private val todayDate: LocalDate get() = Clock.System.todayIn(TimeZone.currentSystemDefault())
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -92,15 +101,15 @@ fun ReviewScreen(
                         IconButton(onClick = viewModel::previousDay) { Icon(Icons.Default.ChevronLeft, null) }
                         Text(
                             when (day) {
-                                LocalDate.now() -> stringResource(R.string.today)
-                                LocalDate.now().minusDays(1) -> stringResource(R.string.yesterday)
-                                else -> dayFmt.format(day)
+                                todayDate -> stringResource(R.string.today)
+                                todayDate.minus(1, DateTimeUnit.DAY) -> stringResource(R.string.yesterday)
+                                else -> dayFmt.format(day.toJavaLocalDate())
                             },
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.weight(1f),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         )
-                        IconButton(onClick = viewModel::nextDay, enabled = day.isBefore(LocalDate.now())) { Icon(Icons.Default.ChevronRight, null) }
+                        IconButton(onClick = viewModel::nextDay, enabled = day < todayDate) { Icon(Icons.Default.ChevronRight, null) }
                     }
                     SwipeReview(
                         memos = dayMemos,
@@ -132,15 +141,15 @@ fun ReviewScreen(
                         IconButton(onClick = viewModel::previousDay) { Icon(Icons.Default.ChevronLeft, null) }
                         Text(
                             when (day) {
-                                LocalDate.now() -> stringResource(R.string.today)
-                                LocalDate.now().minusDays(1) -> stringResource(R.string.yesterday)
-                                else -> dayFmt.format(day)
+                                todayDate -> stringResource(R.string.today)
+                                todayDate.minus(1, DateTimeUnit.DAY) -> stringResource(R.string.yesterday)
+                                else -> dayFmt.format(day.toJavaLocalDate())
                             },
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.weight(1f),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         )
-                        IconButton(onClick = viewModel::nextDay, enabled = day.isBefore(LocalDate.now())) { Icon(Icons.Default.ChevronRight, null) }
+                        IconButton(onClick = viewModel::nextDay, enabled = day < todayDate) { Icon(Icons.Default.ChevronRight, null) }
                     }
                     val located = dayMemos.filter { it.location != null }
                     if (located.isEmpty()) {

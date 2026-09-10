@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.keltruc.mymemos.data.attachments.FileAttachmentStore
 import com.keltruc.mymemos.data.crypto.MemoCipher
 import com.keltruc.mymemos.data.crypto.PasswordSession
 import com.keltruc.mymemos.data.repository.AccountRepository
@@ -53,6 +54,7 @@ class EditorViewModel @Inject constructor(
     private val memoRepository: MemoRepository,
     private val accountRepository: AccountRepository,
     private val passwordSession: PasswordSession,
+    private val attachmentStore: FileAttachmentStore,
     templateRepository: TemplateRepository,
 ) : ViewModel() {
     val passwordRemembered: Boolean get() = passwordSession.isRemembered
@@ -129,7 +131,7 @@ class EditorViewModel @Inject constructor(
     fun attach(uri: Uri) {
         viewModelScope.launch {
             val id = ensureMemoExists()
-            memoRepository.addAttachment(id, uri)
+            memoRepository.addAttachment(id, attachmentStore.stage(uri))
         }
     }
 
