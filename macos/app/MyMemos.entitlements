@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      Notarisation requires the hardened runtime, which denies these unless asked for.
+      Deliberately short: this app talks to one server the user names, reads files the user
+      picks, and keeps credentials in the Keychain. It wants nothing else, and asking for
+      more than that is how an entitlement list stops meaning anything.
+    -->
+
+    <!-- Reaching the user's own Memos server, and openstreetmap.org when map previews are on. -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+
+    <!-- Files chosen through the open panel, for attachments. -->
+    <key>com.apple.security.files.user-selected.read-only</key>
+    <true/>
+</dict>
+</plist>

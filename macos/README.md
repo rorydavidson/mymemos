@@ -1,0 +1,73 @@
+# MyMemos for macOS
+
+A macOS client sharing its data layer with the Android app: the same sync engine, outbox,
+three-way merge, Room database and memo cipher, in `core-model`, `core-network`,
+`core-database` and `core-data`. Only the interface and the platform seams are written twice.
+
+Requires macOS 15 on Apple silicon.
+
+## Building and running
+
+```bash
+macos/app/build.sh && open macos/app/build/MyMemos.app
+```
+
+`macos/shared` is the Kotlin framework the app links against. `macos/app` is the SwiftUI
+application, built by script rather than an Xcode project, because the Swift side is a handful
+of files and one less thing to keep in step is worth having.
+
+## Checks
+
+Two things are checked rather than asserted, both because getting them wrong is quiet:
+
+```bash
+macos/app/check-cipher.sh   # a memo locked on Android opens here, and back again
+macos/app/check-tiles.sh    # no map tile is fetched while previews are off
+```
+
+`check-tiles.sh` has a control line: it turns previews on and expects a fetch, so a broken
+check fails rather than passing quietly.
+
+## Packaging
+
+```bash
+macos/app/package.sh
+```
+
+With no credentials this produces an ad-hoc signed DMG. That works on the machine that built
+it and Gatekeeper refuses it anywhere else, which is fine for trying it and no use for
+handing to anyone.
+
+For a DMG that opens on someone else's Mac you need two things this repository cannot supply:
+
+1. **A Developer ID Application certificate.** Needs a paid Apple Developer Program
+   membership. Create it in the developer portal or from Xcode's Accounts pane, then check it
+   arrived:
+
+   ```bash
+   security find-identity -v -p codesigning
+   ```
+
+   `package.sh` picks it up on its own, or set `SIGN_IDENTITY` to choose between several.
+
+2. **Notarisation credentials.** An app-specific password from appleid.apple.com, stored once:
+
+   ```bash
+   xcrun notarytool store-credentials "notary" \
+       --apple-id you@example.com --team-id TEAMID --password app-specific-password
+   ```
+
+   Then `NOTARY_PROFILE=notary macos/app/package.sh`, which signs with the hardened runtime,
+   submits to Apple, waits, staples the ticket and verifies the result.
+
+`MyMemos.entitlements` is deliberately short: outgoing network for the user's own server and
+for openstreetmap.org when map previews are on, and read access to files chosen through the
+open panel. Nothing else, because an entitlement list that asks for everything tells the
+reader nothing.
+
+## What is not built yet
+
+Comments and reactions, the account and admin screens, reminders and recurring templates, and
+export, import and encrypted backup, which need a multiplatform zip that nothing provides
+well. Nearby is deliberately absent: it ranks memos by distance from where you are, and this
+app does not ask the machine where it is.

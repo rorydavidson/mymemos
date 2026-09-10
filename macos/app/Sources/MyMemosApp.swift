@@ -137,7 +137,7 @@ final class SessionModel: ObservableObject {
     }
 
     func loadReview() async {
-        streak = Int((try? await session.streak()) ?? 0)
+        streak = ((try? await session.streak()).map { Int(truncating: $0) }) ?? 0
         activeDays = Set((try? await session.activeDays()) ?? [])
         throwbacks = (try? await session.onThisDay()) ?? []
     }
