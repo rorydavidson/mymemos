@@ -23,7 +23,7 @@ struct MemoDetailView: View {
                 } else if memo.locked {
                     lockedNotice
                 } else {
-                    MarkdownView(text: bodyBelowTitle)
+                    MarkdownView(text: detail.bodyBelowTitle)
                         .frame(maxWidth: Theme.readingWidth, alignment: .leading)
                 }
 
@@ -48,26 +48,6 @@ struct MemoDetailView: View {
         }
         .background(Theme.canvas)
         .task(id: detail.row.localId) { attachments = await model.attachments(detail.row.localId) }
-    }
-
-    /// The memo without the line already shown as the title.
-    ///
-    /// A memo that opens with a heading would otherwise show it twice: once as the title at
-    /// the top and again as the first thing in the text.
-    private var bodyBelowTitle: String {
-        var lines = memo.body.components(separatedBy: "\n")
-        guard let first = lines.firstIndex(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
-        else { return memo.body }
-        let stripped = lines[first]
-            .trimmingCharacters(in: .whitespaces)
-            .drop { $0 == "#" }
-            .trimmingCharacters(in: .whitespaces)
-        guard stripped == memo.title else { return memo.body }
-        lines.removeSubrange(lines.startIndex...first)
-        while let next = lines.first, next.trimmingCharacters(in: .whitespaces).isEmpty {
-            lines.removeFirst()
-        }
-        return lines.joined(separator: "\n")
     }
 
     private var header: some View {

@@ -57,7 +57,9 @@ final class SessionModel: ObservableObject {
 
     enum Pane: Hashable { case memos, tasks, review }
 
-    private let session = MemosSession()
+    /// The editor needs it directly for list continuation, which happens per keystroke and
+    /// should not go through the model.
+    let session = MemosSession()
 
     init() {
         // The shared cipher has no AES-GCM of its own on this platform; hand it CryptoKit's.

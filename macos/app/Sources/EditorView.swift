@@ -18,13 +18,16 @@ struct EditorView: View {
     @State private var showPreview = false
     @State private var saving = false
     @State private var loaded = false
-    @FocusState private var editorFocused: Bool
+    @State private var pendingEdit: EditorEdit?
 
     private var isNew: Bool { editing == nil }
 
     var body: some View {
         VStack(spacing: 0) {
             toolbar
+            Divider()
+
+            FormatBar { pendingEdit = $0 }
             Divider()
 
             HStack(spacing: 0) {
@@ -85,21 +88,14 @@ struct EditorView: View {
 
     private var editor: some View {
         ZStack(alignment: .topLeading) {
-            TextEditor(text: $text)
-                .font(Type.body)
-                .lineSpacing(Theme.readingLeading)
-                .scrollContentBackground(.hidden)
-                .background(Theme.card)
-                .focused($editorFocused)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 16)
+            MarkdownEditor(text: $text, pendingEdit: $pendingEdit, session: model.session)
 
             if text.isEmpty {
-                Text("Write something. Markdown works: # headings, - lists, - [ ] tasks, #tags.")
+                Text("Write something. The buttons above add Markdown, or type it yourself.")
                     .font(Type.body)
-                    .foregroundStyle(Theme.inkSoft.opacity(0.7))
-                    .padding(.horizontal, 23)
-                    .padding(.vertical, 24)
+                    .foregroundStyle(Theme.inkSoft.opacity(0.6))
+                    .padding(.horizontal, 19)
+                    .padding(.vertical, 21)
                     .allowsHitTesting(false)
             }
         }
@@ -126,7 +122,6 @@ struct EditorView: View {
             text = await model.rawContent(editing) ?? ""
             pinned = model.memo(editing)?.pinned ?? false
         }
-        editorFocused = true
     }
 
     private func save() async {

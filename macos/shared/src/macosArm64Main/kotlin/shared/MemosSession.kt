@@ -9,6 +9,7 @@ import com.keltruc.mymemos.data.repository.MemoRepository
 import com.keltruc.mymemos.data.sync.SyncEngine
 import com.keltruc.mymemos.data.sync.SyncScheduler
 import com.keltruc.mymemos.data.text.DueDateParser
+import com.keltruc.mymemos.data.text.MarkdownContinuation
 import com.keltruc.mymemos.data.text.MemoTitle
 import com.keltruc.mymemos.data.text.TaskLine
 import com.keltruc.mymemos.data.timeline.TimelineGrouping
@@ -124,6 +125,7 @@ class MemosSession {
             latitude = memo.location?.latitude ?: 0.0,
             longitude = memo.location?.longitude ?: 0.0,
             hasPlace = memo.location != null,
+            bodyBelowTitle = if (memo.isLocked) "" else MemoTitle.withoutTitleLine(memo.displayContent),
         )
     }
 
@@ -386,6 +388,22 @@ class MemosSession {
     /** True when the delete can still be taken back, which is what the phone's Undo relies on. */
     suspend fun delete(localId: String): Boolean = memos.delete(localId)
 
+    /**
+     * Continues a list or task after Return, the same way the phone does.
+     *
+     * Called with the field as it was and as it now is, because the shared logic runs after the
+     * newline has already landed rather than instead of it.
+     */
+    fun continueAfterReturn(
+        beforeText: String,
+        beforeCursor: Int,
+        afterText: String,
+        afterCursor: Int,
+    ): ListContinuation? =
+        MarkdownContinuation.continueAfterReturn(beforeText, beforeCursor, afterText, afterCursor)?.let {
+            ListContinuation(text = it.text, cursor = it.cursor)
+        }
+
     /** The raw Markdown, which is what the editor opens. */
     suspend fun rawContent(localId: String): String? = memos.observeMemoOnce(localId)?.displayContent
 
@@ -473,6 +491,8 @@ data class MemoDetail(
     val latitude: Double,
     val longitude: Double,
     val hasPlace: Boolean,
+    /** The text without the line the title came from, so a view showing both does not repeat it. */
+    val bodyBelowTitle: String,
 )
 
 /**
@@ -532,6 +552,9 @@ data class AttachmentRow(
     val isImage: Boolean,
     val uploaded: Boolean,
 )
+
+/** The text and where the cursor lands after Return inside a list. */
+data class ListContinuation(val text: String, val cursor: Int)
 
 /** What a locked memo looks like when asked to show itself. */
 data class Reveal(val text: String?, val needsPassword: Boolean, val wrongPassword: Boolean)

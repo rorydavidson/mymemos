@@ -1,0 +1,160 @@
+import AppKit
+import SwiftUI
+import Shared
+
+/// The text view behind the editor.
+///
+/// SwiftUI's TextEditor gives no access to the selection and no hook on Return, and both are
+/// needed here: a formatting button has to know what is selected to wrap it, and pressing
+/// Return inside a list has to carry the marker down, which is shared logic the phone already
+/// uses. So this wraps NSTextView.
+struct MarkdownEditor: NSViewRepresentable {
+    @Binding var text: String
+    /// Set to ask the view to apply an edit; cleared once it has.
+    @Binding var pendingEdit: EditorEdit?
+    let session: MemosSession
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scroll = NSTextView.scrollableTextView()
+        guard let view = scroll.documentView as? NSTextView else { return scroll }
+
+        view.delegate = context.coordinator
+        view.string = text
+        view.isRichText = false
+        view.allowsUndo = true
+        view.font = NSFont(name: "Google Sans Flex", size: 15) ?? .systemFont(ofSize: 15)
+        view.textContainerInset = NSSize(width: 14, height: 16)
+        view.drawsBackground = false
+        // Smart quotes turn a Markdown quote into a curly one, and smart dashes turn "--" into
+        // an em dash. Both corrupt text that is meant to be read literally.
+        view.isAutomaticQuoteSubstitutionEnabled = false
+        view.isAutomaticDashSubstitutionEnabled = false
+        view.isAutomaticTextReplacementEnabled = false
+
+        scroll.drawsBackground = false
+        context.coordinator.textView = view
+        context.coordinator.prime(view)
+        return scroll
+    }
+
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        guard let view = scroll.documentView as? NSTextView else { return }
+        if view.string != text { view.string = text }
+
+        if let edit = pendingEdit {
+            context.coordinator.apply(edit, to: view)
+            // Clearing during an update loops, so hand it back on the next turn.
+            DispatchQueue.main.async { pendingEdit = nil }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        private let parent: MarkdownEditor
+        weak var textView: NSTextView?
+
+        init(_ parent: MarkdownEditor) {
+            self.parent = parent
+        }
+
+        func prime(_ view: NSTextView) {
+            snapshot(view)
+        }
+
+        /// The field as it was before the current keystroke, which is what the shared list
+        /// continuation compares against. It runs after the newline has landed rather than
+        /// instead of it, so intercepting Return before the insert would never match.
+        private var previousText = ""
+        private var previousCursor = 0
+
+        func textDidChange(_ notification: Foundation.Notification) {
+            guard let view = notification.object as? NSTextView else { return }
+
+            if let result = parent.session.continueAfterReturn(
+                beforeText: previousText,
+                beforeCursor: Int32(previousCursor),
+                afterText: view.string,
+                afterCursor: Int32(view.selectedRange().location)
+            ) {
+                replace(view, with: result.text, cursor: Int(result.cursor))
+            } else {
+                parent.text = view.string
+            }
+            snapshot(view)
+        }
+
+        func textViewDidChangeSelection(_ notification: Foundation.Notification) {
+            guard let view = notification.object as? NSTextView else { return }
+            snapshot(view)
+        }
+
+        private func snapshot(_ view: NSTextView) {
+            previousText = view.string
+            previousCursor = view.selectedRange().location
+        }
+
+        func apply(_ edit: EditorEdit, to view: NSTextView) {
+            let range = view.selectedRange()
+            let text = view.string as NSString
+            let selected = text.substring(with: range)
+            let (replacement, cursorOffset) = edit.apply(to: selected, wholeText: view.string, at: range)
+            let updated = text.replacingCharacters(in: range, with: replacement)
+            replace(view, with: updated, cursor: range.location + cursorOffset)
+        }
+
+        /// One undoable edit, rather than clearing and retyping the document.
+        private func replace(_ view: NSTextView, with updated: String, cursor: Int) {
+            let whole = NSRange(location: 0, length: (view.string as NSString).length)
+            if view.shouldChangeText(in: whole, replacementString: updated) {
+                view.textStorage?.replaceCharacters(in: whole, with: updated)
+                view.didChangeText()
+            }
+            let bounded = max(0, min(cursor, (view.string as NSString).length))
+            view.setSelectedRange(NSRange(location: bounded, length: 0))
+            view.scrollRangeToVisible(view.selectedRange())
+            parent.text = view.string
+        }
+    }
+}
+
+/// A formatting action the toolbar can ask the editor to perform.
+enum EditorEdit: Identifiable {
+    /// Puts markers either side of the selection, e.g. bold.
+    case wrap(String)
+    /// Puts a marker at the start of each selected line, e.g. a bullet.
+    case prefixLines(String)
+    /// Drops text in where the cursor is.
+    case insert(String)
+
+    var id: String {
+        switch self {
+        case let .wrap(marker): return "wrap-\(marker)"
+        case let .prefixLines(marker): return "prefix-\(marker)"
+        case let .insert(text): return "insert-\(text)"
+        }
+    }
+
+    /// Returns the replacement text and where to leave the cursor within it.
+    func apply(to selected: String, wholeText: String, at range: NSRange) -> (String, Int) {
+        switch self {
+        case let .wrap(marker):
+            if selected.isEmpty { return (marker + marker, marker.count) }
+            return (marker + selected + marker, (marker + selected + marker).count)
+
+        case let .prefixLines(marker):
+            // With nothing selected, the marker goes on the line the cursor is in.
+            if selected.isEmpty {
+                return (marker, marker.count)
+            }
+            let prefixed = selected
+                .components(separatedBy: "\n")
+                .map { $0.isEmpty ? $0 : marker + $0 }
+                .joined(separator: "\n")
+            return (prefixed, prefixed.count)
+
+        case let .insert(text):
+            return (text, text.count)
+        }
+    }
+}
