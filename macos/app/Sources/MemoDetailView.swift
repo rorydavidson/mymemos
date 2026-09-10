@@ -8,6 +8,7 @@ struct MemoDetailView: View {
     var edit: () -> Void = {}
     @Environment(\.colorScheme) private var scheme
     @State private var attachments: [AttachmentRow] = []
+    @State private var settingReminder = false
 
     private var memo: MemoRow { detail.row }
 
@@ -48,6 +49,9 @@ struct MemoDetailView: View {
         }
         .background(Theme.canvas)
         .task(id: detail.row.localId) { attachments = await model.attachments(detail.row.localId) }
+        .sheet(isPresented: $settingReminder) {
+            ReminderSheet(model: model, memoLocalId: memo.localId)
+        }
     }
 
     private var header: some View {
@@ -85,6 +89,7 @@ struct MemoDetailView: View {
                     Button("Attach a file…", systemImage: "paperclip") {
                         Task { await attachFiles() }
                     }
+                    Button("Remind me…", systemImage: "bell") { settingReminder = true }
                     Divider()
                     Button("Delete", systemImage: "trash", role: .destructive) {
                         Task { await model.delete(memo.localId) }

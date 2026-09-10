@@ -16,14 +16,20 @@ struct MemoListView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 4, pinnedViews: [.sectionHeaders]) {
+            LazyVStack(alignment: .leading, spacing: model.compactList ? 1 : 4, pinnedViews: [.sectionHeaders]) {
                 ForEach(model.sections, id: \.key) { section in
                     Section {
                         if !model.collapsed.contains(section.key) {
                             ForEach(section.memos, id: \.localId) { memo in
-                                MemoRowView(memo: memo, selected: selection == memo.localId)
-                                    .onTapGesture { selection = memo.localId }
-                                    .padding(.horizontal, 10)
+                                Group {
+                                    if model.compactList {
+                                        CompactMemoRowView(memo: memo, selected: selection == memo.localId)
+                                    } else {
+                                        MemoRowView(memo: memo, selected: selection == memo.localId)
+                                    }
+                                }
+                                .onTapGesture { selection = memo.localId }
+                                .padding(.horizontal, 10)
                             }
                         }
                     } header: {
@@ -170,5 +176,77 @@ struct MemoRowView: View {
             .joined(separator: " ")
             .replacingOccurrences(of: "#", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+/// One memo as a single line: its title, the time it was written, and the badges that say
+/// something a title cannot. For scanning a long timeline rather than reading it, and the
+/// same idea as the phone's compact rows.
+struct CompactMemoRowView: View {
+    let memo: MemoRow
+    var selected = false
+
+    @Environment(\.colorScheme) private var scheme
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            // The colour a card shows as a whole tint has to survive here as something, so it
+            // becomes the bar down the side. Without it a coloured memo is indistinguishable.
+            Rectangle()
+                .fill(Color.memoTint(memo.colourHex, isDark: scheme == .dark)?.opacity(0.9) ?? .clear)
+                .frame(width: 3)
+
+            if memo.pinned {
+                Image(systemName: "pin.fill")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.accent)
+            }
+            if memo.locked {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.accent)
+            }
+
+            Text(title)
+                .font(Type.rowBody)
+                .foregroundStyle(memo.locked ? Theme.inkSoft : Theme.ink)
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            Spacer(minLength: 8)
+
+            if memo.hasOpenTasks {
+                Image(systemName: "checklist")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.inkSoft)
+            }
+            if memo.attachmentCount > 0 {
+                Image(systemName: "paperclip")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.inkSoft)
+            }
+
+            Text(memo.timeLabel)
+                .font(Type.rowMeta)
+                .monospacedDigit()
+                .foregroundStyle(Theme.inkSoft.opacity(0.8))
+        }
+        .padding(.trailing, 12)
+        .padding(.vertical, 6)
+        .frame(height: 28)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(selected ? Theme.accent.opacity(0.16) : (hovering ? Theme.ink.opacity(0.04) : .clear))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+    }
+
+    /// A locked memo's body is ciphertext, so there is no title to be had from it.
+    private var title: String {
+        if memo.locked { return "Locked memo" }
+        return memo.title.isEmpty ? "Untitled" : memo.title
     }
 }

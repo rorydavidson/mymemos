@@ -25,6 +25,10 @@ struct Sidebar: View {
                         selected: model.pane == .tasks) { model.pane = .tasks }
                     row("Review", "calendar.badge.clock", count: nil,
                         selected: model.pane == .review) { model.pane = .review }
+                    row("Reminders", "bell", count: model.reminders.isEmpty ? nil : model.reminders.count,
+                        selected: model.pane == .reminders) { model.pane = .reminders }
+                    row("Templates", "doc.on.doc", count: nil,
+                        selected: model.pane == .templates) { model.pane = .templates }
 
                     if !model.tags.isEmpty {
                         header("Tags").padding(.top, 14)

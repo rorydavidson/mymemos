@@ -5,8 +5,11 @@ import com.keltruc.mymemos.data.crypto.PasswordSession
 import com.keltruc.mymemos.data.crypto.RememberedPassword
 import com.keltruc.mymemos.data.account.AvatarSource
 import com.keltruc.mymemos.data.mapper.remoteUrl
+import com.keltruc.mymemos.data.config.ConfigRepository
 import com.keltruc.mymemos.data.repository.AccountRepository
+import com.keltruc.mymemos.data.repository.AccountSettingsRepository
 import com.keltruc.mymemos.data.repository.MemoRepository
+import com.keltruc.mymemos.data.repository.TemplateRepository
 import com.keltruc.mymemos.data.sync.SyncEngine
 import com.keltruc.mymemos.data.sync.SyncScheduler
 import com.keltruc.mymemos.data.text.DueDateParser
@@ -27,6 +30,16 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.todayIn
 import kotlinx.datetime.toLocalDateTime
+import com.keltruc.mymemos.data.notify.Digest
+import com.keltruc.mymemos.data.notify.Schedule
+import com.keltruc.mymemos.model.Reminder
+import com.keltruc.mymemos.model.RecurringTemplate
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.atTime
+import kotlinx.datetime.toInstant
+import kotlin.uuid.Uuid
+import kotlin.time.Duration.Companion.days
 import kotlinx.serialization.json.Json
 
 /**
@@ -64,6 +77,13 @@ class MemosSession {
         passwords,
         registry, json,
     )
+
+    private val settings = AccountSettingsRepository(registry, db.accountDao(), json)
+
+    /** Reminders, recurring templates and the digest switch all live in the config memo. */
+    private val config = ConfigRepository(db.memoDao(), memos, accounts, settings)
+
+    private val templates = TemplateRepository(db.templateDao())
 
     var serverVersion: String = ""
         private set
@@ -145,6 +165,14 @@ class MemosSession {
     suspend fun sortByModified(): Boolean = MacStack.preferences.settings.first().sortByModified
 
     suspend fun setSortByModified(enabled: Boolean) = MacStack.preferences.setSortByModified(enabled)
+
+    /**
+     * One line per memo instead of a card, for scanning a long timeline rather than reading
+     * it. Local to this Mac: it is a view preference, not something to follow you about.
+     */
+    suspend fun compactList(): Boolean = MacStack.preferences.settings.first().compactList
+
+    suspend fun setCompactList(enabled: Boolean) = MacStack.preferences.setCompactList(enabled)
 
     // MARK: tasks
 
@@ -465,6 +493,183 @@ class MemosSession {
         }
     }
 
+    // MARK: templates
+
+    /**
+     * The saved templates, seeding the three defaults the first time anyone looks. Seeding on
+     * read rather than at startup keeps it off the launch path, and the check is a COUNT.
+     */
+    suspend fun templates(): List<TemplateRow> {
+        templates.seedDefaultsIfEmpty()
+        return templates.templates.first().map { TemplateRow(it.id, it.title, it.body) }
+    }
+
+    suspend fun saveTemplate(id: Long, title: String, body: String) =
+        templates.save(id.takeIf { it > 0 }, title, body)
+
+    suspend fun deleteTemplate(id: Long) = templates.delete(id)
+
+    /** A template's body with today's date and time written into it, ready to edit. */
+    fun expandTemplate(body: String): String =
+        TemplateRepository.expand(body, MacTemplateValues())
+
+    // MARK: reminders and recurring templates
+    //
+    // Both live in the config memo, so they sync: a reminder set on the phone arrives here on
+    // the next pull, and one set here reaches the phone the same way.
+
+    suspend fun reminders(): List<ReminderRow> {
+        val zone = TimeZone.currentSystemDefault()
+        return config.current().reminders
+            .sortedBy { it.atEpochMs }
+            .map { reminder ->
+                val memo = memos.observeMemoOnce(localIdFor(reminder.memoRemoteName))
+                ReminderRow(
+                    id = reminder.id,
+                    memoRemoteName = reminder.memoRemoteName,
+                    memoLocalId = memo?.localId.orEmpty(),
+                    memoTitle = memo?.let { m ->
+                        if (m.isLocked) "Locked memo" else MemoTitle.of(m.displayContent) ?: m.firstLine()
+                    }.orEmpty(),
+                    note = reminder.note,
+                    atEpochMs = reminder.atEpochMs,
+                    whenLabel = Instant.fromEpochMilliseconds(reminder.atEpochMs).friendlyWithTime(zone),
+                    overdue = reminder.atEpochMs <= Clock.System.now().toEpochMilliseconds(),
+                )
+            }
+    }
+
+    /**
+     * Sets a one-off reminder on a memo. Returns false for a memo the server has not seen yet:
+     * reminders travel by the memo's server name, and a memo still in the outbox has none.
+     */
+    suspend fun addReminder(memoLocalId: String, atEpochMs: Long, note: String): Boolean {
+        val remoteName = memos.observeMemoOnce(memoLocalId)?.remoteName ?: return false
+        val reminder = Reminder(
+            id = Uuid.random().toString(),
+            memoRemoteName = remoteName,
+            atEpochMs = atEpochMs,
+            note = note,
+        )
+        config.update { it.copy(reminders = it.reminders + reminder) }
+        return true
+    }
+
+    suspend fun removeReminder(id: String) =
+        config.update { c -> c.copy(reminders = c.reminders.filterNot { it.id == id }) }
+
+    suspend fun recurring(): List<RecurringRow> {
+        val enabledByTitle = config.current().recurring.associateBy { it.templateTitle }
+        val zone = TimeZone.currentSystemDefault()
+        val now = Clock.System.now()
+        return templates().map { template ->
+            val existing = enabledByTitle[template.title]
+            val hour = existing?.hour?.toInt() ?: 8
+            val minute = existing?.minute?.toInt() ?: 0
+            RecurringRow(
+                templateId = template.id,
+                templateTitle = template.title,
+                hour = hour,
+                minute = minute,
+                enabled = existing?.enabled == true,
+                nextLabel = if (existing?.enabled == true) {
+                    Schedule.nextDaily(hour, minute, now, zone).friendlyWithTime(zone)
+                } else {
+                    ""
+                },
+            )
+        }
+    }
+
+    suspend fun setRecurring(templateTitle: String, hour: Int, minute: Int, enabled: Boolean) {
+        config.update { c ->
+            val rest = c.recurring.filterNot { it.templateTitle == templateTitle }
+            c.copy(recurring = rest + RecurringTemplate(templateTitle, hour, minute, enabled))
+        }
+    }
+
+    suspend fun weeklyDigest(): Boolean = config.current().weeklyDigest
+
+    suspend fun setWeeklyDigest(enabled: Boolean) = config.update { it.copy(weeklyDigest = enabled) }
+
+    /**
+     * Runs any recurring template whose time has passed without one being written today, and
+     * returns the titles it created.
+     *
+     * This is the honest shape of the feature on a Mac: the system will deliver a notification
+     * scheduled earlier even with the app closed, but nothing can write a memo while the app is
+     * not running. So the alarm tells you, and the next launch catches up.
+     */
+    suspend fun runDueRecurring(): List<String> {
+        val account = db.accountDao().getActive() ?: return emptyList()
+        val zone = TimeZone.currentSystemDefault()
+        val today = Clock.System.todayIn(zone)
+        val now = Clock.System.now()
+        val saved = templates.templates.first().associateBy { it.title }
+        val created = mutableListOf<String>()
+
+        for (entry in config.current().recurring.filter { it.enabled }) {
+            val template = saved[entry.templateTitle] ?: continue
+            // Not yet due today: the next launch after the time will pick it up.
+            val dueToday = today.atTime(LocalTime(entry.hour.toInt(), entry.minute.toInt())).toInstant(zone)
+            if (dueToday > now) continue
+
+            val body = TemplateRepository.expand(template.body, MacTemplateValues())
+            val writtenToday = memos.observeCreatedOn(account.id, today, zone).first()
+                .map { Schedule.firstLine(it.content) }
+            if (!Schedule.shouldCreate(Schedule.firstLine(body), writtenToday)) continue
+
+            memos.create(account.id, body, Visibility.PRIVATE)
+            created += template.title
+        }
+        return created
+    }
+
+    /**
+     * The hour the digest goes out, so the app can set a weekly alarm on the same time this
+     * label describes.
+     */
+    val digestHour: Int get() = DIGEST_HOUR
+
+    /**
+     * The most recent Sunday evening that has already gone: the digest this Mac owes, if it
+     * has not shown one since.
+     *
+     * The app needs this because the notification it scheduled a week ago carries a body
+     * written a week ago. The alarm is what survives being closed; the words are worked out
+     * when there is something to work them out from.
+     */
+    suspend fun lastDigestDueEpochMs(): Long {
+        val zone = TimeZone.currentSystemDefault()
+        val next = Schedule.nextWeekly(DayOfWeek.SUNDAY, DIGEST_HOUR, 0, Clock.System.now(), zone)
+        return (next - 7.days).toEpochMilliseconds()
+    }
+
+    /** When the digest next goes out, or empty when it is switched off. */
+    suspend fun digestNextLabel(): String {
+        if (!config.current().weeklyDigest) return ""
+        val zone = TimeZone.currentSystemDefault()
+        return Schedule.nextWeekly(DayOfWeek.SUNDAY, DIGEST_HOUR, 0, Clock.System.now(), zone)
+            .friendlyWithTime(zone)
+    }
+
+    /** The digest itself, worked out from the local database by the same code the phone uses. */
+    suspend fun digestText(): String? {
+        val account = db.accountDao().getActive() ?: return null
+        val zone = TimeZone.currentSystemDefault()
+        val summary = Digest.summarise(
+            all = memos.allForDigest(account.id),
+            activeDays = memos.observeActiveDays(account.id, zone).first(),
+            today = Clock.System.todayIn(zone),
+            zone = zone,
+        )
+        return Digest.text(summary, MacDigestLabels())
+    }
+
+    /** A reminder's memo, if this Mac has a local copy of it yet. */
+    private suspend fun localIdFor(remoteName: String): String =
+        accounts.activeAccountOrNull()?.let { memos.ensureLocal(it, remoteName) }.orEmpty()
+
     suspend fun signedInAs(): String? = db.accountDao().getActive()?.let {
         serverVersion = it.serverVersion
         displayName = it.displayName.ifEmpty { it.username }
@@ -482,6 +687,11 @@ class MemosSession {
         val read = Keychain.read(probe)
         Keychain.delete(probe)
         return read == "ok"
+    }
+
+    private companion object {
+        /** Sunday evening, late enough that the week is genuinely over. */
+        const val DIGEST_HOUR = 18
     }
 
     private fun Memo.toRow(): MemoRow = MemoRow(
@@ -503,6 +713,15 @@ class MemosSession {
     private fun Memo.firstLine(): String =
         displayContent.lineSequence().firstOrNull { it.isNotBlank() }?.trim()?.take(80).orEmpty()
 
+    private fun Instant.friendlyWithTime(zone: TimeZone): String {
+        val local = toLocalDateTime(zone)
+        val day = MacTimelineLabels().label(
+            TimelineGrouping.Bucket.Day(local.date),
+            Clock.System.todayIn(zone),
+        )
+        return "$day at ${local.hour.pad()}:${local.minute.pad()}"
+    }
+
     private fun Instant.timeOfDay(): String {
         val local = toLocalDateTime(TimeZone.currentSystemDefault())
         return "${local.hour.pad()}:${local.minute.pad()}"
@@ -518,6 +737,34 @@ class MemosSession {
 }
 
 /** One header and the memos beneath it. */
+data class TemplateRow(val id: Long, val title: String, val body: String)
+
+/** A one-off reminder, with its memo already looked up so the list can name it. */
+data class ReminderRow(
+    val id: String,
+    val memoRemoteName: String,
+    val memoLocalId: String,
+    val memoTitle: String,
+    val note: String,
+    val atEpochMs: Long,
+    val whenLabel: String,
+    val overdue: Boolean,
+)
+
+/**
+ * A template and whether it runs itself daily. Every template gets a row, switched off unless
+ * the config says otherwise, so turning one on is a switch rather than a separate thing to add.
+ */
+data class RecurringRow(
+    val templateId: Long,
+    val templateTitle: String,
+    val hour: Int,
+    val minute: Int,
+    val enabled: Boolean,
+    /** When it next runs, already written out. Empty when it is switched off. */
+    val nextLabel: String,
+)
+
 data class TimelineSection(val key: String, val label: String, val memos: List<MemoRow>)
 
 /** Everything the detail pane shows beyond the row itself. */
