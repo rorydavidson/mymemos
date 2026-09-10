@@ -48,3 +48,12 @@ kotlin {
         }
     }
 }
+
+// `./gradlew test` is the documented way to run the suite and is what CI runs. A
+// multiplatform module has no `test` task of its own, so without this these tests would
+// quietly stop being run at all. The macOS tests need a Mac and stay out of it.
+tasks.register("test") {
+    group = "verification"
+    description = "Runs the host unit tests, so the module joins the root `test` task."
+    dependsOn("testAndroidHostTest")
+}

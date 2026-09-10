@@ -45,3 +45,4 @@ dependencies {
     add("kspAndroid", libs.room.compiler)
     add("kspMacosArm64", libs.room.compiler)
 }
+
