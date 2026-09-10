@@ -71,13 +71,8 @@ struct Sidebar: View {
         VStack(spacing: 0) {
             Divider().overlay(Theme.hairline)
             HStack(spacing: 9) {
-                ZStack {
-                    Circle().fill(Theme.accentSoft)
-                    Text(initials)
-                        .font(Type.rowMeta)
-                        .foregroundStyle(Theme.onAccentSoft)
-                }
-                .frame(width: 24, height: 24)
+                AvatarView(image: model.avatar, initials: initials)
+                    .frame(width: 26, height: 26)
 
                 VStack(alignment: .leading, spacing: 0) {
                     Text(model.displayName.isEmpty ? "Not signed in" : model.displayName)
@@ -89,16 +84,23 @@ struct Sidebar: View {
                 Spacer(minLength: 4)
 
                 if model.passwordRemembered {
-                    Button { model.forgetPassword() } label: {
-                        Image(systemName: "lock.rotation").font(.system(size: 11))
+                    FooterButton(symbol: "lock.rotation",
+                                 help: "Forget the memo password on this Mac") {
+                        model.forgetPassword()
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Theme.inkSoft)
-                    .help("Forget the memo password on this Mac")
                 }
+
+                SettingsLink {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.inkSoft)
+                        .frame(width: 24, height: 22)
+                }
+                .buttonStyle(.plain)
+                .help("Settings (⌘,)")
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
         }
     }
 
@@ -147,5 +149,54 @@ private struct SidebarRow: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+    }
+}
+
+/// The account's picture, or its initials when there is none.
+private struct AvatarView: View {
+    let image: NSImage?
+    let initials: String
+
+    var body: some View {
+        ZStack {
+            Circle().fill(Theme.accentSoft)
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .clipShape(Circle())
+            } else {
+                Text(initials)
+                    .font(Type.rowMeta)
+                    .foregroundStyle(Theme.onAccentSoft)
+            }
+        }
+        .overlay(Circle().strokeBorder(Theme.hairline, lineWidth: 0.5))
+    }
+}
+
+/// A quiet button for the sidebar's footer.
+private struct FooterButton: View {
+    let symbol: String
+    let help: String
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.inkSoft)
+                .frame(width: 24, height: 22)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(hovering ? Theme.hairline.opacity(0.7) : .clear)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(help)
     }
 }

@@ -1,6 +1,5 @@
 package com.keltruc.mymemos.ui.components
 
-import android.util.Base64
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
+import com.keltruc.mymemos.data.account.AvatarSource
 
 /**
  * Circular avatar. Memos stores avatars either as a `data:` URI or as a path on the server;
@@ -40,9 +40,14 @@ fun Avatar(name: String, url: String, serverUrl: String, modifier: Modifier = Mo
     }
 }
 
-private fun avatarModel(url: String, serverUrl: String): Any? = when {
-    url.isBlank() -> null
-    url.startsWith("data:") -> runCatching { Base64.decode(url.substringAfter(",", ""), Base64.DEFAULT) }.getOrNull()?.takeIf { it.isNotEmpty() }
-    url.startsWith("http") -> url
-    else -> serverUrl.trimEnd('/') + "/" + url.trimStart('/')
-}
+/**
+ * Coil takes bytes or a URL; [AvatarSource] decides which, and whether the URL is the
+ * account's own server. A foreign one is still shown, but the image loader's interceptor only
+ * attaches the token for the account's own origin, so the credential does not travel with it.
+ */
+private fun avatarModel(url: String, serverUrl: String): Any? =
+    when (val source = AvatarSource.of(url, serverUrl)) {
+        is AvatarSource.None -> null
+        is AvatarSource.Bytes -> source.bytes
+        is AvatarSource.Url -> source.url
+    }

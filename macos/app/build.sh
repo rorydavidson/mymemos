@@ -51,4 +51,13 @@ swiftc -O \
     macos/app/Sources/*.swift \
     -o "$APP/Contents/MacOS/MyMemos"
 
+# Sign with the local certificate if it exists. Without a stable code identity the Keychain
+# treats every rebuild as a different application asking for someone else's credentials, and
+# prompts. make-signing-cert.sh creates one; ad hoc is the fallback.
+if security find-certificate -c "MyMemos Local Signing" >/dev/null 2>&1; then
+    codesign --force --deep --sign "MyMemos Local Signing" "$APP" 2>/dev/null
+else
+    codesign --force --deep --sign - "$APP" 2>/dev/null
+fi
+
 echo "built $APP"

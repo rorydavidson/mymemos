@@ -66,6 +66,25 @@ chrome sizes are kept apart in `Type`. If the bundled font ever fails to registe
 falls back to the system font, which is why `check-font.sh` exists: the failure is otherwise
 silent.
 
+## Signing locally
+
+```bash
+macos/app/make-signing-cert.sh
+```
+
+Creates a self-signed code-signing certificate in the login keychain, once, and `build.sh`
+uses it from then on.
+
+This is not about Gatekeeper. An unsigned or ad-hoc build gets a new code identity every time
+it is rebuilt, and the Keychain scopes saved credentials to the identity that stored them, so
+every rebuild had macOS asking whether a different application should be allowed at someone
+else's password. With the certificate the designated requirement is the bundle id and the
+certificate, which does not change between builds:
+
+    designated => identifier "com.keltruc.mymemos.macos" and certificate leaf = H"902a5d…"
+
+macOS asks once more for items stored under the previous identity. Choose Always Allow.
+
 ## Packaging
 
 ```bash
