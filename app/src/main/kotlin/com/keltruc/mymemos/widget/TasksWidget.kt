@@ -40,7 +40,7 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.keltruc.mymemos.MainActivity
 import com.keltruc.mymemos.R
-import com.keltruc.mymemos.ui.components.toggleTaskLine
+import com.keltruc.mymemos.data.text.TaskLine
 
 /** Every unticked task across your memos. Tapping a box ticks it through the outbox. */
 class TasksWidget : GlanceAppWidget() {
@@ -133,7 +133,7 @@ class ToggleTaskAction : ActionCallback {
         val line = parameters[TasksWidget.lineKey] ?: return
         val repo = WidgetEntryPoint.get(context).memoRepository()
         val memo = repo.observeMemoOnce(memoId) ?: return
-        toggleTaskLine(memo.content, line, true)?.let { repo.updateContent(memoId, it) }
+        TaskLine.toggle(memo.content, line, true)?.let { repo.updateContent(memoId, it) }
         TasksWidget().updateAll(context)
     }
 }

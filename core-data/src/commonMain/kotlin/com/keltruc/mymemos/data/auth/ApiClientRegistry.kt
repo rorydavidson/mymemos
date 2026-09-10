@@ -2,6 +2,7 @@ package com.keltruc.mymemos.data.auth
 
 import com.keltruc.mymemos.network.MemosApiFactory
 import com.keltruc.mymemos.network.api.MemosApi
+import io.ktor.client.HttpClient
 import kotlin.concurrent.atomics.AtomicReference
 
 /** One authenticated [MemosApi] per account, built lazily and reused. */
@@ -20,6 +21,15 @@ class ApiClientRegistry(
         entry(serverUrl, userResourceName).tokenStore
 
     fun api(serverUrl: String, userResourceName: String): MemosApi = entry(serverUrl, userResourceName).api
+
+    /**
+     * The authenticated client itself, for the few things that are not API calls: attachment
+     * files are served from a plain path rather than the v1 surface, and still want the bearer
+     * token. Only ever use it against the account's own server; sending the credential
+     * anywhere else would hand it to whoever controls a link.
+     */
+    fun client(serverUrl: String, userResourceName: String): HttpClient =
+        entry(serverUrl, userResourceName).built.client
 
     fun anonymousApi(serverUrl: String): MemosApi = factory.createAnonymous(serverUrl)
 
