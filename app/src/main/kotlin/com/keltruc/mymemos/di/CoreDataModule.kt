@@ -5,9 +5,12 @@ import android.content.pm.ApplicationInfo
 import androidx.room.Room
 import com.keltruc.mymemos.data.attachments.AttachmentStore
 import com.keltruc.mymemos.data.auth.ActiveSession
+import com.keltruc.mymemos.data.auth.AccountSecretsFactory
 import com.keltruc.mymemos.data.auth.ApiClientRegistry
+import com.keltruc.mymemos.data.auth.SecureTokenStore
 import com.keltruc.mymemos.data.config.ConfigRepository
 import com.keltruc.mymemos.data.crypto.PasswordSession
+import com.keltruc.mymemos.data.crypto.RememberedPassword
 import com.keltruc.mymemos.data.export.MarkdownExporter
 import com.keltruc.mymemos.data.imports.MarkdownImporter
 import com.keltruc.mymemos.data.prefs.AppPreferences
@@ -31,6 +34,7 @@ import com.keltruc.mymemos.database.dao.RelationDao
 import com.keltruc.mymemos.database.dao.ShortcutDao
 import com.keltruc.mymemos.database.dao.TemplateDao
 import com.keltruc.mymemos.network.MemosApiFactory
+import com.keltruc.mymemos.secrets.KeystoreRememberedPassword
 import com.keltruc.mymemos.sync.WorkManagerBackgroundSync
 import dagger.Module
 import dagger.Provides
@@ -80,7 +84,18 @@ object CoreDataModule {
 
     @Provides
     @Singleton
-    fun passwordSession(@ApplicationContext context: Context) = PasswordSession(context)
+    fun rememberedPassword(@ApplicationContext context: Context): RememberedPassword =
+        KeystoreRememberedPassword(context)
+
+    @Provides
+    @Singleton
+    fun passwordSession(remembered: RememberedPassword) = PasswordSession(remembered)
+
+    /** The Keystore-backed credential store, one per account. */
+    @Provides
+    @Singleton
+    fun accountSecrets(@ApplicationContext context: Context) =
+        AccountSecretsFactory { key -> SecureTokenStore(context, key) }
 
     @Provides
     @Singleton
@@ -88,8 +103,8 @@ object CoreDataModule {
 
     @Provides
     @Singleton
-    fun apiClientRegistry(@ApplicationContext context: Context, factory: MemosApiFactory) =
-        ApiClientRegistry(context, factory)
+    fun apiClientRegistry(factory: MemosApiFactory, secrets: AccountSecretsFactory) =
+        ApiClientRegistry(factory, secrets)
 
     @Provides
     @Singleton

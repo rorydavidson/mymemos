@@ -83,6 +83,9 @@ dependencies {
     implementation(libs.compose.material.icons.extended)
     debugImplementation(libs.compose.ui.tooling)
 
+    // The Keystore-backed credential store lives here now, behind core-data's interfaces.
+    implementation(libs.security.crypto)
+
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)

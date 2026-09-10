@@ -1,44 +1,41 @@
 package com.keltruc.mymemos.data.crypto
 
-import android.content.Context
-import android.content.SharedPreferences
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * The memo password for the current process. Held in memory by default; "remember on this
- * device" keeps it in Keystore-backed encrypted preferences so locked memos open without
- * a prompt. Forgetting clears both.
+ * Where a remembered memo password is kept between launches. Keystore-backed preferences on
+ * Android, the Keychain on a Mac; either way it never leaves the device.
  */
-class PasswordSession constructor(context: Context) {
-    private val prefs: SharedPreferences = EncryptedSharedPreferences.create(
-        context,
-        "mymemos_memo_password",
-        MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-    )
+interface RememberedPassword {
+    fun read(): CharArray?
+    fun write(password: CharArray)
+    fun forget()
+    fun isRemembered(): Boolean
+}
 
-    private val _password = MutableStateFlow<CharArray?>(prefs.getString(KEY, null)?.toCharArray())
+/**
+ * The memo password for the current process. Held in memory by default; "remember on this
+ * device" hands it to [RememberedPassword] so locked memos open without a prompt. Forgetting
+ * clears both.
+ */
+class PasswordSession(private val remembered: RememberedPassword) {
+
+    private val _password = MutableStateFlow(remembered.read())
     val password: StateFlow<CharArray?> = _password
-    val isRemembered: Boolean get() = prefs.contains(KEY)
+
+    val isRemembered: Boolean get() = remembered.isRemembered()
 
     fun current(): CharArray? = _password.value
 
     fun set(password: CharArray, remember: Boolean) {
         _password.value = password
-        if (remember) prefs.edit().putString(KEY, String(password)).apply() else prefs.edit().remove(KEY).apply()
+        if (remember) remembered.write(password) else remembered.forget()
     }
 
     fun forget() {
         _password.value?.fill(' ')
         _password.value = null
-        prefs.edit().remove(KEY).apply()
-    }
-
-    private companion object {
-        const val KEY = "memo_password"
+        remembered.forget()
     }
 }
