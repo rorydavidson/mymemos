@@ -135,6 +135,21 @@ private struct DigestCard: View {
                     .font(Type.rowMeta)
                     .foregroundStyle(Theme.accent)
             }
+
+            // The week so far, whether or not the digest is switched on. Waiting until Sunday
+            // to find out what it would say is a poor way to decide whether you want it.
+            if !model.digestPreview.isEmpty {
+                Divider().padding(.vertical, 2)
+                Text(model.weeklyDigest ? "This week so far" : "This is what it would say")
+                    .font(Type.label)
+                    .tracking(0.8)
+                    .foregroundStyle(Theme.inkSoft.opacity(0.7))
+                Text(model.digestPreview)
+                    .font(Type.rowBody)
+                    .foregroundStyle(Theme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)

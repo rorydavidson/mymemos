@@ -46,6 +46,7 @@ final class SessionModel: ObservableObject {
     @Published var recurring: [RecurringRow] = []
     @Published var weeklyDigest = false
     @Published var digestNext = ""
+    @Published var digestPreview = ""
     @Published var notificationsAllowed = false
     @Published var notificationsDenied = false
     /// Set by the menu bar, which has no view of its own to present a sheet from.
@@ -371,6 +372,7 @@ final class SessionModel: ObservableObject {
         recurring = (try? await session.recurring()) ?? []
         weeklyDigest = ((try? await session.weeklyDigest()) as? Bool) ?? false
         digestNext = (try? await session.digestNextLabel()) ?? ""
+        digestPreview = (try? await session.digestText()) ?? ""
         await applySchedules()
     }
 
@@ -415,6 +417,25 @@ final class SessionModel: ObservableObject {
         await sync()
     }
 
+    /// Shows the digest for a Sunday that has gone by without one being shown.
+    ///
+    /// The scheduled notification can only carry words written a week earlier, which by the
+    /// time it arrives are a week out of date. So that one is a nudge, and the real summary is
+    /// posted here, from memos as they actually are. The date last shown is kept on this Mac
+    /// rather than in the config memo: it is about this device having told you, not about the
+    /// account.
+    private func catchUpDigest() async {
+        guard weeklyDigest else { return }
+        guard let due = (try? await session.lastDigestDueEpochMs())?.int64Value else { return }
+        let key = "digest.lastShownEpochMs"
+        guard due > (UserDefaults.standard.object(forKey: key) as? Int64 ?? 0) else { return }
+
+        let text = (try? await session.digestText()) ?? ""
+        guard !text.isEmpty else { return }
+        notifications.postNow(id: "digest.caught-up", title: "Your week in memos", body: text)
+        UserDefaults.standard.set(due, forKey: key)
+    }
+
     /// The catching up a Mac has to do, because the system fires the alarm but only the app
     /// can write the memo. Run at launch, after the first sync, so it sees what the phone did.
     func catchUp() async {
@@ -430,6 +451,8 @@ final class SessionModel: ObservableObject {
                 )
             }
         }
+        await catchUpDigest()
+
         // A reminder whose moment passed while the app was shut is shown now and cleared, the
         // same as the phone does when its alarm fires.
         let now = Date().timeIntervalSince1970 * 1000

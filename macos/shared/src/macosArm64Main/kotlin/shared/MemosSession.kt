@@ -39,6 +39,7 @@ import kotlinx.datetime.LocalTime
 import kotlinx.datetime.atTime
 import kotlinx.datetime.toInstant
 import kotlin.uuid.Uuid
+import kotlin.time.Duration.Companion.days
 import kotlinx.serialization.json.Json
 
 /**
@@ -629,6 +630,20 @@ class MemosSession {
      * label describes.
      */
     val digestHour: Int get() = DIGEST_HOUR
+
+    /**
+     * The most recent Sunday evening that has already gone: the digest this Mac owes, if it
+     * has not shown one since.
+     *
+     * The app needs this because the notification it scheduled a week ago carries a body
+     * written a week ago. The alarm is what survives being closed; the words are worked out
+     * when there is something to work them out from.
+     */
+    suspend fun lastDigestDueEpochMs(): Long {
+        val zone = TimeZone.currentSystemDefault()
+        val next = Schedule.nextWeekly(DayOfWeek.SUNDAY, DIGEST_HOUR, 0, Clock.System.now(), zone)
+        return (next - 7.days).toEpochMilliseconds()
+    }
 
     /** When the digest next goes out, or empty when it is switched off. */
     suspend fun digestNextLabel(): String {
