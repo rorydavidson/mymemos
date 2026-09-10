@@ -96,8 +96,8 @@ class MemosSession {
      */
     suspend fun timeline(): List<TimelineSection> {
         val account = db.accountDao().getActive() ?: return emptyList()
-        val all = memos.observeTimeline(account.id, byModified = false).first()
-        return group(all)
+        val byModified = MacStack.preferences.settings.first().sortByModified
+        return group(memos.observeTimeline(account.id, byModified = byModified).first())
     }
 
     /** Offline full-text search, straight off the local FTS index. */
@@ -122,6 +122,21 @@ class MemosSession {
             wordCount = memo.displayContent.split(Regex("\\s+")).count { it.isNotBlank() },
         )
     }
+
+    // MARK: account
+
+    /** Revokes this device's token on the server and forgets the account locally. */
+    suspend fun signOut() {
+        val account = db.accountDao().getActive() ?: return
+        accounts.activeAccount.first()?.let { accounts.signOut(it) }
+        MacStack.attachments.delete(account.userResourceName)
+        passwords.forget()
+    }
+
+    /** Order the timeline by when memos were last changed rather than when they were written. */
+    suspend fun sortByModified(): Boolean = MacStack.preferences.settings.first().sortByModified
+
+    suspend fun setSortByModified(enabled: Boolean) = MacStack.preferences.setSortByModified(enabled)
 
     // MARK: tasks
 

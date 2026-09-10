@@ -33,6 +33,10 @@ final class SessionModel: ObservableObject {
     /// Revealed text for locked memos, by localId. Display only: nothing stored changes.
     @Published var revealed: [String: String] = [:]
     @Published var pane: Pane = .memos
+    /// Selection lives here rather than in a view because the menu bar acts on it.
+    @Published var selection: String?
+    @Published var editing: EditorTarget?
+    @Published var sortByModified = false
     @Published var taskGroups: [TaskGroup] = []
     @Published var throwbacks: [Throwback] = []
     @Published var activeDays: Set<String> = []
@@ -58,6 +62,39 @@ final class SessionModel: ObservableObject {
     /// Goes through the one session: building another would open a second database.
     func detail(for localId: String) async -> MemoDetail? {
         try? await session.memo(localId: localId)
+    }
+
+    // MARK: account and ordering
+
+    var selectedMemo: MemoRow? { selection.flatMap { memo($0) } }
+
+    func signOut() async {
+        try? await session.signOut()
+        sections = []
+        tags = []
+        selection = nil
+        revealed.removeAll()
+        displayName = ""
+        phase = .signedOut
+    }
+
+    func setSortByModified(_ enabled: Bool) async {
+        try? await session.setSortByModified(enabled: enabled)
+        sortByModified = enabled
+        await reload()
+    }
+
+    /// Opens a memo from another pane, putting the timeline back on screen.
+    func open(_ localId: String) {
+        selection = localId
+        pane = .memos
+    }
+
+    func newMemo() { editing = EditorTarget(localId: nil) }
+
+    func editSelected() {
+        guard let selection, memo(selection)?.locked != true else { return }
+        editing = EditorTarget(localId: selection)
     }
 
     // MARK: tasks and review
@@ -209,6 +246,7 @@ final class SessionModel: ObservableObject {
         if !session.credentialStoreAvailable() {
             credentialWarning = "The Keychain is not available, so this session will be forgotten on quit."
         }
+        sortByModified = ((try? await session.sortByModified()) as? Bool) ?? false
         phase = .working("Looking for a saved account")
         guard let who = try? await session.signedInAs(), !who.isEmpty else {
             phase = .signedOut
@@ -289,9 +327,7 @@ final class SessionModel: ObservableObject {
 // MARK: - Root
 
 struct RootView: View {
-    @StateObject private var model = SessionModel()
-    @State private var selection: String?
-    @State private var editing: EditorTarget?
+    @ObservedObject var model: SessionModel
 
     var body: some View {
         Group {
@@ -303,7 +339,7 @@ struct RootView: View {
         }
         .frame(minWidth: 860, minHeight: 580)
         .task { await model.restore() }
-        .sheet(item: $editing) { target in
+        .sheet(item: $model.editing) { target in
             EditorView(model: model, editing: target.localId)
         }
         .sheet(isPresented: $model.askingForPassword) {
@@ -321,33 +357,26 @@ struct RootView: View {
                 .navigationTitle(title)
                 .navigationSubtitle(subtitle)
         } detail: {
-            DetailPane(model: model, selection: selection, edit: { editing = EditorTarget(localId: $0) })
+            DetailPane(model: model, selection: model.selection, edit: { model.editing = EditorTarget(localId: $0) })
         }
         .searchable(text: $model.query, placement: .toolbar, prompt: "Search memos")
         .onChange(of: model.query) { _, _ in Task { await model.reload() } }
         .onChange(of: model.activeTag) { _, _ in Task { await model.reload() } }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                Button { editing = EditorTarget(localId: nil) } label: {
-                    Image(systemName: "square.and.pencil")
-                }
-                .help("New memo (⌘N)")
-                .keyboardShortcut("n")
+                // No keyboard shortcuts here: those belong in the menu bar, where they are
+                // discoverable and where the system can show them.
+                Button { model.newMemo() } label: { Image(systemName: "square.and.pencil") }
+                    .help("New memo")
 
-                Button {
-                    if let selection { editing = EditorTarget(localId: selection) }
-                } label: {
-                    Image(systemName: "pencil")
-                }
-                .help("Edit this memo (⌘E)")
-                .keyboardShortcut("e")
-                .disabled(selection == nil || model.memo(selection ?? "")?.locked == true)
+                Button { model.editSelected() } label: { Image(systemName: "pencil") }
+                    .help("Edit this memo")
+                    .disabled(model.selectedMemo == nil || model.selectedMemo?.locked == true)
 
                 Button { Task { await model.sync() } } label: {
                     Image(systemName: "arrow.triangle.2.circlepath")
                 }
-                .help("Sync with the server (⌘R)")
-                .keyboardShortcut("r")
+                .help("Sync with the server")
                 .disabled(model.isBusy)
             }
         }
@@ -357,18 +386,12 @@ struct RootView: View {
     private var content: some View {
         switch model.pane {
         case .memos:
-            MemoListView(model: model, selection: $selection)
+            MemoListView(model: model, selection: $model.selection)
         case .tasks:
-            TasksView(model: model) { open($0) }
+            TasksView(model: model) { model.open($0) }
         case .review:
-            ReviewView(model: model) { open($0) }
+            ReviewView(model: model) { model.open($0) }
         }
-    }
-
-    /// Jumping to a memo from another pane: show it, and put the timeline back on screen.
-    private func open(_ localId: String) {
-        selection = localId
-        model.pane = .memos
     }
 
     private var title: String {
@@ -581,9 +604,14 @@ struct SignInView: View {
 
 @main
 struct MyMemosApp: App {
+    @StateObject private var model = SessionModel()
+
     var body: some Scene {
-        WindowGroup("MyMemos") { RootView() }
+        WindowGroup("MyMemos") { RootView(model: model) }
             .defaultSize(width: 1040, height: 720)
             .windowToolbarStyle(.unified)
+            .commands { AppCommands(model: model) }
+
+        Settings { SettingsView(model: model) }
     }
 }
