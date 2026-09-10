@@ -98,6 +98,13 @@ struct AppCommands: Commands {
                 set: { enabled in Task { await model.setSortByModified(enabled) } }
             ))
             .disabled(model.phase == .signedOut)
+
+            Toggle("Compact List", isOn: Binding(
+                get: { model.compactList },
+                set: { enabled in Task { await model.setCompactList(enabled) } }
+            ))
+            .keyboardShortcut("c", modifiers: [.command, .option])
+            .disabled(model.phase == .signedOut)
         }
 
         // Help, replacing the stub that points at nothing.
@@ -141,11 +148,21 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
             }
 
-            Section("Timeline") {
+            Section {
                 Toggle("Sort by when memos were last changed", isOn: Binding(
                     get: { model.sortByModified },
                     set: { enabled in Task { await model.setSortByModified(enabled) } }
                 ))
+                Toggle("Compact list", isOn: Binding(
+                    get: { model.compactList },
+                    set: { enabled in Task { await model.setCompactList(enabled) } }
+                ))
+            } header: {
+                Text("Timeline")
+            } footer: {
+                Text("A compact list gives each memo one line: its title, the time, and whether it is pinned or locked. Good for finding something in a long timeline.")
+                    .font(Type.rowMeta)
+                    .foregroundStyle(Theme.inkSoft)
             }
 
             Section {

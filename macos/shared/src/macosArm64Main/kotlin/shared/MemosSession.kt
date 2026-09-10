@@ -146,6 +146,14 @@ class MemosSession {
 
     suspend fun setSortByModified(enabled: Boolean) = MacStack.preferences.setSortByModified(enabled)
 
+    /**
+     * One line per memo instead of a card, for scanning a long timeline rather than reading
+     * it. Local to this Mac: it is a view preference, not something to follow you about.
+     */
+    suspend fun compactList(): Boolean = MacStack.preferences.settings.first().compactList
+
+    suspend fun setCompactList(enabled: Boolean) = MacStack.preferences.setCompactList(enabled)
+
     // MARK: tasks
 
     /**

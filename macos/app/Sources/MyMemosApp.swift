@@ -40,6 +40,7 @@ final class SessionModel: ObservableObject {
     @Published var selection: String?
     @Published var editing: EditorTarget?
     @Published var sortByModified = false
+    @Published var compactList = false
     @Published var mapTiles = false
     @Published var placed: [PlacedMemo] = []
     @Published var taskGroups: [TaskGroup] = []
@@ -107,6 +108,12 @@ final class SessionModel: ObservableObject {
         try? await session.setSortByModified(enabled: enabled)
         sortByModified = enabled
         await reload()
+    }
+
+    /// A view preference only, so there is nothing to reload: the same sections, drawn smaller.
+    func setCompactList(_ enabled: Bool) async {
+        try? await session.setCompactList(enabled: enabled)
+        compactList = enabled
     }
 
     /// Opens a memo from another pane, putting the timeline back on screen.
@@ -319,6 +326,7 @@ final class SessionModel: ObservableObject {
             credentialWarning = "The Keychain is not available, so this session will be forgotten on quit."
         }
         sortByModified = ((try? await session.sortByModified()) as? Bool) ?? false
+        compactList = ((try? await session.compactList()) as? Bool) ?? false
         mapTiles = ((try? await session.mapTilesEnabled()) as? Bool) ?? false
         await TileLoader.shared.setEnabled(mapTiles)
         phase = .working("Looking for a saved account")
@@ -452,6 +460,11 @@ struct RootView: View {
                     model.editSelected()
                 }
                 ToolbarIcon(symbol: "square.and.pencil", help: "New memo") { model.newMemo() }
+
+                ToolbarIcon(symbol: model.compactList ? "rectangle.grid.1x2" : "list.bullet",
+                            help: model.compactList ? "Show full memo cards" : "Show one line per memo") {
+                    Task { await model.setCompactList(!model.compactList) }
+                }
 
                 ToolbarMenu(symbol: model.appearance.symbol, help: "Light or dark") {
                     Picker("Appearance", selection: $model.appearance) {
