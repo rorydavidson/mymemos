@@ -33,15 +33,12 @@ import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.Json
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Everything about the account and the instance that is not a memo. All of it is
  * online-only: these screens are read on demand and edits go straight to the server.
  */
-@Singleton
-class AccountSettingsRepository @Inject constructor(
+class AccountSettingsRepository constructor(
     private val registry: ApiClientRegistry,
     private val accountDao: AccountDao,
     private val json: Json,

@@ -21,11 +21,8 @@ import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class AccountRepository @Inject constructor(
+class AccountRepository constructor(
     private val accountDao: AccountDao,
     private val memoDao: MemoDao,
     private val attachmentDao: AttachmentDao,

@@ -11,11 +11,8 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class TemplateRepository @Inject constructor(private val dao: TemplateDao) {
+class TemplateRepository constructor(private val dao: TemplateDao) {
     val templates: Flow<List<Template>> = dao.observeAll().map { list -> list.map { it.toModel() } }
 
     suspend fun seedDefaultsIfEmpty() {

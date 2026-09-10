@@ -18,15 +18,12 @@ import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Shortcuts are CEL filters the server evaluates, so running one needs a connection. The
  * memos it returns are upserted locally and then shown from Room like everything else.
  */
-@Singleton
-class ShortcutRepository @Inject constructor(
+class ShortcutRepository constructor(
     private val db: MyMemosDatabase,
     private val shortcutDao: ShortcutDao,
     private val memoDao: MemoDao,

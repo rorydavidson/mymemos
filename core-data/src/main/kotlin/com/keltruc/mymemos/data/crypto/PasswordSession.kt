@@ -4,19 +4,15 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * The memo password for the current process. Held in memory by default; "remember on this
  * device" keeps it in Keystore-backed encrypted preferences so locked memos open without
  * a prompt. Forgetting clears both.
  */
-@Singleton
-class PasswordSession @Inject constructor(@ApplicationContext context: Context) {
+class PasswordSession constructor(context: Context) {
     private val prefs: SharedPreferences = EncryptedSharedPreferences.create(
         context,
         "mymemos_memo_password",

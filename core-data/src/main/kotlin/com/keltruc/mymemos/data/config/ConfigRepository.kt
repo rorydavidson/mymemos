@@ -14,16 +14,13 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Reads and writes the hidden config memo. Writes go through the normal outbox, so they
  * sync and merge like any memo; the JSON block is rewritten whole, last writer wins.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-@Singleton
-class ConfigRepository @Inject constructor(
+class ConfigRepository constructor(
     private val memoDao: MemoDao,
     private val memoRepository: MemoRepository,
     private val accountRepository: AccountRepository,

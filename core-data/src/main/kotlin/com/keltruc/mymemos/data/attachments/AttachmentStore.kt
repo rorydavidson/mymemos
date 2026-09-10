@@ -3,17 +3,13 @@ package com.keltruc.mymemos.data.attachments
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /** Local copies of attachment files, in app-private storage, named by attachment localId. */
-@Singleton
-class AttachmentStore @Inject constructor(@ApplicationContext private val context: Context) {
+class AttachmentStore constructor(private val context: Context) {
 
     data class Staged(val localId: String, val file: File, val filename: String, val mimeType: String, val size: Long)
 

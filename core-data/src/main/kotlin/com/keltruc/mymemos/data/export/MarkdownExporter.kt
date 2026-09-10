@@ -13,15 +13,12 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Writes every memo as a Markdown file with YAML front matter into a zip, plus any
  * attachment files held locally. Readable by Obsidian and friends.
  */
-@Singleton
-class MarkdownExporter @Inject constructor(
+class MarkdownExporter constructor(
     private val memoDao: MemoDao,
     private val attachmentStore: AttachmentStore,
 ) {

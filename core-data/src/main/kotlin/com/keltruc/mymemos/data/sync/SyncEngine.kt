@@ -47,15 +47,12 @@ import java.io.IOException
 import kotlin.time.Clock
 import kotlin.time.Instant
 import java.util.UUID
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Push the outbox, then pull changes, then reconcile. Safe to call from a worker and from
  * the UI; a mutex keeps two runs from interleaving.
  */
-@Singleton
-class SyncEngine @Inject constructor(
+class SyncEngine constructor(
     private val db: MyMemosDatabase,
     private val accountDao: AccountDao,
     private val memoDao: MemoDao,

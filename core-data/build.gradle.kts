@@ -2,7 +2,6 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.hilt)
 }
 
 android {
@@ -33,13 +32,8 @@ dependencies {
     // transitively through core-network, which no longer speaks OkHttp directly.
     implementation(libs.okhttp)
 
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
     implementation(libs.security.crypto)
     implementation(libs.datastore.preferences)
-    implementation(libs.work.runtime)
-    implementation(libs.hilt.work)
-    ksp(libs.hilt.androidx.compiler)
     implementation(libs.kotlinx.datetime)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)

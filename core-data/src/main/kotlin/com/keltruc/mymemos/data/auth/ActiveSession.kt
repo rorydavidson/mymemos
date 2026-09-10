@@ -13,15 +13,12 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.Response
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Snapshot of the active account for callers that cannot suspend, such as the image
  * loader's interceptor.
  */
-@Singleton
-class ActiveSession @Inject constructor(
+class ActiveSession constructor(
     accountDao: AccountDao,
     private val registry: ApiClientRegistry,
 ) {

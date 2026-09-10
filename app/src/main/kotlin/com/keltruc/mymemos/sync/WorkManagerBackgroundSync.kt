@@ -1,4 +1,4 @@
-package com.keltruc.mymemos.data.sync
+package com.keltruc.mymemos.sync
 
 import android.content.Context
 import androidx.hilt.work.HiltWorker
@@ -13,19 +13,12 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.keltruc.mymemos.data.sync.BackgroundSync
+import com.keltruc.mymemos.data.sync.SyncEngine
 import com.keltruc.mymemos.database.dao.AccountDao
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
-import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
-import javax.inject.Inject
-import javax.inject.Singleton
 
 @HiltWorker
 class SyncWorker @AssistedInject constructor(
@@ -51,40 +44,13 @@ class SyncWorker @AssistedInject constructor(
     }
 }
 
-/**
- * Two paths to a sync: an immediate in-process run (debounced, so a burst of edits becomes
- * one push) while the app is alive, and WorkManager for background catch-up and retries
- * after the process is gone.
- */
-@Singleton
-class SyncScheduler @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val engine: SyncEngine,
-    private val accountDao: AccountDao,
-) {
-    private val workManager get() = WorkManager.getInstance(context)
+/** The Android half of [BackgroundSync]: catching up after the process is gone. */
+class WorkManagerBackgroundSync(context: Context) : BackgroundSync {
+
+    private val workManager = WorkManager.getInstance(context)
     private val online = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var immediate: Job? = null
 
-    /**
-     * Run soon, once, e.g. after the user saves a memo. [afterMs] holds it back longer, which a
-     * delete uses so there is time to take it back before it reaches the server. Any later call
-     * replaces this one, so a delayed sync can still be brought forward by the next edit.
-     */
-    fun syncNow(full: Boolean = false, afterMs: Long = DEBOUNCE_MS) {
-        immediate?.cancel()
-        immediate = scope.launch {
-            delay(afterMs)
-            val accountId = accountDao.getActive()?.id ?: return@launch
-            when (engine.sync(accountId, fullPull = full)) {
-                SyncEngine.Outcome.Success, is SyncEngine.Outcome.AuthFailed -> Unit
-                is SyncEngine.Outcome.Retry -> enqueueBackground(full)
-            }
-        }
-    }
-
-    private fun enqueueBackground(full: Boolean) {
+    override fun enqueueRetry(full: Boolean) {
         val request = OneTimeWorkRequestBuilder<SyncWorker>()
             .setConstraints(online)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
@@ -93,15 +59,14 @@ class SyncScheduler @Inject constructor(
         workManager.enqueueUniqueWork(NOW, ExistingWorkPolicy.REPLACE, request)
     }
 
-    /** Background catch-up while the app is closed. */
-    fun ensurePeriodic() {
+    override fun ensurePeriodic() {
         val request = PeriodicWorkRequestBuilder<SyncWorker>(30, TimeUnit.MINUTES)
             .setConstraints(online)
             .build()
         workManager.enqueueUniquePeriodicWork(PERIODIC, ExistingPeriodicWorkPolicy.KEEP, request)
     }
 
-    fun cancelAll() {
+    override fun cancelAll() {
         workManager.cancelUniqueWork(NOW)
         workManager.cancelUniqueWork(PERIODIC)
     }
@@ -109,6 +74,5 @@ class SyncScheduler @Inject constructor(
     private companion object {
         const val NOW = "sync-now"
         const val PERIODIC = "sync-periodic"
-        const val DEBOUNCE_MS = 400L
     }
 }

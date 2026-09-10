@@ -5,13 +5,10 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import com.keltruc.mymemos.data.repository.MemoRepository
 import com.keltruc.mymemos.model.Visibility
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.InputStream
 import java.util.zip.ZipInputStream
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Turns Markdown files, or zips of them, into memos. Dates come from the file rather than the
@@ -21,9 +18,8 @@ import javax.inject.Singleton
  * Memos v0.30 has no bulk create, so this is a loop of ordinary creates through the outbox. A file
  * that cannot be read does not stop the rest: the result says what landed and what did not.
  */
-@Singleton
-class MarkdownImporter @Inject constructor(
-    @ApplicationContext private val context: Context,
+class MarkdownImporter constructor(
+    private val context: Context,
     private val memoRepository: MemoRepository,
 ) {
     data class Result(val imported: Int, val skipped: Int, val duplicates: Int, val failures: List<String>)

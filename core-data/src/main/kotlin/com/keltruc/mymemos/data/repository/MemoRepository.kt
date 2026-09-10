@@ -50,16 +50,13 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 import com.keltruc.mymemos.model.NoteColour
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Every write lands in Room and the outbox in one transaction, then a sync is scheduled.
  * Reads only ever observe Room.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-@Singleton
-class MemoRepository @Inject constructor(
+class MemoRepository constructor(
     private val db: MyMemosDatabase,
     private val memoDao: MemoDao,
     private val attachmentDao: AttachmentDao,

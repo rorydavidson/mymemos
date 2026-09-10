@@ -67,6 +67,9 @@ dependencies {
     implementation(project(":core-model"))
     implementation(project(":core-data"))
     implementation(project(":core-database"))
+    // The app wires core-data's plain constructors together itself now, so it names the
+    // network types directly rather than getting them transitively.
+    implementation(project(":core-network"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

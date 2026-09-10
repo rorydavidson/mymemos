@@ -10,12 +10,9 @@ import com.keltruc.mymemos.network.dto.MemoShareDto
 import io.ktor.client.plugins.ResponseException
 import kotlinx.serialization.json.Json
 import kotlin.time.Instant
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /** Public share links. Online only: a link that cannot reach the server is no use anyway. */
-@Singleton
-class ShareRepository @Inject constructor(
+class ShareRepository constructor(
     private val registry: ApiClientRegistry,
     private val json: Json,
 ) {

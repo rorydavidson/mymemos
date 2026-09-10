@@ -10,12 +10,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.keltruc.mymemos.data.timeline.TimelineGrouping
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import javax.inject.Inject
-import javax.inject.Singleton
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore("settings")
 
@@ -43,8 +40,7 @@ data class Settings(
     val sortByModified: Boolean = false,
 )
 
-@Singleton
-class AppPreferences @Inject constructor(@ApplicationContext private val context: Context) {
+class AppPreferences constructor(private val context: Context) {
     private val sortCompleted = booleanPreferencesKey("sort_completed_tasks")
     private val dynamic = booleanPreferencesKey("dynamic_colour")
     private val tiles = booleanPreferencesKey("map_tiles")
