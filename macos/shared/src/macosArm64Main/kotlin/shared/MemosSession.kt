@@ -78,7 +78,22 @@ class MemosSession {
     }
 
     suspend fun signedInAs(): String? = db.accountDao().getActive()?.let {
-        it.displayName.ifEmpty { it.username }
+        serverVersion = it.serverVersion
+        displayName = it.displayName.ifEmpty { it.username }
+        displayName
+    }
+
+    /**
+     * Whether credentials can actually be stored. The Keychain refuses an application it
+     * cannot identify, so an unsigned build can sign in happily and then forget everything on
+     * quit. Better to say so than to look broken later.
+     */
+    fun credentialStoreAvailable(): Boolean {
+        val probe = "probe"
+        Keychain.write(probe, "ok")
+        val read = Keychain.read(probe)
+        Keychain.delete(probe)
+        return read == "ok"
     }
 
     private fun Memo.toRow(): MemoRow = MemoRow(

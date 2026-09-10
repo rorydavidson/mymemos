@@ -22,8 +22,25 @@ final class SessionModel: ObservableObject {
     @Published var memos: [MemoRow] = []
     @Published var serverVersion = ""
     @Published var displayName = ""
+    @Published var credentialWarning: String?
 
     private let session = MemosSession()
+
+    /// Credentials live in the Keychain, so a signed-in account survives a quit.
+    func restore() async {
+        if !session.credentialStoreAvailable() {
+            credentialWarning = "The Keychain is not available, so this session will be forgotten on quit."
+        }
+        phase = .working("Looking for a saved account")
+        guard let who = try? await session.signedInAs(), !who.isEmpty else {
+            phase = .signedOut
+            return
+        }
+        displayName = who
+        serverVersion = session.serverVersion
+        await load()
+        await sync()
+    }
 
     var canSignIn: Bool {
         !server.isEmpty && !username.isEmpty && !password.isEmpty && phase != .working("")
@@ -120,6 +137,10 @@ struct SignInView: View {
             if case let .failed(message) = model.phase {
                 Text(message).font(.callout).foregroundStyle(.red).textSelection(.enabled)
             }
+            if let warning = model.credentialWarning {
+                Label(warning, systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(.orange)
+            }
         }
         .padding(32)
         .frame(width: 460)
@@ -174,6 +195,7 @@ struct RootView: View {
             }
         }
         .frame(minWidth: 460, minHeight: 520)
+        .task { await model.restore() }
     }
 }
 

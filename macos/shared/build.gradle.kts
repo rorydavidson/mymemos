@@ -27,6 +27,10 @@ kotlin {
             implementation(libs.sqlite.bundled)
             implementation(libs.datastore.preferences.core)
         }
-        all { languageSettings.optIn("kotlin.time.ExperimentalTime") }
+        all {
+            languageSettings.optIn("kotlin.time.ExperimentalTime")
+            languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi")
+            languageSettings.optIn("kotlinx.cinterop.BetaInteropApi")
+        }
     }
 }

@@ -58,35 +58,52 @@ internal object MacStack {
     }
 
     /**
-     * In memory for now. The Keychain-backed store lands with the rest of the macOS work;
-     * until then the app asks for a password each launch, which is honest rather than
-     * pretending to remember one.
+     * The Keychain, keyed the same way the Android side namespaces its encrypted preferences,
+     * so an account's token, its cookies and the name of the token it minted sit together and
+     * a sign-out clears the lot.
      */
-    private class MemorySecrets : AccountSecrets {
-        private var token: String? = null
-        private var pat = false
-        private var patName: String? = null
-        private var cookieBlob: String? = null
-        override suspend fun accessToken() = token
-        override suspend fun updateAccessToken(token: String, expiresAt: String?) { this.token = token }
-        override suspend fun isPersonalAccessToken() = pat
-        override suspend fun cookies() = cookieBlob
-        override suspend fun saveCookies(serialised: String) { cookieBlob = serialised }
+    private class KeychainSecrets(private val accountKey: String) : AccountSecrets {
+
+        private fun key(suffix: String) = "$accountKey.$suffix"
+
+        override suspend fun accessToken(): String? = Keychain.read(key(ACCESS_TOKEN))
+
+        override suspend fun updateAccessToken(token: String, expiresAt: String?) {
+            Keychain.write(key(ACCESS_TOKEN), token)
+            expiresAt?.let { Keychain.write(key(EXPIRES_AT), it) } ?: Keychain.delete(key(EXPIRES_AT))
+        }
+
+        override suspend fun isPersonalAccessToken(): Boolean = Keychain.read(key(IS_PAT)) == "true"
+
+        override suspend fun cookies(): String? = Keychain.read(key(COOKIES))
+
+        override suspend fun saveCookies(serialised: String) = Keychain.write(key(COOKIES), serialised)
+
         override suspend fun setPersonalAccessToken(token: String, tokenResourceName: String?) {
-            this.token = token
-            pat = true
-            patName = tokenResourceName
+            Keychain.write(key(ACCESS_TOKEN), token)
+            Keychain.write(key(IS_PAT), "true")
+            tokenResourceName?.let { Keychain.write(key(PAT_NAME), it) } ?: Keychain.delete(key(PAT_NAME))
+            Keychain.delete(key(EXPIRES_AT))
         }
-        override suspend fun mintedTokenName() = patName
+
+        override suspend fun mintedTokenName(): String? = Keychain.read(key(PAT_NAME))
+
         override suspend fun setPasswordSession(accessToken: String, expiresAt: String?) {
-            token = accessToken
-            pat = false
+            Keychain.write(key(ACCESS_TOKEN), accessToken)
+            expiresAt?.let { Keychain.write(key(EXPIRES_AT), it) } ?: Keychain.delete(key(EXPIRES_AT))
+            Keychain.write(key(IS_PAT), "false")
         }
+
         override suspend fun clear() {
-            token = null
-            pat = false
-            patName = null
-            cookieBlob = null
+            listOf(ACCESS_TOKEN, EXPIRES_AT, IS_PAT, COOKIES, PAT_NAME).forEach { Keychain.delete(key(it)) }
+        }
+
+        private companion object {
+            const val ACCESS_TOKEN = "access_token"
+            const val EXPIRES_AT = "expires_at"
+            const val IS_PAT = "is_pat"
+            const val COOKIES = "cookies"
+            const val PAT_NAME = "pat_name"
         }
     }
 
@@ -95,7 +112,7 @@ internal object MacStack {
     val registry: ApiClientRegistry by lazy {
         ApiClientRegistry(
             MemosApiFactory(),
-            AccountSecretsFactory { key -> secretsByAccount.getOrPut(key) { MemorySecrets() } },
+            AccountSecretsFactory { key -> secretsByAccount.getOrPut(key) { KeychainSecrets(key) } },
         )
     }
 
