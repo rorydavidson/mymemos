@@ -18,7 +18,13 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.Dispatchers
 import okio.Path.Companion.toPath
 import platform.Foundation.NSApplicationSupportDirectory
+import platform.Foundation.NSData
 import platform.Foundation.NSFileManager
+import platform.Foundation.NSString
+import platform.Foundation.NSUTF8StringEncoding
+import platform.Foundation.dataWithContentsOfFile
+import platform.Foundation.stringWithContentsOfFile
+import platform.Foundation.writeToFile
 import platform.Foundation.NSURL
 import platform.Foundation.NSUserDomainMask
 
@@ -126,4 +132,21 @@ internal object MacStack {
     }
 
     val widgets: WidgetRefresher = WidgetRefresher.None
+
+    // MARK: the avatar, kept between launches
+
+    private val avatarFile get() = "$supportDirectory/avatar.bin"
+    private val avatarSourceFile get() = "$supportDirectory/avatar.source"
+
+    /** The stored copy, if it came from the same URL the account still points at. */
+    fun cachedAvatar(url: String): ByteArray? {
+        val storedUrl = NSString.stringWithContentsOfFile(avatarSourceFile, NSUTF8StringEncoding, null)
+        if (storedUrl != url) return null
+        return NSData.dataWithContentsOfFile(avatarFile)?.toByteArray()?.takeIf { it.isNotEmpty() }
+    }
+
+    fun cacheAvatar(url: String, bytes: ByteArray) {
+        bytes.toNSData().writeToFile(avatarFile, true)
+        (url as NSString).writeToFile(avatarSourceFile, true, NSUTF8StringEncoding, null)
+    }
 }

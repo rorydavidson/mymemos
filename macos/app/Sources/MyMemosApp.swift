@@ -46,6 +46,7 @@ final class SessionModel: ObservableObject {
     @Published var throwbacks: [Throwback] = []
     @Published var activeDays: Set<String> = []
     @Published var streak = 0
+    @Published var avatar: NSImage?
 
     /// Per-machine, so it lives in UserDefaults rather than the synced settings memo.
     @Published var appearance: Appearance = .system {
@@ -95,6 +96,7 @@ final class SessionModel: ObservableObject {
         try? await session.signOut()
         sections = []
         tags = []
+        avatar = nil
         selection = nil
         revealed.removeAll()
         displayName = ""
@@ -121,6 +123,15 @@ final class SessionModel: ObservableObject {
     }
 
     // MARK: places
+
+    /// The avatar, fetched once and kept for the session. Nil means show an initial.
+    func loadAvatar() async {
+        guard let bytes = try? await session.avatarBytes() else {
+            avatar = nil
+            return
+        }
+        avatar = NSImage(data: bytes.toData())
+    }
 
     func loadPlaces() async {
         mapTiles = ((try? await session.mapTilesEnabled()) as? Bool) ?? false
@@ -317,6 +328,7 @@ final class SessionModel: ObservableObject {
         }
         displayName = who
         serverVersion = session.serverVersion
+        Task { await loadAvatar() }
         await reload()
         await sync()
     }
@@ -328,6 +340,7 @@ final class SessionModel: ObservableObject {
             displayName = session.displayName
             serverVersion = session.serverVersion
             password = ""
+            Task { await loadAvatar() }
             await sync()
         } catch {
             phase = .failed(readable(error))

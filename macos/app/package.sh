@@ -34,7 +34,12 @@ if [ -z "$SIGN_IDENTITY" ]; then
         | grep "Developer ID Application" | head -1 | sed -E 's/.*"(.*)"/\1/' || true)
 fi
 
-if [ -n "$SIGN_IDENTITY" ]; then
+if [ -z "$SIGN_IDENTITY" ] && security find-certificate -c "MyMemos Local Signing" >/dev/null 2>&1; then
+    echo "==> No Developer ID; signing with the local certificate."
+    echo "    Stable enough for the Keychain, still refused by Gatekeeper elsewhere."
+    codesign --force --deep --sign "MyMemos Local Signing" "$APP"
+    SIGNED=local
+elif [ -n "$SIGN_IDENTITY" ]; then
     echo "==> Signing as: $SIGN_IDENTITY"
     # --options runtime is the hardened runtime, which notarisation requires.
     codesign --force --deep --timestamp --options runtime \

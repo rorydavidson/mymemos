@@ -3,6 +3,7 @@ package shared
 import com.keltruc.mymemos.data.crypto.MemoCipher
 import com.keltruc.mymemos.data.crypto.PasswordSession
 import com.keltruc.mymemos.data.crypto.RememberedPassword
+import com.keltruc.mymemos.data.account.AvatarSource
 import com.keltruc.mymemos.data.mapper.remoteUrl
 import com.keltruc.mymemos.data.repository.AccountRepository
 import com.keltruc.mymemos.data.repository.MemoRepository
@@ -15,6 +16,7 @@ import com.keltruc.mymemos.data.text.TaskLine
 import com.keltruc.mymemos.data.timeline.TimelineGrouping
 import com.keltruc.mymemos.model.Memo
 import com.keltruc.mymemos.model.Visibility
+import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.readRawBytes
 import kotlinx.coroutines.flow.first
@@ -238,6 +240,44 @@ class MemosSession {
             }
         }
     }
+
+    // MARK: the account's avatar
+
+    /**
+     * The account's avatar, or null when there is none to show.
+     *
+     * A `data:` avatar is decoded here. One on the account's own server is fetched with the
+     * credential, like any other file. One pointing somewhere else is fetched without it: an
+     * avatar URL is set on the server and would otherwise be a way to collect bearer tokens
+     * from whoever renders it.
+     */
+    suspend fun avatarBytes(): ByteArray? {
+        val account = db.accountDao().getActive() ?: return null
+        return when (val source = AvatarSource.of(account.avatarUrl, account.serverUrl)) {
+            is AvatarSource.None -> null
+
+            is AvatarSource.Bytes -> source.bytes
+
+            is AvatarSource.Url -> {
+                // Avatars are full-size uploads rather than thumbnails, so this one is well
+                // over a megabyte for a circle drawn at 26 points. Fetch it once and keep it.
+                MacStack.cachedAvatar(source.url)?.let { return it }
+
+                val client = if (source.sameOrigin) {
+                    registry.client(account.serverUrl, account.userResourceName)
+                } else {
+                    anonymous
+                }
+                runCatching { client.get(source.url).readRawBytes() }
+                    .onFailure { println("W/Avatar: could not fetch ${source.url}: $it") }
+                    .getOrNull()
+                    ?.also { MacStack.cacheAvatar(source.url, it) }
+            }
+        }
+    }
+
+    /** No credential attached, for anything that is not the account's own server. */
+    private val anonymous by lazy { HttpClient() }
 
     // MARK: places
 
