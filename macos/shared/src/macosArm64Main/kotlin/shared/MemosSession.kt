@@ -8,7 +8,9 @@ import com.keltruc.mymemos.data.repository.AccountRepository
 import com.keltruc.mymemos.data.repository.MemoRepository
 import com.keltruc.mymemos.data.sync.SyncEngine
 import com.keltruc.mymemos.data.sync.SyncScheduler
+import com.keltruc.mymemos.data.text.DueDateParser
 import com.keltruc.mymemos.data.text.MemoTitle
+import com.keltruc.mymemos.data.text.TaskLine
 import com.keltruc.mymemos.data.timeline.TimelineGrouping
 import com.keltruc.mymemos.model.Memo
 import com.keltruc.mymemos.model.Visibility
@@ -17,7 +19,9 @@ import io.ktor.client.statement.readRawBytes
 import kotlinx.coroutines.flow.first
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
 import kotlinx.datetime.todayIn
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
@@ -117,6 +121,101 @@ class MemosSession {
             visibility = memo.visibility.name.lowercase().replaceFirstChar { it.uppercase() },
             wordCount = memo.displayContent.split(Regex("\\s+")).count { it.isNotBlank() },
         )
+    }
+
+    // MARK: tasks
+
+    /**
+     * Every unticked task across the account's memos, grouped by the memo it lives in and
+     * ordered by when it is due, with undated ones last. The parsing is shared with the phone,
+     * so a completion can never mean a different day than it shows.
+     */
+    suspend fun openTasks(): List<TaskGroup> {
+        val account = db.accountDao().getActive() ?: return emptyList()
+        val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
+        val labels = MacDueDateLabels()
+
+        return memos.observeMemosWithOpenTasks(account.id).first()
+            .filter { !it.isLocked }
+            .map { memo ->
+                val tasks = TaskLine.openTasks(memo.displayContent).map { open ->
+                    val due = DueDateParser.parse(open.text, today)?.date
+                    TaskRow(
+                        memoLocalId = memo.localId,
+                        lineIndex = open.lineIndex,
+                        text = open.text,
+                        dueLabel = due?.let { labels.label(it, today) },
+                        overdue = due != null && due < today,
+                        dueSort = due?.toEpochDays()?.toLong() ?: Long.MAX_VALUE,
+                    )
+                }
+                TaskGroup(
+                    memoLocalId = memo.localId,
+                    memoTitle = MemoTitle.of(memo.displayContent) ?: memo.firstLine(),
+                    tasks = tasks,
+                    earliestDue = tasks.minOfOrNull { it.dueSort } ?: Long.MAX_VALUE,
+                )
+            }
+            .filter { it.tasks.isNotEmpty() }
+            .sortedWith(compareBy({ it.earliestDue }, { it.memoTitle }))
+    }
+
+    /** Ticks a task off, which edits the memo's own text. */
+    suspend fun completeTask(memoLocalId: String, lineIndex: Int) {
+        val memo = memos.observeMemoOnce(memoLocalId) ?: return
+        TaskLine.toggle(memo.content, lineIndex, checked = true)?.let {
+            memos.updateContent(memoLocalId, it)
+        }
+    }
+
+    // MARK: review
+
+    /** How many days in a row have something written, counting back from today. */
+    suspend fun streak(): Int {
+        val account = db.accountDao().getActive() ?: return 0
+        val zone = TimeZone.currentSystemDefault()
+        val days = memos.observeActiveDays(account.id, zone).first()
+        var day = Clock.System.todayIn(zone)
+        if (day !in days) day = day.minus(1, DateTimeUnit.DAY)
+        var count = 0
+        while (day in days) {
+            count++
+            day = day.minus(1, DateTimeUnit.DAY)
+        }
+        return count
+    }
+
+    /** The last year of writing, as one entry per day that has any. */
+    suspend fun activeDays(): List<String> {
+        val account = db.accountDao().getActive() ?: return emptyList()
+        return memos.observeActiveDays(account.id).first().map { it.toString() }.sorted()
+    }
+
+    /**
+     * Memos written on this day in earlier months and years, which is what "On this day" shows.
+     */
+    suspend fun onThisDay(): List<Throwback> {
+        val account = db.accountDao().getActive() ?: return emptyList()
+        val zone = TimeZone.currentSystemDefault()
+        val today = Clock.System.todayIn(zone)
+        val days = memos.observeActiveDays(account.id, zone).first()
+            .filter { it != today && it.day == today.day && it < today }
+            .sortedDescending()
+
+        return days.flatMap { day ->
+            val years = today.year - day.year
+            val months = years * 12 + (today.month.ordinal - day.month.ordinal)
+            memos.observeCreatedOn(account.id, day, zone).first().map { memo ->
+                Throwback(
+                    row = memo.toRow(),
+                    whenLabel = if (years >= 1) {
+                        "$years year${if (years == 1) "" else "s"} ago"
+                    } else {
+                        "$months month${if (months == 1) "" else "s"} ago"
+                    },
+                )
+            }
+        }
     }
 
     // MARK: attachments
@@ -342,6 +441,27 @@ private class KeychainPassword : RememberedPassword {
         const val KEY = "memo_password"
     }
 }
+
+/** An unticked task, and where in its memo it lives. */
+data class TaskRow(
+    val memoLocalId: String,
+    val lineIndex: Int,
+    val text: String,
+    val dueLabel: String?,
+    val overdue: Boolean,
+    val dueSort: Long,
+)
+
+/** The open tasks of one memo. */
+data class TaskGroup(
+    val memoLocalId: String,
+    val memoTitle: String,
+    val tasks: List<TaskRow>,
+    val earliestDue: Long,
+)
+
+/** A memo resurfaced from the same date in an earlier month or year. */
+data class Throwback(val row: MemoRow, val whenLabel: String)
 
 /** One attachment, as the strip under a memo shows it. */
 data class AttachmentRow(

@@ -32,6 +32,13 @@ final class SessionModel: ObservableObject {
     @Published var wrongPassword = false
     /// Revealed text for locked memos, by localId. Display only: nothing stored changes.
     @Published var revealed: [String: String] = [:]
+    @Published var pane: Pane = .memos
+    @Published var taskGroups: [TaskGroup] = []
+    @Published var throwbacks: [Throwback] = []
+    @Published var activeDays: Set<String> = []
+    @Published var streak = 0
+
+    enum Pane: Hashable { case memos, tasks, review }
 
     private let session = MemosSession()
 
@@ -51,6 +58,25 @@ final class SessionModel: ObservableObject {
     /// Goes through the one session: building another would open a second database.
     func detail(for localId: String) async -> MemoDetail? {
         try? await session.memo(localId: localId)
+    }
+
+    // MARK: tasks and review
+
+    func loadTasks() async {
+        taskGroups = (try? await session.openTasks()) ?? []
+    }
+
+    func completeTask(_ memoLocalId: String, _ lineIndex: Int) async {
+        try? await session.completeTask(memoLocalId: memoLocalId, lineIndex: Int32(lineIndex))
+        await loadTasks()
+        await reload()
+        await sync()
+    }
+
+    func loadReview() async {
+        streak = Int((try? await session.streak()) ?? 0)
+        activeDays = Set((try? await session.activeDays()) ?? [])
+        throwbacks = (try? await session.onThisDay()) ?? []
     }
 
     // MARK: attachments
@@ -290,9 +316,9 @@ struct RootView: View {
             Sidebar(model: model)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
         } content: {
-            MemoListView(model: model, selection: $selection)
-                .navigationSplitViewColumnWidth(min: 260, ideal: 330, max: 460)
-                .navigationTitle(model.activeTag.map { "#\($0)" } ?? "Memos")
+            content
+                .navigationSplitViewColumnWidth(min: 280, ideal: 350, max: 520)
+                .navigationTitle(title)
                 .navigationSubtitle(subtitle)
         } detail: {
             DetailPane(model: model, selection: selection, edit: { editing = EditorTarget(localId: $0) })
@@ -327,10 +353,42 @@ struct RootView: View {
         }
     }
 
+    @ViewBuilder
+    private var content: some View {
+        switch model.pane {
+        case .memos:
+            MemoListView(model: model, selection: $selection)
+        case .tasks:
+            TasksView(model: model) { open($0) }
+        case .review:
+            ReviewView(model: model) { open($0) }
+        }
+    }
+
+    /// Jumping to a memo from another pane: show it, and put the timeline back on screen.
+    private func open(_ localId: String) {
+        selection = localId
+        model.pane = .memos
+    }
+
+    private var title: String {
+        switch model.pane {
+        case .memos: return model.activeTag.map { "#\($0)" } ?? "Memos"
+        case .tasks: return "Tasks"
+        case .review: return "Review"
+        }
+    }
+
     private var subtitle: String {
         if case let .working(what) = model.phase { return what }
         if case let .failed(message) = model.phase { return message }
-        return "\(model.memoCount) memos"
+        switch model.pane {
+        case .memos: return "\(model.memoCount) memos"
+        case .tasks:
+            let count = model.taskGroups.reduce(0) { $0 + $1.tasks.count }
+            return "\(count) open across \(model.taskGroups.count) memos"
+        case .review: return model.streak == 1 ? "1 day in a row" : "\(model.streak) days in a row"
+        }
     }
 }
 
@@ -342,9 +400,9 @@ struct Sidebar: View {
     var body: some View {
         List {
             Section("Library") {
-                Label("All memos", systemImage: "tray.full")
-                    .foregroundStyle(model.activeTag == nil ? Theme.accent : Theme.ink)
-                    .onTapGesture { model.activeTag = nil }
+                sidebarItem("All memos", "tray.full", pane: .memos, clearsTag: true)
+                sidebarItem("Tasks", "checklist", pane: .tasks)
+                sidebarItem("Review", "calendar.badge.clock", pane: .review)
             }
             if !model.tags.isEmpty {
                 Section("Tags") {
@@ -355,13 +413,27 @@ struct Sidebar: View {
                         }
                         .contentShape(Rectangle())
                         .foregroundStyle(model.activeTag == tag ? Theme.accent : Theme.ink)
-                        .onTapGesture { model.activeTag = model.activeTag == tag ? nil : tag }
+                        .onTapGesture {
+                            model.activeTag = model.activeTag == tag ? nil : tag
+                            model.pane = .memos
+                        }
                     }
                 }
             }
         }
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) { accountFooter }
+    }
+
+    private func sidebarItem(_ title: String, _ symbol: String, pane: SessionModel.Pane, clearsTag: Bool = false) -> some View {
+        let active = model.pane == pane && (!clearsTag || model.activeTag == nil)
+        return Label(title, systemImage: symbol)
+            .foregroundStyle(active ? Theme.accent : Theme.ink)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                model.pane = pane
+                if clearsTag { model.activeTag = nil }
+            }
     }
 
     private var accountFooter: some View {

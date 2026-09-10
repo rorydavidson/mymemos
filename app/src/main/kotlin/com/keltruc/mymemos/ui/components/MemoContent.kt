@@ -41,6 +41,7 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.keltruc.mymemos.data.text.TaskLine
 import com.keltruc.mymemos.model.TagStyle
 import com.keltruc.mymemos.ui.tags.LocalTagStyles
 import com.keltruc.mymemos.ui.tags.label
@@ -353,14 +354,6 @@ private fun Table(table: TableBlock, onTagClick: ((String) -> Unit)?) {
     }
 }
 
-/** Flips the checkbox on [lineIndex] and returns the new content, or null if not a task line. */
-fun toggleTaskLine(content: String, lineIndex: Int, checked: Boolean): String? {
-    val lines = content.lines().toMutableList()
-    val line = lines.getOrNull(lineIndex) ?: return null
-    val m = Regex("^(\\s*(?:[-*+]|\\d+[.)]) )\\[([ xX])](.*)$").matchEntire(line) ?: return null
-    lines[lineIndex] = "${m.groupValues[1]}[${if (checked) "x" else " "}]${m.groupValues[3]}"
-    return lines.joinToString("\n")
-}
 
 @Suppress("unused")
 private val keepContext = LocalContext

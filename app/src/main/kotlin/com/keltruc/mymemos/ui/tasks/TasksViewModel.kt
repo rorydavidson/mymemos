@@ -6,7 +6,7 @@ import com.keltruc.mymemos.data.repository.AccountRepository
 import com.keltruc.mymemos.data.repository.MemoRepository
 import com.keltruc.mymemos.data.text.DueDateParser
 import com.keltruc.mymemos.model.Memo
-import com.keltruc.mymemos.ui.components.toggleTaskLine
+import com.keltruc.mymemos.data.text.TaskLine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlin.time.Clock
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -34,18 +34,13 @@ class TasksViewModel @Inject constructor(
     accountRepository: AccountRepository,
     private val memoRepository: MemoRepository,
 ) : ViewModel() {
-    private val taskLine = Regex("^(\\s*)(?:[-*+]|\\d+[.)]) \\[ ] (.*)$")
-
     val groups: StateFlow<List<TaskGroup>> = accountRepository.activeAccount.filterNotNull()
         .flatMapLatest { memoRepository.observeMemosWithOpenTasks(it.id) }
         .map { memos ->
             val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
             memos.filter { !it.isLocked }.map { memo ->
-                val tasks = memo.displayContent.lines().mapIndexedNotNull { i, line ->
-                    taskLine.matchEntire(line)?.let { m ->
-                        val text = m.groupValues[2]
-                        OpenTask(memo, i, text, DueDateParser.parse(text, today)?.date)
-                    }
+                val tasks = TaskLine.openTasks(memo.displayContent).map {
+                    OpenTask(memo, it.lineIndex, it.text, DueDateParser.parse(it.text, today)?.date)
                 }
                 TaskGroup(memo, tasks)
             }.filter { it.tasks.isNotEmpty() }
@@ -54,6 +49,6 @@ class TasksViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun complete(task: OpenTask) = viewModelScope.launch {
-        toggleTaskLine(task.memo.content, task.lineIndex, true)?.let { memoRepository.updateContent(task.memo.localId, it) }
+        TaskLine.toggle(task.memo.content, task.lineIndex, true)?.let { memoRepository.updateContent(task.memo.localId, it) }
     }
 }

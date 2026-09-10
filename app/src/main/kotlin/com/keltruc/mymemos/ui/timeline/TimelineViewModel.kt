@@ -15,7 +15,7 @@ import com.keltruc.mymemos.model.Account
 import com.keltruc.mymemos.model.Memo
 import com.keltruc.mymemos.model.MemoState
 import com.keltruc.mymemos.model.NoteColour
-import com.keltruc.mymemos.ui.components.toggleTaskLine
+import com.keltruc.mymemos.data.text.TaskLine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlin.time.Clock
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -242,7 +242,7 @@ class TimelineViewModel @Inject constructor(
     fun setColour(memo: Memo, colour: NoteColour?) = viewModelScope.launch { memoRepository.setColour(memo.localId, colour) }
 
     fun toggleTask(memo: Memo, lineIndex: Int, checked: Boolean) = viewModelScope.launch {
-        toggleTaskLine(memo.content, lineIndex, checked)?.let { memoRepository.updateContent(memo.localId, it) }
+        TaskLine.toggle(memo.content, lineIndex, checked)?.let { memoRepository.updateContent(memo.localId, it) }
     }
 
     fun reauthenticate(password: String) = viewModelScope.launch {

@@ -16,7 +16,7 @@ import com.keltruc.mymemos.model.MemoState
 import com.keltruc.mymemos.model.Reaction
 import com.keltruc.mymemos.model.Reference
 import com.keltruc.mymemos.navigation.MemoDetailRoute
-import com.keltruc.mymemos.ui.components.toggleTaskLine
+import com.keltruc.mymemos.data.text.TaskLine
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -195,9 +195,9 @@ class MemoDetailViewModel @AssistedInject constructor(
         if (m.isLocked) {
             val plain = unlockedText.value ?: return@launch
             val pw = passwordSession.current() ?: return@launch
-            toggleTaskLine(plain, lineIndex, checked)?.let { memoRepository.updateLockedContent(m.localId, it, pw) }
+            TaskLine.toggle(plain, lineIndex, checked)?.let { memoRepository.updateLockedContent(m.localId, it, pw) }
         } else {
-            toggleTaskLine(m.content, lineIndex, checked)?.let { memoRepository.updateContent(m.localId, it) }
+            TaskLine.toggle(m.content, lineIndex, checked)?.let { memoRepository.updateContent(m.localId, it) }
         }
     }
 
