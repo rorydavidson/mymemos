@@ -60,3 +60,14 @@ enum Hint {
     static let firstMemo = "Tap the pencil to write the first one."
     #endif
 }
+
+/// Words that differ by platform, kept out of the views that use them.
+enum Platform {
+    #if os(macOS)
+    static let settingsAppName = "System Settings"
+    static let locationNote = " No Apple location service is used either way."
+    #else
+    static let settingsAppName = "Settings"
+    static let locationNote = " Your own location is only read when you add it to a memo."
+    #endif
+}

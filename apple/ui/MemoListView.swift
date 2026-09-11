@@ -168,14 +168,29 @@ struct MemoRowView: View {
         memo.pinned || memo.locked || memo.hasTasks || memo.attachmentCount > 0
     }
 
-    /// The body without the line already used as the title, so the preview is not a repeat.
+        /// The body without the line already used as the title, so the preview is not a repeat,
+    /// and without the Markdown markers, so a task list reads as its tasks rather than as
+    /// brackets. A preview is a taste of the text, not the text.
     private var bodyPreview: String {
         let lines = memo.body.components(separatedBy: "\n")
         let remainder = lines.drop { $0.trimmingCharacters(in: .whitespaces).isEmpty }.dropFirst()
         return remainder
-            .joined(separator: " ")
-            .replacingOccurrences(of: "#", with: "")
+            .map(Self.plain)
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static let marker = try! NSRegularExpression(
+        pattern: "^\\s*(?:[-*+]\\s+(?:\\[[ xX]\\]\\s+)?|\\d+[.)]\\s+|>\\s+|#{1,6}\\s+)"
+    )
+    private static let emphasis = try! NSRegularExpression(pattern: "[*_`~]{1,3}")
+
+    private static func plain(_ line: String) -> String {
+        let all = { (s: String) in NSRange(location: 0, length: (s as NSString).length) }
+        var text = marker.stringByReplacingMatches(in: line, range: all(line), withTemplate: "")
+        text = emphasis.stringByReplacingMatches(in: text, range: all(text), withTemplate: "")
+        return text.replacingOccurrences(of: "#", with: "").trimmingCharacters(in: .whitespaces)
     }
 }
 

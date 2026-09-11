@@ -45,8 +45,13 @@ struct MemoDetailView: View {
                 Divider().padding(.top, 4)
                 footer
             }
+                        #if os(macOS)
             .padding(.horizontal, 40)
             .padding(.top, 32)
+            #else
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            #endif
             .padding(.bottom, 48)
             .frame(maxWidth: Theme.readingWidth + 80, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -146,7 +151,8 @@ struct MemoDetailView: View {
         .background(Theme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
     }
 
-    private var footer: some View {
+        private var footer: some View {
+        #if os(macOS)
         HStack(spacing: 26) {
             fact("Created", detail.created)
             fact("Last changed", detail.updated)
@@ -154,6 +160,16 @@ struct MemoDetailView: View {
             if !memo.locked { fact("Words", "\(detail.wordCount)") }
             Spacer()
         }
+        #else
+        // A phone is too narrow for four columns; one fact per line reads better than
+        // labels broken mid-word.
+        VStack(alignment: .leading, spacing: 8) {
+            fact("Created", detail.created)
+            fact("Last changed", detail.updated)
+            fact("Visibility", detail.visibility)
+            if !memo.locked { fact("Words", "\(detail.wordCount)") }
+        }
+        #endif
     }
 
     /// Where the memo was written. The coordinates are the memo's own, and no tile is fetched

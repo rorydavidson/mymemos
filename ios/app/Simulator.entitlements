@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      For the script-built simulator bundle only. iOS refuses Keychain access to an app with
+      no application identifier, simulator included, so the ad hoc signature carries one. The
+      team is a placeholder: the simulator checks that it is present, not that it is real.
+      Xcode writes the equivalent itself for the generated project.
+    -->
+    <key>application-identifier</key>
+    <string>LOCAL.com.keltruc.mymemos.ios</string>
+    <key>keychain-access-groups</key>
+    <array>
+        <string>LOCAL.com.keltruc.mymemos.ios</string>
+    </array>
+    <key>com.apple.security.get-task-allow</key>
+    <true/>
+</dict>
+</plist>

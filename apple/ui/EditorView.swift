@@ -24,8 +24,34 @@ struct EditorView: View {
     private var isNew: Bool { editing == nil }
 
     var body: some View {
+        #if os(macOS)
+        panel
+        #else
+        NavigationStack {
+            panel
+                .navigationTitle(isNew ? "New memo" : "Edit memo")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(isNew ? "Save" : "Update") { Task { await save() } }
+                            .disabled(saving || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+        }
+        .interactiveDismissDisabled(!text.isEmpty)
+        #endif
+    }
+
+    private var panel: some View {
         VStack(spacing: 0) {
+            #if os(macOS)
             toolbar
+            #else
+            options
+            #endif
             Divider()
 
             FormatBar { pendingEdit = $0 }
@@ -52,6 +78,32 @@ struct EditorView: View {
     }
 
     // MARK: Pieces
+
+    /// Visibility, pin and preview on a phone: the buttons that are not Cancel or Save.
+    private var options: some View {
+        HStack(spacing: 14) {
+            Picker("Visibility", selection: $visibility) {
+                Text("Private").tag("PRIVATE")
+                Text("Protected").tag("PROTECTED")
+                Text("Public").tag("PUBLIC")
+            }
+            .labelsHidden()
+
+            Spacer()
+
+            Toggle(isOn: $pinned) {
+                Image(systemName: pinned ? "pin.fill" : "pin")
+            }
+            .toggleStyle(.button)
+
+            Toggle(isOn: $showPreview) {
+                Image(systemName: showPreview ? "eye.fill" : "eye")
+            }
+            .toggleStyle(.button)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+    }
 
     private var toolbar: some View {
         HStack(spacing: 12) {
