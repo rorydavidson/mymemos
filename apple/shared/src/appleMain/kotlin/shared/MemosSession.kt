@@ -996,6 +996,24 @@ class MemosSession {
 
     // MARK: tag styles
 
+    /**
+     * How many memos carry each tag, over the whole account rather than whatever the
+     * timeline happens to be showing, most used first. The same counting observeTags does.
+     */
+    suspend fun tagCounts(): List<TagCount> {
+        val account = db.accountDao().getActive() ?: return emptyList()
+        return db.memoDao().observeTagStrings(account.id).first()
+            .flatMap { it.split(com.keltruc.mymemos.database.entity.MemoEntity.TAG_SEPARATOR) }
+            .filter { it.isNotEmpty() && !com.keltruc.mymemos.data.text.ColourTag.isColourTag(it) }
+            .groupingBy { it }.eachCount()
+            .entries.sortedByDescending { it.value }
+            .map { TagCount(it.key, it.value) }
+    }
+
+    /** The emoji offered for a tag, by category; any emoji can still be typed. */
+    fun emojiCatalogue(): List<EmojiGroup> =
+        com.keltruc.mymemos.data.text.EmojiCatalogue.categories.map { (name, emoji) -> EmojiGroup(name, emoji) }
+
     suspend fun tagStyles(): List<TagStyleRow> =
         config.current().tagStyles.map { (tag, style) -> TagStyleRow(tag, style.emoji, style.colour?.name, style.colour?.hex ?: -1L) }
 
@@ -1468,6 +1486,8 @@ data class NotificationRow(
 )
 
 data class TagCount(val tag: String, val count: Int)
+
+data class EmojiGroup(val name: String, val emoji: List<String>)
 
 data class StatsRow(
     val totalMemos: Int,

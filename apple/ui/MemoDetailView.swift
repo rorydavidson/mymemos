@@ -115,6 +115,19 @@ struct MemoDetailView: View {
                     Button(memo.pinned ? "Unpin" : "Pin", systemImage: memo.pinned ? "pin.slash" : "pin") {
                         Task { await model.setPinned(memo.localId, !memo.pinned) }
                     }
+                    if memo.locked {
+                        Button("Show", systemImage: "eye") {
+                            Task { await model.reveal(memo.localId) }
+                        }
+                        Button("Remove encryption", systemImage: "lock.open") {
+                            Task { await model.unlockForGood(memo.localId) }
+                        }
+                    } else {
+                        Button("Encrypt", systemImage: "lock") {
+                            Task { await model.lock(memo.localId) }
+                        }
+                    }
+                    Divider()
                     Button(detail.archived ? "Unarchive" : "Archive", systemImage: detail.archived ? "tray.and.arrow.up" : "archivebox") {
                         Task { await model.setArchived(memo.localId, !detail.archived) }
                     }
@@ -138,18 +151,6 @@ struct MemoDetailView: View {
                     }
                     #endif
                     Divider()
-                    if memo.locked {
-                        Button("Show", systemImage: "eye") {
-                            Task { await model.reveal(memo.localId) }
-                        }
-                        Button("Remove encryption", systemImage: "lock.open") {
-                            Task { await model.unlockForGood(memo.localId) }
-                        }
-                    } else {
-                        Button("Encrypt", systemImage: "lock") {
-                            Task { await model.lock(memo.localId) }
-                        }
-                    }
                     Button("Attach a file…", systemImage: "paperclip") {
                         Task { await attachFiles() }
                     }

@@ -274,7 +274,11 @@ extension SessionModel {
     func loadTagStyles() async {
         let rows = (try? await session.tagStyles()) ?? []
         tagStyles = Dictionary(uniqueKeysWithValues: rows.map { ($0.tag, $0) })
+        let counts = (try? await session.tagCounts()) ?? []
+        tagCounts = Dictionary(uniqueKeysWithValues: counts.map { ($0.tag, Int($0.count)) })
     }
+
+    var emojiCatalogue: [EmojiGroup] { session.emojiCatalogue() }
 
     func setTagStyle(_ tag: String, emoji: String?, colourName: String?) async {
         try? await session.setTagStyle(tag: tag, emoji: emoji, colourName: colourName)
