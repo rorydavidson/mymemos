@@ -22,6 +22,7 @@ mkdir -p "$APP"
 # Google Sans Flex, the same file the Android and Mac apps ship, under the same licence.
 cp ios/app/Resources/GoogleSansFlex.ttf "$APP/"
 cp ios/app/Resources/GOOGLE_SANS_FLEX_OFL.txt "$APP/"
+cp ios/app/Resources/PrivacyInfo.xcprivacy "$APP/"
 
 # The icon, compiled from the asset catalogue the Xcode project also uses.
 xcrun actool ios/app/Resources/Assets.xcassets \
