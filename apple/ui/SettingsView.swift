@@ -11,9 +11,26 @@ struct SettingsView: View {
         Form {
             Section("Account") {
                 LabeledContent("Signed in as", value: model.displayName.isEmpty ? "—" : model.displayName)
-                LabeledContent("Server", value: model.server)
+                LabeledContent("Server", value: model.accounts.first { $0.active }?.serverUrl ?? model.server)
                 LabeledContent("Memos version", value: model.serverVersion.isEmpty ? "—" : model.serverVersion)
+                #if os(iOS)
+                NavigationLink("Profile, password and default visibility") { ProfileView(model: model).navigationTitle("Profile") }
+                NavigationLink("Notifications") { NotificationsView(model: model).navigationTitle("Notifications") }
+                NavigationLink("Statistics") { StatsView(model: model).navigationTitle("Statistics") }
+                NavigationLink("Access tokens") { TokensView(model: model).navigationTitle("Access tokens") }
+                NavigationLink("Webhooks") { WebhooksView(model: model).navigationTitle("Webhooks") }
+                #endif
             }
+
+            #if os(iOS)
+            AccountsSection(model: model)
+
+            Section("Editor") {
+                NavigationLink("Templates") { TemplatesView(model: model).navigationTitle("Templates") }
+                NavigationLink("Tags") { TagsView(model: model).navigationTitle("Tags") }
+                NavigationLink("Shortcuts") { ShortcutsView(model: model).navigationTitle("Shortcuts") }
+            }
+            #endif
 
             Section("Appearance") {
                 Picker("Theme", selection: Binding(
@@ -33,6 +50,10 @@ struct SettingsView: View {
                 Toggle("Compact list", isOn: Binding(
                     get: { model.compactList },
                     set: { enabled in Task { await model.setCompactList(enabled) } }
+                ))
+                Toggle("Sink completed tasks on save", isOn: Binding(
+                    get: { model.sortCompletedTasks },
+                    set: { enabled in Task { await model.setSortCompletedTasks(enabled) } }
                 ))
             } header: {
                 Text("Timeline")
@@ -87,6 +108,15 @@ struct SettingsView: View {
                     }
                 }
             }
+
+            #if os(iOS)
+            if model.isAdmin {
+                Section("Administration") {
+                    NavigationLink("Users") { AdminUsersView(model: model).navigationTitle("Users") }
+                    NavigationLink("Instance") { AdminInstanceView(model: model).navigationTitle("Instance") }
+                }
+            }
+            #endif
 
             Section {
                 Button("Sign Out…", role: .destructive) { confirmingSignOut = true }

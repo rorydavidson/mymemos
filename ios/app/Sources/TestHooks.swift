@@ -64,6 +64,7 @@ enum TestHooks {
                 if bits.count == 2, let memo = nth(model, bits[0]), let line = Int(bits[1]) { await model.toggleTask(memo.localId, line: line, checked: true) }
             case "delete": if let memo = nth(model, arg) { await model.delete(memo.localId) }
             case "sync": await model.sync()
+            case "library": if let screen = MemosScreen.Library(rawValue: arg) { PhoneNavigation.shared.path = [screen] }
             case "wait": try? await Task.sleep(for: .seconds(Double(arg) ?? 1))
             default: break
             }

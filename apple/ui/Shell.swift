@@ -71,6 +71,11 @@ struct DetailPane: View {
 
 struct SignInView: View {
     @ObservedObject var model: SessionModel
+    /// True when presented from Settings to add a second account, in which case success
+    /// closes the sheet rather than replacing the whole screen.
+    var embedded = false
+    @Environment(\.dismiss) private var dismiss
+    @State private var knownServers: [String] = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -89,6 +94,20 @@ struct SignInView: View {
 
                 VStack(alignment: .leading, spacing: 10) {
                     field("Server", text: $model.server, symbol: "server.rack")
+                    // Servers signed into before, so an unwanted sign-out means a tap, not
+                    // retyping an address. Only the address is kept.
+                    if knownServers.count > 1 || (knownServers.first != nil && knownServers.first != model.server) {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(knownServers, id: \.self) { server in
+                                    Button(server.replacingOccurrences(of: "https://", with: "")) { model.server = server }
+                                        .font(Type.rowMeta)
+                                        .buttonStyle(.bordered)
+                                        .controlSize(.small)
+                                }
+                            }
+                        }
+                    }
                     field("Username", text: $model.username, symbol: "person")
                     secureField("Password", text: $model.password)
                 }
@@ -108,7 +127,10 @@ struct SignInView: View {
                         Text(what).font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
                     }
                     Spacer()
-                    Button("Sign in") { Task { await model.signIn() } }
+                    if embedded {
+                        Button("Cancel") { dismiss() }
+                    }
+                    Button("Sign in") { Task { await submit() } }
                         .keyboardShortcut(.defaultAction)
                         .disabled(model.isBusy || model.username.isEmpty || model.password.isEmpty)
                 }
@@ -122,6 +144,16 @@ struct SignInView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.canvas)
+        .task { knownServers = await model.knownServers() }
+    }
+
+    private func submit() async {
+        await model.signIn()
+        if embedded, case .failed = model.phase {} else if embedded {
+            await model.loadAccounts()
+            await model.reload()
+            dismiss()
+        }
     }
 
     private func field(_ label: String, text: Binding<String>, symbol: String) -> some View {
@@ -136,7 +168,7 @@ struct SignInView: View {
             Image(systemName: "lock").frame(width: 16).foregroundStyle(Theme.inkSoft)
             SecureField(label, text: text)
                 .textFieldStyle(.roundedBorder)
-                .onSubmit { Task { await model.signIn() } }
+                .onSubmit { Task { await submit() } }
         }
     }
 }

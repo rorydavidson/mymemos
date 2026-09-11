@@ -3,10 +3,22 @@ import Shared
 
 /// The memos tab on a phone: the timeline, search, and the menu that reaches everything the
 /// Mac keeps in its sidebar.
+/// The phone's navigation path, held outside the view so the library screens can be reached
+/// from elsewhere (the tour driver, and later a widget or a notification).
+@MainActor
+final class PhoneNavigation: ObservableObject {
+    static let shared = PhoneNavigation()
+    @Published var path: [MemosScreen.Library] = []
+}
+
 struct MemosScreen: View {
     @ObservedObject var model: SessionModel
+    @ObservedObject private var nav = PhoneNavigation.shared
 
-    enum Library: Hashable { case reminders, templates, settings }
+    enum Library: String, Hashable {
+        case reminders, templates, settings, shortcuts, tags, notifications
+        case profile, tokens, webhooks, stats, adminUsers, adminInstance
+    }
 
     private var title: String {
         if let shortcut = model.activeShortcut { return shortcut.title }
@@ -15,7 +27,7 @@ struct MemosScreen: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $nav.path) {
             MemoListView(model: model, selection: $model.selection)
                 .navigationTitle(title)
                 .navigationBarTitleDisplayMode(.large)
@@ -33,6 +45,24 @@ struct MemosScreen: View {
                         TemplatesView(model: model).navigationTitle("Templates")
                     case .settings:
                         SettingsView(model: model).navigationTitle("Settings")
+                    case .shortcuts:
+                        ShortcutsView(model: model).navigationTitle("Shortcuts")
+                    case .tags:
+                        TagsView(model: model) { tag in model.activeTag = tag; model.showArchived = false }.navigationTitle("Tags")
+                    case .notifications:
+                        NotificationsView(model: model).navigationTitle("Notifications")
+                    case .profile:
+                        ProfileView(model: model).navigationTitle("Profile")
+                    case .tokens:
+                        TokensView(model: model).navigationTitle("Access tokens")
+                    case .webhooks:
+                        WebhooksView(model: model).navigationTitle("Webhooks")
+                    case .stats:
+                        StatsView(model: model).navigationTitle("Statistics")
+                    case .adminUsers:
+                        AdminUsersView(model: model).navigationTitle("Users")
+                    case .adminInstance:
+                        AdminInstanceView(model: model).navigationTitle("Instance")
                     }
                 }
         }
@@ -44,6 +74,7 @@ struct MemosScreen: View {
 /// The timeline's toolbar: sync, a new memo, and the library menu.
 struct MemosToolbar: ToolbarContent {
     @ObservedObject var model: SessionModel
+    @State private var showingSync = false
 
     var body: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
@@ -54,6 +85,15 @@ struct MemosToolbar: ToolbarContent {
                     }
                     NavigationLink(value: MemosScreen.Library.templates) {
                         Label("Templates", systemImage: "doc.on.doc")
+                    }
+                    NavigationLink(value: MemosScreen.Library.shortcuts) {
+                        Label(model.activeShortcut.map { "Shortcut: \($0.title)" } ?? "Shortcuts", systemImage: "line.3.horizontal.decrease.circle")
+                    }
+                    NavigationLink(value: MemosScreen.Library.tags) {
+                        Label("Tags", systemImage: "number")
+                    }
+                    NavigationLink(value: MemosScreen.Library.notifications) {
+                        Label(model.unreadNotifications > 0 ? "Notifications (\(model.unreadNotifications))" : "Notifications", systemImage: "bell.badge")
                     }
                 }
 
@@ -98,12 +138,23 @@ struct MemosToolbar: ToolbarContent {
                 }
 
                 Section {
+                    Button { showingSync = true } label: {
+                        Label("Sync status", systemImage: "arrow.triangle.2.circlepath")
+                    }
                     NavigationLink(value: MemosScreen.Library.settings) {
                         Label("Settings", systemImage: "gearshape")
                     }
                 }
             } label: {
                 Image(systemName: "line.3.horizontal")
+                    .overlay(alignment: .topTrailing) {
+                        if (model.syncStatus?.failed ?? 0) > 0 || (model.syncStatus?.authExpired ?? false) || model.unreadNotifications > 0 {
+                            Circle().fill(Theme.danger).frame(width: 7, height: 7).offset(x: 3, y: -3)
+                        }
+                    }
+            }
+            .sheet(isPresented: $showingSync) {
+                SyncStatusView(model: model).presentationDetents([.medium, .large])
             }
         }
 
