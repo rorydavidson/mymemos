@@ -38,7 +38,7 @@ struct TemplatesView: View {
                 EmptyState(
                     icon: "doc.on.doc",
                     title: "No templates",
-                    detail: "A template is a memo you start from often. Add one and it will be here on both this Mac and your phone."
+                    detail: "A template is a memo you start from often. Add one and it will be there on every device you sign in on."
                 )
             }
         }
@@ -81,6 +81,13 @@ private struct TemplateCard: View {
 
     @State private var hovering = false
 
+    /// A touch screen has no hover, so buttons that appear on it never would.
+    #if os(macOS)
+    private static let hovers = true
+    #else
+    private static let hovers = false
+    #endif
+
     private var enabled: Bool { schedule?.enabled ?? false }
     private var hour: Int { Int(schedule?.hour ?? 8) }
     private var minute: Int { Int(schedule?.minute ?? 0) }
@@ -92,9 +99,9 @@ private struct TemplateCard: View {
                     .font(Type.heading3)
                     .foregroundStyle(Theme.ink)
                 Spacer(minLength: 0)
-                if hovering {
-                    Button("Edit", action: edit).buttonStyle(.link).font(Type.rowMeta)
-                    Button("Delete", action: remove).buttonStyle(.link).font(Type.rowMeta)
+                if hovering || !Self.hovers {
+                    Button("Edit", action: edit).linkButton().font(Type.rowMeta)
+                    Button("Delete", action: remove).linkButton().font(Type.rowMeta)
                 }
                 Button("Use", action: use)
                     .controlSize(.small)
@@ -255,7 +262,7 @@ private struct TemplateEditor: View {
             }
             .padding(14)
         }
-        .frame(width: 520)
+        .sheetWidth(520)
         .background(Theme.canvas)
         .onAppear {
             guard !loaded else { return }

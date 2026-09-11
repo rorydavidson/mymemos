@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import Shared
 
 /// One memo, in full.
@@ -9,6 +10,9 @@ struct MemoDetailView: View {
     @Environment(\.colorScheme) private var scheme
     @State private var attachments: [AttachmentRow] = []
     @State private var settingReminder = false
+    #if os(iOS)
+    @State private var importing = false
+    #endif
 
     private var memo: MemoRow { detail.row }
 
@@ -52,6 +56,12 @@ struct MemoDetailView: View {
         .sheet(isPresented: $settingReminder) {
             ReminderSheet(model: model, memoLocalId: memo.localId)
         }
+        #if os(iOS)
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            guard let urls = try? result.get() else { return }
+            Task { await attach(urls) }
+        }
+        #endif
     }
 
     private var header: some View {
@@ -127,7 +137,7 @@ struct MemoDetailView: View {
                 .font(Type.rowMeta)
             Spacer()
             Button("Hide") { model.revealed.removeValue(forKey: memo.localId) }
-                .buttonStyle(.link)
+                .linkButton()
                 .font(Type.rowMeta)
         }
         .foregroundStyle(Theme.inkSoft)
@@ -146,8 +156,8 @@ struct MemoDetailView: View {
         }
     }
 
-    /// Where the memo was written. The coordinates are the memo's own; nothing asks this Mac
-    /// where it is, and no tile is fetched unless map previews are turned on.
+    /// Where the memo was written. The coordinates are the memo's own, and no tile is fetched
+    /// unless map previews are turned on.
     @ViewBuilder
     private var place: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -171,14 +181,25 @@ struct MemoDetailView: View {
         }
     }
 
-    /// The standard open panel: the app never reaches for a file the user has not chosen.
+    /// The standard picker: the app never reaches for a file the user has not chosen.
     private func attachFiles() async {
+        #if os(macOS)
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.message = "Choose files to attach to this memo"
         guard panel.runModal() == .OK else { return }
-        await model.attach(memo.localId, urls: panel.urls)
+        await attach(panel.urls)
+        #else
+        importing = true
+        #endif
+    }
+
+    /// Files from the picker arrive security-scoped on iOS and must be opened before reading.
+    private func attach(_ urls: [URL]) async {
+        let scoped = urls.filter { $0.startAccessingSecurityScopedResource() }
+        defer { scoped.forEach { $0.stopAccessingSecurityScopedResource() } }
+        await model.attach(memo.localId, urls: urls)
         attachments = await model.attachments(memo.localId)
     }
 

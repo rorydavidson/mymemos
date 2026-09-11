@@ -94,7 +94,7 @@ private struct ReminderCard: View {
 
             Spacer(minLength: 0)
 
-            Button("Clear", action: remove).buttonStyle(.link).font(Type.rowMeta)
+            Button("Clear", action: remove).linkButton().font(Type.rowMeta)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -125,7 +125,7 @@ private struct DigestCard: View {
             .toggleStyle(.switch)
             .font(Type.rowTitle)
 
-            Text("What you wrote, tasks you closed, your streak, and a few old memos worth reading again. Worked out on this Mac from memos already downloaded; nothing is sent anywhere.")
+            Text("What you wrote, tasks you closed, your streak, and a few old memos worth reading again. Worked out on this device from memos already downloaded; nothing is sent anywhere.")
                 .font(Type.rowMeta)
                 .foregroundStyle(Theme.inkSoft)
                 .fixedSize(horizontal: false, vertical: true)
@@ -232,7 +232,7 @@ struct ReminderSheet: View {
             }
             .padding(14)
         }
-        .frame(width: 400)
+        .sheetWidth(400)
         .background(Theme.canvas)
     }
 

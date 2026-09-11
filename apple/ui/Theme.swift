@@ -44,10 +44,16 @@ enum Theme {
     static let readingLeading: CGFloat = 7
 
     private static func adaptive(light: Int, dark: Int) -> Color {
+        #if os(macOS)
         Color(nsColor: NSColor(name: nil) { appearance in
             let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
             return NSColor(hex: isDark ? dark : light)
         })
+        #else
+        Color(uiColor: UIColor { traits in
+            UIColor(hex: traits.userInterfaceStyle == .dark ? dark : light)
+        })
+        #endif
     }
 }
 
@@ -62,9 +68,17 @@ enum Type {
     /// Falls back to the system font if the bundled file ever fails to register, so a missing
     /// font is a slightly plainer app rather than no text at all.
     private static func sans(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-        NSFont(name: family, size: size) == nil
-            ? .system(size: size, weight: weight)
-            : .custom(family, size: size).weight(weight)
+        registered
+            ? .custom(family, size: size).weight(weight)
+            : .system(size: size, weight: weight)
+    }
+
+    private static var registered: Bool {
+        #if os(macOS)
+        NSFont(name: family, size: 12) != nil
+        #else
+        UIFont(name: family, size: 12) != nil
+        #endif
     }
 
     // Reading: the memo itself.
@@ -86,6 +100,7 @@ enum Type {
     static let label = sans(9.5, .semibold)
 }
 
+#if os(macOS)
 extension NSColor {
     convenience init(hex: Int) {
         self.init(
@@ -96,6 +111,18 @@ extension NSColor {
         )
     }
 }
+#else
+extension UIColor {
+    convenience init(hex: Int) {
+        self.init(
+            red: CGFloat((hex >> 16) & 0xFF) / 255,
+            green: CGFloat((hex >> 8) & 0xFF) / 255,
+            blue: CGFloat(hex & 0xFF) / 255,
+            alpha: 1
+        )
+    }
+}
+#endif
 
 extension Color {
     /// A memo's tint, softened into something a page of text can sit on.

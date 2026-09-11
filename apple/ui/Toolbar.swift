@@ -114,7 +114,9 @@ struct ToolbarMenu<Content: View>: View {
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.ink)
         }
+        #if os(macOS)
         .menuStyle(.borderlessButton)
+        #endif
         .menuIndicator(.hidden)
         .frame(width: 26, height: 22)
         .background(

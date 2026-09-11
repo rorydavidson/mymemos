@@ -52,7 +52,7 @@ struct MemoListView: View {
                     icon: model.query.isEmpty ? "tray" : "magnifyingglass",
                     title: model.query.isEmpty ? "No memos yet" : "Nothing found",
                     detail: model.query.isEmpty
-                        ? "Press ⌘N to write the first one."
+                        ? Hint.firstMemo
                         : "No memo matches “\(model.query)”."
                 )
             }

@@ -3,8 +3,8 @@ import Shared
 
 /// A map made of OpenStreetMap tiles.
 ///
-/// No MapKit and no Apple location services, matching the Android app: tiles come straight
-/// from openstreetmap.org, and only when the user has turned them on. That switch is not
+/// No MapKit, matching the Android app: tiles come straight from openstreetmap.org, and only
+/// when the user has turned them on. That switch is not
 /// decoration. Drawing a memo's location asks OSM for the tiles around it, which tells them
 /// roughly where the memo was written, so with tiles off nothing is drawn and nothing leaves
 /// the machine.
@@ -148,12 +148,12 @@ struct MapLayout {
 /// One tile, fetched and cached in memory for the session.
 private struct TileImage: View {
     let tile: MapLayout.Tile
-    @State private var image: NSImage?
+    @State private var image: PlatformImage?
 
     var body: some View {
         Group {
             if let image {
-                Image(nsImage: image).resizable()
+                Image(platform: image).resizable()
             } else {
                 Theme.hairline.opacity(0.3)
             }
@@ -174,7 +174,13 @@ private struct TileImage: View {
 actor TileLoader {
     static let shared = TileLoader()
 
-    private var cache: [String: NSImage] = [:]
+    #if os(macOS)
+    private static let platform = "macOS"
+    #else
+    private static let platform = "iOS"
+    #endif
+
+    private var cache: [String: PlatformImage] = [:]
     private var enabled = false
 
     func setEnabled(_ value: Bool) {
@@ -185,17 +191,17 @@ actor TileLoader {
     /// Exposed so the guarantee can be checked rather than assumed.
     func isEnabled() -> Bool { enabled }
 
-    func tile(_ tile: MapLayout.Tile) async -> NSImage? {
+    func tile(_ tile: MapLayout.Tile) async -> PlatformImage? {
         guard enabled else { return nil }
         if let cached = cache[tile.id] { return cached }
         guard let url = URL(string: "https://tile.openstreetmap.org/\(tile.zoom)/\(tile.x)/\(tile.y).png")
         else { return nil }
 
         var request = URLRequest(url: url)
-        request.setValue("MyMemos/0.1 (macOS; https://github.com/usememos/memos)", forHTTPHeaderField: "User-Agent")
+        request.setValue("MyMemos/0.1 (\(Self.platform); https://github.com/usememos/memos)", forHTTPHeaderField: "User-Agent")
         guard
             let (data, _) = try? await URLSession.shared.data(for: request),
-            let image = NSImage(data: data)
+            let image = PlatformImage(data: data)
         else { return nil }
 
         cache[tile.id] = image

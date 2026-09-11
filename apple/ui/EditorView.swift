@@ -31,6 +31,7 @@ struct EditorView: View {
             FormatBar { pendingEdit = $0 }
             Divider()
 
+            #if os(macOS)
             HStack(spacing: 0) {
                 editor
                 if showPreview {
@@ -38,8 +39,14 @@ struct EditorView: View {
                     preview
                 }
             }
+            #else
+            // A phone has no room for two columns: the preview takes the editor's place.
+            if showPreview { preview } else { editor }
+            #endif
         }
+        #if os(macOS)
         .frame(minWidth: showPreview ? 860 : 560, minHeight: 460)
+        #endif
         .background(Theme.canvas)
         .task { await load() }
     }
@@ -100,7 +107,9 @@ struct EditorView: View {
                     .allowsHitTesting(false)
             }
         }
+        #if os(macOS)
         .frame(minWidth: 420)
+        #endif
         .background(Theme.card)
     }
 
@@ -110,7 +119,9 @@ struct EditorView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(20)
         }
+        #if os(macOS)
         .frame(minWidth: 320)
+        #endif
         .background(Theme.canvas)
     }
 

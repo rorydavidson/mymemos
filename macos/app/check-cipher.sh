@@ -10,7 +10,7 @@ OUT=$(mktemp -d)
 swiftc -O -parse-as-library \
     -target arm64-apple-macos15.0 \
     macos/app/Checks/CipherParityCheck.swift \
-    macos/app/Sources/AppleCrypto.swift \
+    apple/ui/AppleCrypto.swift \
     -F apple/shared/build/bin/macosArm64/debugFramework \
     -framework Shared -lsqlite3 \
     -o "$OUT/ciphercheck"

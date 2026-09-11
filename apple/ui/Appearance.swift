@@ -1,4 +1,7 @@
+import SwiftUI
+#if os(macOS)
 import AppKit
+#endif
 
 /// Light, dark, or whatever the system is doing.
 enum Appearance: String, CaseIterable, Identifiable {
@@ -22,6 +25,16 @@ enum Appearance: String, CaseIterable, Identifiable {
         }
     }
 
+    /// What SwiftUI's `preferredColorScheme` wants; nil hands the decision back to the system.
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+
+    #if os(macOS)
     /// nil hands the decision back to the system.
     var nsAppearance: NSAppearance? {
         switch self {
@@ -34,4 +47,8 @@ enum Appearance: String, CaseIterable, Identifiable {
     func apply() {
         NSApp?.appearance = nsAppearance
     }
+    #else
+    /// On iOS the root view applies `colorScheme`; there is no process-wide switch to flip.
+    func apply() {}
+    #endif
 }

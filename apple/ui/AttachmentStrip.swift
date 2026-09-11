@@ -1,3 +1,4 @@
+import QuickLook
 import SwiftUI
 import UniformTypeIdentifiers
 import Shared
@@ -33,8 +34,11 @@ private struct AttachmentTile: View {
     let memoLocalId: String
     let attachment: AttachmentRow
 
-    @State private var image: NSImage?
+    @State private var image: PlatformImage?
     @State private var loading = true
+    #if os(iOS)
+    @State private var previewURL: URL?
+    #endif
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -47,6 +51,9 @@ private struct AttachmentTile: View {
         .contentShape(Rectangle())
         .onTapGesture { Task { await open() } }
         .help("Open \(attachment.filename)")
+        #if os(iOS)
+        .quickLookPreview($previewURL)
+        #endif
         .task { await load() }
     }
 
@@ -55,7 +62,7 @@ private struct AttachmentTile: View {
         ZStack {
             Theme.canvas
             if let image {
-                Image(nsImage: image)
+                Image(platform: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
             } else if loading, attachment.isImage {
@@ -106,7 +113,7 @@ private struct AttachmentTile: View {
         defer { loading = false }
         guard attachment.isImage else { return }
         guard let data = await model.attachmentData(memoLocalId, attachment.localId) else { return }
-        image = NSImage(data: data)
+        image = PlatformImage(data: data)
     }
 
     /// Writes the bytes somewhere the system can open, then hands it over.
@@ -119,6 +126,10 @@ private struct AttachmentTile: View {
             at: url.deletingLastPathComponent(), withIntermediateDirectories: true
         )
         guard (try? data.write(to: url)) != nil else { return }
+        #if os(macOS)
         NSWorkspace.shared.open(url)
+        #else
+        previewURL = url
+        #endif
     }
 }

@@ -10,7 +10,7 @@ JAVA_HOME=${JAVA_HOME:-/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents
     ./gradlew :apple-shared:linkDebugFrameworkMacosArm64 --console=plain -q
 OUT=$(mktemp -d)
 swiftc -O -parse-as-library -target arm64-apple-macos15.0 \
-    macos/app/Checks/EditorCheck.swift macos/app/Sources/AppleCrypto.swift \
+    macos/app/Checks/EditorCheck.swift apple/ui/AppleCrypto.swift \
     -F apple/shared/build/bin/macosArm64/debugFramework -framework Shared -lsqlite3 \
     -o "$OUT/editorcheck"
 "$OUT/editorcheck" 2>&1 | grep -v "^W/SyncEngine"

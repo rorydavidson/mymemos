@@ -40,7 +40,7 @@ struct PasswordSheet: View {
                 .focused($focused)
                 .onSubmit { submit() }
 
-            Toggle("Remember on this Mac", isOn: $remember)
+            Toggle("Remember on this device", isOn: $remember)
                 .font(Type.rowBody)
                 .help("Kept in the Keychain, so locked memos open without asking again.")
 
@@ -49,7 +49,7 @@ struct PasswordSheet: View {
                     .font(Type.rowMeta).foregroundStyle(Theme.danger)
             }
 
-            Text("Your password never leaves this Mac. The server only ever holds the scrambled text.")
+            Text("Your password never leaves this device. The server only ever holds the scrambled text.")
                 .font(Type.rowMeta)
                 .foregroundStyle(Theme.inkSoft)
                 .fixedSize(horizontal: false, vertical: true)
@@ -69,7 +69,7 @@ struct PasswordSheet: View {
             }
         }
         .padding(22)
-        .frame(width: 400)
+        .sheetWidth(400)
         .background(Theme.card)
         .task { focused = true }
     }
