@@ -12,6 +12,8 @@ struct MarkdownEditor: NSViewRepresentable {
     @Binding var text: String
     /// Set to ask the view to apply an edit; cleared once it has.
     @Binding var pendingEdit: EditorEdit?
+    /// The `#tag` or `@date` under the cursor, for the completion bar. Nil when there is none.
+    @Binding var currentWord: String?
     let session: MemosSession
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -89,13 +91,22 @@ struct MarkdownEditor: NSViewRepresentable {
             snapshot(view)
         }
 
+        private func reportWord(_ view: NSTextView) {
+            let word = EditorEdit.wordAtCursor(in: view.string, cursor: view.selectedRange().location)?.0
+            if parent.currentWord != word { DispatchQueue.main.async { self.parent.currentWord = word } }
+        }
+
         private func snapshot(_ view: NSTextView) {
             previousText = view.string
             previousCursor = view.selectedRange().location
+            reportWord(view)
         }
 
         func apply(_ edit: EditorEdit, to view: NSTextView) {
-            let range = view.selectedRange()
+            var range = view.selectedRange()
+            if case .replaceWord = edit, let (_, wordRange) = EditorEdit.wordAtCursor(in: view.string, cursor: range.location) {
+                range = wordRange
+            }
             let text = view.string as NSString
             let selected = text.substring(with: range)
             let (replacement, cursorOffset) = edit.apply(to: selected, wholeText: view.string, at: range)
@@ -114,47 +125,6 @@ struct MarkdownEditor: NSViewRepresentable {
             view.setSelectedRange(NSRange(location: bounded, length: 0))
             view.scrollRangeToVisible(view.selectedRange())
             parent.text = view.string
-        }
-    }
-}
-
-/// A formatting action the toolbar can ask the editor to perform.
-enum EditorEdit: Identifiable {
-    /// Puts markers either side of the selection, e.g. bold.
-    case wrap(String)
-    /// Puts a marker at the start of each selected line, e.g. a bullet.
-    case prefixLines(String)
-    /// Drops text in where the cursor is.
-    case insert(String)
-
-    var id: String {
-        switch self {
-        case let .wrap(marker): return "wrap-\(marker)"
-        case let .prefixLines(marker): return "prefix-\(marker)"
-        case let .insert(text): return "insert-\(text)"
-        }
-    }
-
-    /// Returns the replacement text and where to leave the cursor within it.
-    func apply(to selected: String, wholeText: String, at range: NSRange) -> (String, Int) {
-        switch self {
-        case let .wrap(marker):
-            if selected.isEmpty { return (marker + marker, marker.count) }
-            return (marker + selected + marker, (marker + selected + marker).count)
-
-        case let .prefixLines(marker):
-            // With nothing selected, the marker goes on the line the cursor is in.
-            if selected.isEmpty {
-                return (marker, marker.count)
-            }
-            let prefixed = selected
-                .components(separatedBy: "\n")
-                .map { $0.isEmpty ? $0 : marker + $0 }
-                .joined(separator: "\n")
-            return (prefixed, prefixed.count)
-
-        case let .insert(text):
-            return (text, text.count)
         }
     }
 }

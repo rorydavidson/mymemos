@@ -1,13 +1,14 @@
 #!/bin/bash
-# Builds the macOS app into a .app bundle. There is no Xcode project yet: the Swift side is
-# one file, and a script keeps it runnable from the same place the Gradle build lives.
+# Builds the macOS app into a .app bundle. There is no Xcode project: the Swift side is a
+# handful of files, and a script keeps it runnable from the same place the Gradle build lives.
+# apple/ui is the SwiftUI shared with the iOS app; macos/app/Sources is what only a Mac has.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 JAVA_HOME=${JAVA_HOME:-/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home} \
-    ./gradlew :macos-shared:linkDebugFrameworkMacosArm64 --console=plain -q
+    ./gradlew :apple-shared:linkDebugFrameworkMacosArm64 --console=plain -q
 
-FRAMEWORK_DIR="macos/shared/build/bin/macosArm64/debugFramework"
+FRAMEWORK_DIR="apple/shared/build/bin/macosArm64/debugFramework"
 APP="macos/app/build/MyMemos.app"
 
 rm -rf "$APP"
@@ -48,6 +49,7 @@ swiftc -O \
     -framework Shared \
     -lsqlite3 \
     -parse-as-library \
+    apple/ui/*.swift \
     macos/app/Sources/*.swift \
     -o "$APP/Contents/MacOS/MyMemos"
 

@@ -10,13 +10,15 @@ kotlin {
 
     // Android keeps its own target rather than borrowing a plain JVM one, so the app goes on
     // using the platform's SQLite and Room's Android artifacts exactly as before. Only the
-    // macOS build gets the bundled SQLite driver.
+    // Apple builds get the bundled SQLite driver.
     androidLibrary {
         namespace = "com.keltruc.mymemos.database"
         compileSdk = 37
         minSdk = 26
     }
     macosArm64()
+    iosArm64()
+    iosSimulatorArm64()
 
     sourceSets {
         commonMain.dependencies {
@@ -27,7 +29,7 @@ kotlin {
             // core-data still reaches for withTransaction, which lives here.
             api(libs.room.ktx)
         }
-        macosArm64Main.dependencies {
+        appleMain.dependencies {
             implementation(libs.sqlite.bundled)
         }
         macosArm64Test.dependencies {
@@ -44,5 +46,7 @@ room {
 dependencies {
     add("kspAndroid", libs.room.compiler)
     add("kspMacosArm64", libs.room.compiler)
+    add("kspIosArm64", libs.room.compiler)
+    add("kspIosSimulatorArm64", libs.room.compiler)
 }
 

@@ -1,11 +1,18 @@
 # MyMemos handoff
 
-State as of 11 September 2026. Everything is merged to `main`, there are no open branches and
-the tree is clean.
+State as of 11 September 2026, evening. The iOS work is on `feat/ios-app`, unmerged, in
+nine commits; `main` is as it was in the morning.
 
-There are now two clients over one data layer: the Android app, which is feature complete
-against Memos v0.30, and a macOS app, which is not yet but does the daily work. Almost
-everything that is not a screen is shared between them.
+There are now three clients over one data layer: the Android app, which is feature complete
+against Memos v0.30; an iOS app, which matches it except for export, import and backup; and
+a macOS app, which does the daily work. Almost everything that is not a screen is shared
+between them, and since the iOS work most of the screens are shared between the Mac and the
+phone too.
+
+**The iOS commits are unsigned.** 1Password's SSH signer refused every commit in that
+session ("failed to fill whole buffer"), so they were made with `commit.gpgsign=false`.
+Re-sign before merging if signed history matters:
+`git rebase --exec 'git commit --amend --no-edit -S' main`.
 
 The one piece of Android work still outstanding is item 3 below, locked notes keeping a
 readable title. It was deliberately left until last because it changes a stored format, and it
@@ -26,11 +33,14 @@ now has three places waiting on it rather than two.
   twice, against two quite different compilers. That has already caught real differences.
 
 - **Six modules**: `app`, `core-model`, `core-network`, `core-database`, `core-data`,
-  `macos-shared`. The four `core-*` modules are Kotlin Multiplatform and build for both
-  Android and `macosArm64`. `app` is Android only, `macos-shared` is macOS only.
+  `apple-shared` (at `apple/shared`). The four `core-*` modules are Kotlin Multiplatform and
+  build for Android, `macosArm64`, `iosArm64` and `iosSimulatorArm64`. `app` is Android only;
+  `apple-shared` builds the `Shared` framework for the three Apple targets from one
+  `appleMain` source set.
 
 - **CI** is `.gitea/workflows/ci.yml` with an identical mirror at `.github/workflows/ci.yml`.
-  Two jobs: `android` on Linux, and `macos`, which **needs a runner labelled `macos-latest`**.
+  Two jobs: `android` on Linux, and `macos`, which builds the Mac app, its checks and now the
+  iOS simulator bundle, and **needs a runner labelled `macos-latest`**.
   Apple targets cannot be cross-compiled, so without such a runner that job waits rather than
   fails. That is easy to misread as passing, so check it is actually running.
 
@@ -39,6 +49,51 @@ now has three places waiting on it rather than two.
 - Password sign-in mints a personal access token per device, good for 90 days, and revokes it
   on sign out. If a device loses that token or it expires, the app shows a "Sign in again"
   banner rather than failing quietly.
+
+## The iOS client
+
+Built on 11 September 2026 over the same data layer, in one session, on branch
+`feat/ios-app`. `ios/README.md` has the build route, the tour, what it does, what it does not
+do and why, and what was never seen on a screen. Read that first; what follows is what a
+reader of this file needs to know that it does not say.
+
+### How it relates to the Mac
+
+The iOS work restructured the Apple side: `macos/shared` became `apple/shared` and the
+portable SwiftUI moved from `macos/app/Sources` to `apple/ui`, so the Mac app now compiles
+`apple/ui/*.swift` plus its own `macos/app/Sources`. Everything the Mac did before still
+works and every check passes, but the Mac has not yet picked up the screens the phone gained
+(archive, shortcuts, tags, sync status, accounts, the account and admin screens, nearby is
+deliberately absent). The Kotlin side of all of them is in `MemosSession` and the views are
+in `apple/ui`, so wiring them into the Mac's sidebar and menu bar is the next Mac task and
+should be a small one.
+
+### Things that will bite
+
+- **Kotlin property names.** Never call a property `description` on a class Swift will see.
+  Kotlin/Native exports it as `description_` and `row.description` in Swift is `NSObject`'s,
+  the object dump. Three rows had to be renamed (`about`, `label`).
+- **xcodebuild refuses iOS without a matching runtime.** See `ios/README.md`. The script
+  build is the one CI runs; the Xcode project is for people, and for devices.
+- **Entitlements on the simulator** have to be a linker section, not part of the signature.
+- **CoreSimulator can hang `simctl list`** for minutes on this Mac. Device ids are on disk
+  under `~/Library/Developer/CoreSimulator/Devices/*/device.plist`.
+- **Nothing can tap the simulator from an agent session.** The native panel needs
+  `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`, and `osascript` is
+  denied assistive access. `tour.sh` and its `TESTHOOKS` driver exist because of this.
+- **A test server is the way to test sign-in.** `neosmemo/memos:0.30.0` in Docker on
+  `localhost:5230`; create the first user with `POST /api/v1/users` (role HOST), sign in with
+  `POST /api/v1/auth/signin`, which returns a bearer `accessToken`. Each tour run mints a
+  fresh personal access token on that server and never revokes it, which is harmless there
+  and would be untidy on a real one.
+
+### Not verified
+
+The list in `ios/README.md`, plus one thing worth a real phone: whether `thisDevice` ever
+comes up true in the tokens list. Every token the tour minted showed false, which suggests
+`mintedTokenName()` is not being stored on sign-in against a v0.30 server, or the name the
+server returns at creation does not match the one it lists. Android has the same code path,
+so check it there first.
 
 ## The macOS client
 
@@ -57,12 +112,12 @@ a compact list. The app icon and Google Sans Flex are the Android ones.
 
 The rule that kept this honest: **anything that decides something is shared; anything that
 writes words or draws pixels is not.** So `TimelineGrouping` decides which bucket a memo falls
-into and `MacTimelineLabels` writes "Monday 31 August" with NSDateFormatter. `Digest` counts
-the week and `MacDigestLabels` phrases it. `Schedule` works out when a daily template next
+into and `AppleTimelineLabels` writes "Monday 31 August" with NSDateFormatter. `Digest` counts
+the week and `AppleDigestLabels` phrases it. `Schedule` works out when a daily template next
 comes round; the app sets the alarm.
 
 Behind the macOS UI is the real data layer: the same sync engine, outbox, three-way merge and
-Room database, not a reimplementation. `MemosSession` in `macos-shared` is the whole Swift
+Room database, not a reimplementation. `MemosSession` in `apple-shared` is the whole Swift
 facing surface, deliberately plain classes and lists because Swift cannot extend a generic
 Kotlin type and only gets `suspend` as `async` off a plain class.
 

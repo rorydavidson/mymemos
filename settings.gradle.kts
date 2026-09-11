@@ -14,5 +14,5 @@ dependencyResolutionManagement {
 }
 rootProject.name = "MyMemos"
 include(":app", ":core-model", ":core-network", ":core-database", ":core-data")
-include(":macos-shared")
-project(":macos-shared").projectDir = file("macos/shared")
+include(":apple-shared")
+project(":apple-shared").projectDir = file("apple/shared")

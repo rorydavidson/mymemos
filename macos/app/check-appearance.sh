@@ -6,6 +6,6 @@ cd "$(dirname "$0")/../.."
 OUT=$(mktemp -d)
 swiftc -O -parse-as-library -target arm64-apple-macos15.0 \
     macos/app/Checks/AppearanceCheck.swift \
-    macos/app/Sources/Appearance.swift \
+    apple/ui/Appearance.swift \
     -o "$OUT/appearancecheck"
 "$OUT/appearancecheck"
