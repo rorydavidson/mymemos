@@ -1,4 +1,4 @@
-package com.keltruc.mymemos.ui.tags
+package com.keltruc.mymemos.data.text
 
 /** Emoji offered in the tag style picker, by category. Any emoji can still be typed in. */
 object EmojiCatalogue {

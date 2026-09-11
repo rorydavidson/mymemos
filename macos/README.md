@@ -147,9 +147,18 @@ repeating alarm, which keeps telling you, and the memo itself is written on the 
 after its time. `runDueRecurring()` is that catch-up, and it will not write a template twice
 because it compares first lines against what was already written today, phone included.
 
+## Your data
+
+The Account section's "Your data" pane exports every memo as Markdown with front matter in a
+zip (Obsidian reads it), imports Markdown files or zips of them, and writes and restores an
+encrypted backup of the database, attachments and settings. The formats are the Android
+app's, byte for byte: the zip is written by a small codec in `core-data` over the system's
+zlib, and the backup is AES-256-GCM under a password with the same header Android writes,
+held in memory rather than streamed because CryptoKit has no streaming mode. A restore
+relaunches the app, since Room cannot reopen a database swapped underneath it, and asks you
+to sign in again: credentials are Keychain items and are never in a backup.
+
 ## What is not built yet
 
-Comments and reactions, the account and admin screens, and export, import and encrypted
-backup, which need a multiplatform zip that nothing provides well. Nearby is deliberately
-absent: it ranks memos by distance from where you are, and this app does not ask the machine
-where it is.
+Nearby is deliberately absent: it ranks memos by distance from where you are, and this app
+does not ask the machine where it is.

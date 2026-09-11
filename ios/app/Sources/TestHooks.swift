@@ -66,6 +66,19 @@ enum TestHooks {
             case "delete": if let memo = nth(model, arg) { await model.delete(memo.localId) }
             case "sync": await model.sync()
             case "url": if let url = URL(string: arg) { await model.handle(url: url) }
+            case "export":
+                let path = FileManager.default.temporaryDirectory.appendingPathComponent("tour-export.zip").path
+                model.notice = (try? await model.exportMarkdown(to: path)) ?? "export failed"
+            case "import":
+                let path = FileManager.default.temporaryDirectory.appendingPathComponent("tour-export.zip").path
+                do { model.notice = try await model.importMarkdown([path]) } catch { model.notice = "import failed: \(error)" }
+            case "backup":
+                let path = FileManager.default.temporaryDirectory.appendingPathComponent("tour.backup").path
+                do { try await model.backup(to: path, password: arg); model.notice = "backup written" } catch { model.notice = "backup failed: \(error)" }
+            case "restore":
+                let path = FileManager.default.temporaryDirectory.appendingPathComponent("tour.backup").path
+                do { try await model.restore(from: path, password: arg); model.notice = "restored" } catch { model.notice = "restore failed: \(model.readableMessage(error))" }
+            case "exit": exit(0)
             case "library": if let screen = MemosScreen.Library(rawValue: arg) { PhoneNavigation.shared.path = [screen] }
             case "wait": try? await Task.sleep(for: .seconds(Double(arg) ?? 1))
             default: break

@@ -73,6 +73,12 @@ struct RowMenu: View {
         Button(memo.pinned ? "Unpin" : "Pin", systemImage: memo.pinned ? "pin.slash" : "pin") {
             Task { await model.setPinned(memo.localId, !memo.pinned) }
         }
+        if memo.locked {
+            Button("Show", systemImage: "eye") { Task { await model.reveal(memo.localId) } }
+            Button("Remove encryption", systemImage: "lock.open") { Task { await model.unlockForGood(memo.localId) } }
+        } else {
+            Button("Encrypt", systemImage: "lock") { Task { await model.lock(memo.localId) } }
+        }
         Button(model.showArchived ? "Unarchive" : "Archive", systemImage: model.showArchived ? "tray.and.arrow.up" : "archivebox") {
             Task { await model.setArchived(memo.localId, !model.showArchived) }
         }

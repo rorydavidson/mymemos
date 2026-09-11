@@ -80,6 +80,8 @@ final class SessionModel: ObservableObject {
     @Published var conflicts: [MemoRow] = []
     @Published var accounts: [AccountRow] = []
     @Published var tagStyles: [String: TagStyleRow] = [:]
+    /// Memos per tag over the whole account, not just what the timeline is showing.
+    @Published var tagCounts: [String: Int] = [:]
     @Published var isAdmin = false
     @Published var unreadNotifications = 0
     @Published var sortCompletedTasks = false
@@ -104,6 +106,7 @@ final class SessionModel: ObservableObject {
         case shortcuts, tags, notifications
         case profile, stats, tokens, webhooks
         case adminUsers, adminInstance
+        case data
     }
 
     /// The sync sheet, opened from the toolbar, the menu bar or the library menu.
@@ -122,8 +125,9 @@ final class SessionModel: ObservableObject {
 
     var openTaskCount: Int { taskGroups.reduce(0) { $0 + $1.tasks.count } }
 
+    /// From the account-wide counts, so a tag filter or the archive does not skew it.
     func count(forTag tag: String) -> Int {
-        sections.flatMap(\.memos).filter { $0.tags.contains(tag) }.count
+        tagCounts[tag] ?? sections.flatMap(\.memos).filter { $0.tags.contains(tag) }.count
     }
 
     var memoCount: Int { sections.reduce(0) { $0 + $1.memos.count } }

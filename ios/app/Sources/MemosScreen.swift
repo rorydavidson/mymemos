@@ -17,7 +17,7 @@ struct MemosScreen: View {
 
     enum Library: String, Hashable {
         case reminders, templates, settings, shortcuts, tags, notifications
-        case profile, tokens, webhooks, stats, adminUsers, adminInstance
+        case profile, tokens, webhooks, stats, adminUsers, adminInstance, data
     }
 
     private var title: String {
@@ -63,6 +63,8 @@ struct MemosScreen: View {
                         AdminUsersView(model: model).navigationTitle("Users")
                     case .adminInstance:
                         AdminInstanceView(model: model).navigationTitle("Instance")
+                    case .data:
+                        DataView(model: model).navigationTitle("Your data")
                     }
                 }
         }

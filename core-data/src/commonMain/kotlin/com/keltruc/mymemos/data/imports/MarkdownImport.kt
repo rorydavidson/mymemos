@@ -1,9 +1,10 @@
 package com.keltruc.mymemos.data.imports
 
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toInstant
 import kotlin.time.Instant
 
 /**
@@ -28,7 +29,9 @@ object MarkdownImport {
     private val entry = Regex("^([A-Za-z_][A-Za-z0-9_-]*):[ \\t]*(.*)$")
     private val listItem = Regex("^[ \\t]*-[ \\t]+(.*)$")
     // The app's own tag syntax; anything outside it would not survive a round trip through a memo.
-    private val illegalInTag = Regex("[^\\p{L}\\p{N}_/-]+")
+    // A character filter rather than a negated regex class: Kotlin/Native's engine mishandles
+    // \p{L} inside [^...] and would strip the underscore, slash and hyphen along with the rest.
+    private fun Char.isTagCharacter(): Boolean = isLetterOrDigit() || this == '_' || this == '/' || this == '-'
 
     /** Keys different tools use for the same two dates. */
     private val createdKeys = setOf("created", "created_at", "date", "createtime", "create_time")
@@ -70,7 +73,7 @@ object MarkdownImport {
     }
 
     private fun sanitiseTag(raw: String): String? =
-        raw.trim().trim('"', '\'').replace(' ', '-').replace(illegalInTag, "").trim('/', '-')
+        raw.trim().trim('"', '\'').replace(' ', '-').filter { it.isTagCharacter() }.trim('/', '-')
             .takeIf { it.isNotEmpty() }
 
     private fun String.splitInline(): List<String> =
@@ -107,21 +110,17 @@ object MarkdownImport {
 
     /**
      * Front matter comes from whatever wrote it, so this tries the shapes seen in the wild in
-     * turn. The parsing stays on `java.time`, which is lenient in ways worth keeping; only the
-     * result crosses into the model's `kotlin.time.Instant`.
+     * turn: an instant with a zone or offset, a local date-time with a T or a space between
+     * the parts, with or without seconds, and a bare date. Local times are read in the
+     * device's zone, which is where the note was most likely written.
      */
-    private fun parseInstant(raw: String): Instant? = parseJavaInstant(raw)?.let {
-        Instant.fromEpochMilliseconds(it.toEpochMilli())
-    }
-
-    private fun parseJavaInstant(raw: String): java.time.Instant? {
+    private fun parseInstant(raw: String): Instant? {
         val text = raw.trim().trim('"', '\'')
-        runCatching { return java.time.Instant.parse(text) }
-        runCatching { return java.time.OffsetDateTime.parse(text).toInstant() }
-        runCatching { return LocalDateTime.parse(text).atZone(ZoneId.systemDefault()).toInstant() }
-        runCatching { return LocalDateTime.parse(text, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).atZone(ZoneId.systemDefault()).toInstant() }
-        runCatching { return LocalDateTime.parse(text, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")).atZone(ZoneId.systemDefault()).toInstant() }
-        runCatching { return LocalDate.parse(text).atStartOfDay(ZoneId.systemDefault()).toInstant() }
+        val zone = TimeZone.currentSystemDefault()
+        runCatching { return Instant.parse(text) }
+        runCatching { return LocalDateTime.parse(text).toInstant(zone) }
+        runCatching { return LocalDateTime.parse(text.replaceFirst(' ', 'T')).toInstant(zone) }
+        runCatching { return LocalDate.parse(text).atStartOfDayIn(zone) }
         return null
     }
 }

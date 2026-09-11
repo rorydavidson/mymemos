@@ -6,12 +6,15 @@ import com.keltruc.mymemos.model.SyncStatus
 import com.keltruc.mymemos.model.Visibility
 import com.keltruc.mymemos.data.export.MarkdownExporter
 import kotlin.time.Instant
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
-import org.junit.Test
-import java.time.LocalDate
-import java.time.ZoneId
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toInstant
 
 class MarkdownImportTest {
 
@@ -54,24 +57,36 @@ class MarkdownImportTest {
     }
 
     @Test
-    fun `other tools' date keys and formats are accepted`() {
-        val zone = ZoneId.systemDefault()
+    fun `date keys and formats of other tools are accepted`() {
+        val zone = TimeZone.currentSystemDefault()
         assertEquals(
-            LocalDate.of(2026, 9, 8).atStartOfDay(zone).toInstant().toKotlinInstant(),
+            LocalDate(2026, 9, 8).atStartOfDayIn(zone),
             MarkdownImport.parse("---\ndate: 2026-09-08\n---\nx").created,
         )
         assertEquals(
-            LocalDate.of(2026, 9, 8).atTime(14, 30).atZone(zone).toInstant().toKotlinInstant(),
+            LocalDateTime(2026, 9, 8, 14, 30).toInstant(zone),
             MarkdownImport.parse("---\ncreated_at: 2026-09-08 14:30\n---\nx").created,
+        )
+        assertEquals(
+            LocalDateTime(2026, 9, 8, 14, 30, 15).toInstant(zone),
+            MarkdownImport.parse("---\ncreated_at: 2026-09-08 14:30:15\n---\nx").created,
+        )
+        assertEquals(
+            LocalDateTime(2026, 9, 8, 14, 30).toInstant(zone),
+            MarkdownImport.parse("---\ncreated: 2026-09-08T14:30\n---\nx").created,
         )
         assertEquals(
             Instant.parse("2026-09-08T09:00:00Z"),
             MarkdownImport.parse("---\nmodified: 2026-09-08T09:00:00Z\n---\nx").updated,
         )
+        assertEquals(
+            Instant.parse("2026-09-08T07:00:00Z"),
+            MarkdownImport.parse("---\ncreated: 2026-09-08T09:00:00+02:00\n---\nx").created,
+        )
     }
 
     @Test
-    fun `front matter that makes no sense is treated as absent, not fatal`() {
+    fun `front matter that makes no sense is treated as absent rather than fatal`() {
         val parsed = MarkdownImport.parse("---\ncreated: last Tuesday\n: : :\n---\nbody")
         assertNull(parsed.created)
         assertEquals("body", parsed.body)
@@ -128,6 +143,3 @@ class MarkdownImportTest {
         assertEquals(memo.remoteName, parsed.remoteName)
     }
 }
-
-/** These fixtures build instants with java.time; the parser now returns kotlin.time. */
-private fun java.time.Instant.toKotlinInstant(): Instant = Instant.fromEpochMilliseconds(toEpochMilli())

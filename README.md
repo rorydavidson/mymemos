@@ -167,8 +167,9 @@ machine; the native tests need a Mac:
 
 The macOS app lives under `macos/` and the iOS app under `ios/`; the SwiftUI they have in
 common is in `apple/ui` and the Kotlin framework they both link is `apple/shared`. Both are
-built by script against the same sync engine as the phone. See `macos/README.md` and
-`ios/README.md` for what each does and does not do.
+built by script against the same sync engine as the phone, and both read and write the same
+export zips and encrypted backups as Android. See `macos/README.md` and `ios/README.md` for
+what each does and does not do.
 
 ```bash
 macos/app/build.sh && open macos/app/build/MyMemos.app

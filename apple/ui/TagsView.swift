@@ -75,9 +75,35 @@ private struct TagStyleEditor: View {
                 HStack {
                     Text("Emoji").font(Type.rowBody)
                     TextField("None", text: $emoji).textFieldStyle(.roundedBorder).frame(maxWidth: 90)
+                    if !emoji.isEmpty {
+                        Button("Clear") { emoji = "" }.linkButton().font(Type.rowMeta)
+                    }
                     Spacer()
                     TagChip(tag: tag, style: TagStyleRow(tag: tag, emoji: emoji, colourName: colourName, colourHex: hex))
                 }
+                // The same catalogue Android offers, by category. Anything else can be typed above.
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(model.emojiCatalogue, id: \.name) { group in
+                            Text(group.name.uppercased()).font(Type.label).tracking(0.7).foregroundStyle(Theme.inkSoft.opacity(0.8))
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 32), spacing: 4)], spacing: 4) {
+                                ForEach(group.emoji, id: \.self) { candidate in
+                                    Button { emoji = candidate } label: {
+                                        Text(candidate)
+                                            .font(.system(size: 20))
+                                            .frame(width: 32, height: 32)
+                                            .background(RoundedRectangle(cornerRadius: 6).fill(emoji == candidate ? Theme.accentSoft : .clear))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.trailing, 4)
+                }
+                .frame(height: 180)
+                .background(Theme.card, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.hairline))
                 Text("Colour").font(Type.rowBody)
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 34), spacing: 8)], spacing: 8) {
                     swatch(nil, hex: -1)
@@ -90,7 +116,7 @@ private struct TagStyleEditor: View {
             }
             .padding(14)
         }
-        .sheetWidth(400)
+        .sheetWidth(440)
         .background(Theme.canvas)
         .onAppear {
             guard !loaded else { return }

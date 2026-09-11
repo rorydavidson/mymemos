@@ -42,6 +42,14 @@ import kotlin.uuid.Uuid
 import kotlin.time.Duration.Companion.days
 import kotlinx.serialization.json.Json
 import com.keltruc.mymemos.data.mapper.toModel
+import com.keltruc.mymemos.data.export.BackupCipher
+import com.keltruc.mymemos.data.export.MarkdownExporter
+import com.keltruc.mymemos.data.imports.MarkdownImporting
+import com.keltruc.mymemos.data.zip.ByteArraySink
+import com.keltruc.mymemos.data.zip.ZipReader
+import com.keltruc.mymemos.data.zip.ZipWriter
+import com.keltruc.mymemos.database.MyMemosDatabase
+import androidx.room.useWriterConnection
 import com.keltruc.mymemos.data.repository.ShareRepository
 import com.keltruc.mymemos.data.repository.ShortcutRepository
 import com.keltruc.mymemos.model.Location
@@ -117,18 +125,21 @@ class MemosSession {
     }
 
     /** Confirms the address really is a Memos server before anyone types a password at it. */
+    @Throws(Throwable::class)
     suspend fun probe(serverUrl: String): String {
         val version = registry.anonymousApi(serverUrl).getInstanceProfile().version
         serverVersion = version
         return version
     }
 
+    @Throws(Throwable::class)
     suspend fun signIn(serverUrl: String, username: String, password: String) {
         val account = accounts.signInWithPassword(serverUrl, username, password)
         displayName = account.displayName.ifEmpty { account.username }
     }
 
     /** Pulls from the server into the local database, exactly as the phone does. */
+    @Throws(Throwable::class)
     suspend fun sync(): String {
         val account = db.accountDao().getActive() ?: return "not signed in"
         return when (engine.sync(account.id, fullPull = true)) {
@@ -143,6 +154,7 @@ class MemosSession {
      * then whole months. The grouping is shared code; only the words above each group are
      * written here.
      */
+    @Throws(Throwable::class)
     suspend fun timeline(): List<TimelineSection> {
         val account = db.accountDao().getActive() ?: return emptyList()
         val byModified = AppleStack.preferences.settings.first().sortByModified
@@ -150,17 +162,20 @@ class MemosSession {
     }
 
     /** Offline full-text search, straight off the local FTS index. */
+    @Throws(Throwable::class)
     suspend fun search(query: String): List<TimelineSection> {
         val account = db.accountDao().getActive() ?: return emptyList()
         if (query.isBlank()) return timeline()
         return group(memos.search(account.id, query).first())
     }
 
+    @Throws(Throwable::class)
     suspend fun tags(): List<String> {
         val account = db.accountDao().getActive() ?: return emptyList()
         return memos.observeTags(account.id).first()
     }
 
+    @Throws(Throwable::class)
     suspend fun memo(localId: String): MemoDetail? {
         val memo = memos.observeMemo(localId).first() ?: return null
         return MemoDetail(
@@ -183,6 +198,7 @@ class MemosSession {
     // MARK: account
 
     /** Revokes this device's token on the server and forgets the account locally. */
+    @Throws(Throwable::class)
     suspend fun signOut() {
         val account = db.accountDao().getActive() ?: return
         accounts.activeAccount.first()?.let { accounts.signOut(it) }
@@ -191,16 +207,20 @@ class MemosSession {
     }
 
     /** Order the timeline by when memos were last changed rather than when they were written. */
+    @Throws(Throwable::class)
     suspend fun sortByModified(): Boolean = AppleStack.preferences.settings.first().sortByModified
 
+    @Throws(Throwable::class)
     suspend fun setSortByModified(enabled: Boolean) = AppleStack.preferences.setSortByModified(enabled)
 
     /**
      * One line per memo instead of a card, for scanning a long timeline rather than reading
      * it. Local to this Mac: it is a view preference, not something to follow you about.
      */
+    @Throws(Throwable::class)
     suspend fun compactList(): Boolean = AppleStack.preferences.settings.first().compactList
 
+    @Throws(Throwable::class)
     suspend fun setCompactList(enabled: Boolean) = AppleStack.preferences.setCompactList(enabled)
 
     // MARK: tasks
@@ -210,6 +230,7 @@ class MemosSession {
      * ordered by when it is due, with undated ones last. The parsing is shared with the phone,
      * so a completion can never mean a different day than it shows.
      */
+    @Throws(Throwable::class)
     suspend fun openTasks(): List<TaskGroup> {
         val account = db.accountDao().getActive() ?: return emptyList()
         val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
@@ -241,6 +262,7 @@ class MemosSession {
     }
 
     /** Ticks a task off, which edits the memo's own text. */
+    @Throws(Throwable::class)
     suspend fun completeTask(memoLocalId: String, lineIndex: Int) {
         val memo = memos.observeMemoOnce(memoLocalId) ?: return
         TaskLine.toggle(memo.content, lineIndex, checked = true)?.let {
@@ -251,6 +273,7 @@ class MemosSession {
     // MARK: review
 
     /** How many days in a row have something written, counting back from today. */
+    @Throws(Throwable::class)
     suspend fun streak(): Int {
         val account = db.accountDao().getActive() ?: return 0
         val zone = TimeZone.currentSystemDefault()
@@ -266,6 +289,7 @@ class MemosSession {
     }
 
     /** The last year of writing, as one entry per day that has any. */
+    @Throws(Throwable::class)
     suspend fun activeDays(): List<String> {
         val account = db.accountDao().getActive() ?: return emptyList()
         return memos.observeActiveDays(account.id).first().map { it.toString() }.sorted()
@@ -274,6 +298,7 @@ class MemosSession {
     /**
      * Memos written on this day in earlier months and years, which is what "On this day" shows.
      */
+    @Throws(Throwable::class)
     suspend fun onThisDay(): List<Throwback> {
         val account = db.accountDao().getActive() ?: return emptyList()
         val zone = TimeZone.currentSystemDefault()
@@ -308,6 +333,7 @@ class MemosSession {
      * avatar URL is set on the server and would otherwise be a way to collect bearer tokens
      * from whoever renders it.
      */
+    @Throws(Throwable::class)
     suspend fun avatarBytes(): ByteArray? {
         val account = db.accountDao().getActive() ?: return null
         return when (val source = AvatarSource.of(account.avatarUrl, account.serverUrl)) {
@@ -343,11 +369,14 @@ class MemosSession {
      * memo's location asks openstreetmap.org for the tiles around it, which tells them roughly
      * where you are. With it off nothing is drawn and nothing leaves the device.
      */
+    @Throws(Throwable::class)
     suspend fun mapTilesEnabled(): Boolean = AppleStack.preferences.settings.first().mapTiles
 
+    @Throws(Throwable::class)
     suspend fun setMapTiles(enabled: Boolean) = AppleStack.preferences.setMapTiles(enabled)
 
     /** Every memo that carries a location, newest first, for the journey map. */
+    @Throws(Throwable::class)
     suspend fun locatedMemos(): List<PlacedMemo> {
         val account = db.accountDao().getActive() ?: return emptyList()
         return memos.memosWithLocation(account.id)
@@ -366,6 +395,7 @@ class MemosSession {
     // MARK: attachments
 
     /** What a memo carries, for the strip under it. */
+    @Throws(Throwable::class)
     suspend fun attachments(localId: String): List<AttachmentRow> {
         // observeMemoOnce reads the memo row alone; only the observing query joins the
         // attachments, and without them this quietly returns an empty strip.
@@ -390,6 +420,7 @@ class MemosSession {
      * the bearer token, and sending it anywhere other than the account's own server would
      * hand the credential to whoever controls an attachment's link.
      */
+    @Throws(Throwable::class)
     suspend fun attachmentBytes(memoLocalId: String, attachmentLocalId: String): ByteArray? {
         val store = AppleStack.attachments
         if (store.exists(attachmentLocalId)) return store.readBytes(attachmentLocalId)
@@ -406,6 +437,7 @@ class MemosSession {
     }
 
     /** Records a file the user picked. The upload rides the outbox like every other change. */
+    @Throws(Throwable::class)
     suspend fun attach(memoLocalId: String, sourcePath: String, filename: String, mimeType: String): Boolean {
         val staged = AppleStack.attachments.stage(sourcePath, filename, mimeType) ?: return false
         memos.addAttachment(memoLocalId, staged)
@@ -433,6 +465,7 @@ class MemosSession {
      * The readable text of a locked memo, without changing what is stored. The memo stays
      * encrypted on the server and on disk; this is only for showing it.
      */
+    @Throws(Throwable::class)
     suspend fun reveal(localId: String): Reveal {
         val memo = memos.observeMemoOnce(localId) ?: return Reveal(null, needsPassword = false, wrongPassword = false)
         if (!memo.isLocked) return Reveal(memo.displayContent, needsPassword = false, wrongPassword = false)
@@ -445,6 +478,7 @@ class MemosSession {
     }
 
     /** Removes the encryption for good, so the server sees the text again. */
+    @Throws(Throwable::class)
     suspend fun unlockForGood(localId: String): Boolean {
         val password = passwords.current() ?: return false
         return try {
@@ -456,6 +490,7 @@ class MemosSession {
     }
 
     /** Locks a memo that is currently in the clear. */
+    @Throws(Throwable::class)
     suspend fun lock(localId: String): Boolean {
         val password = passwords.current() ?: return false
         memos.lock(localId, password)
@@ -465,24 +500,29 @@ class MemosSession {
     // MARK: writing
 
     /** Saves a new memo locally and pushes it; the outbox handles the network being away. */
+    @Throws(Throwable::class)
     suspend fun create(content: String, visibility: String, pinned: Boolean): String? {
         val account = db.accountDao().getActive() ?: return null
         return memos.create(account.id, content, Visibility.valueOf(visibility), pinned)
     }
 
+    @Throws(Throwable::class)
     suspend fun updateContent(localId: String, content: String) {
         memos.updateContent(localId, content)
     }
 
+    @Throws(Throwable::class)
     suspend fun setPinned(localId: String, pinned: Boolean) {
         memos.setPinned(localId, pinned)
     }
 
+    @Throws(Throwable::class)
     suspend fun setVisibility(localId: String, visibility: String) {
         memos.setVisibility(localId, Visibility.valueOf(visibility))
     }
 
     /** True when the delete can still be taken back, which is what the phone's Undo relies on. */
+    @Throws(Throwable::class)
     suspend fun delete(localId: String): Boolean = memos.delete(localId)
 
     /**
@@ -502,6 +542,7 @@ class MemosSession {
         }
 
     /** The raw Markdown, which is what the editor opens. */
+    @Throws(Throwable::class)
     suspend fun rawContent(localId: String): String? = memos.observeMemoOnce(localId)?.displayContent
 
     private fun group(all: List<Memo>): List<TimelineSection> {
@@ -528,14 +569,17 @@ class MemosSession {
      * The saved templates, seeding the three defaults the first time anyone looks. Seeding on
      * read rather than at startup keeps it off the launch path, and the check is a COUNT.
      */
+    @Throws(Throwable::class)
     suspend fun templates(): List<TemplateRow> {
         templates.seedDefaultsIfEmpty()
         return templates.templates.first().map { TemplateRow(it.id, it.title, it.body) }
     }
 
+    @Throws(Throwable::class)
     suspend fun saveTemplate(id: Long, title: String, body: String) =
         templates.save(id.takeIf { it > 0 }, title, body)
 
+    @Throws(Throwable::class)
     suspend fun deleteTemplate(id: Long) = templates.delete(id)
 
     /** A template's body with today's date and time written into it, ready to edit. */
@@ -547,6 +591,7 @@ class MemosSession {
     // Both live in the config memo, so they sync: a reminder set on the phone arrives here on
     // the next pull, and one set here reaches the phone the same way.
 
+    @Throws(Throwable::class)
     suspend fun reminders(): List<ReminderRow> {
         val zone = TimeZone.currentSystemDefault()
         return config.current().reminders
@@ -572,6 +617,7 @@ class MemosSession {
      * Sets a one-off reminder on a memo. Returns false for a memo the server has not seen yet:
      * reminders travel by the memo's server name, and a memo still in the outbox has none.
      */
+    @Throws(Throwable::class)
     suspend fun addReminder(memoLocalId: String, atEpochMs: Long, note: String): Boolean {
         val remoteName = memos.observeMemoOnce(memoLocalId)?.remoteName ?: return false
         val reminder = Reminder(
@@ -584,9 +630,11 @@ class MemosSession {
         return true
     }
 
+    @Throws(Throwable::class)
     suspend fun removeReminder(id: String) =
         config.update { c -> c.copy(reminders = c.reminders.filterNot { it.id == id }) }
 
+    @Throws(Throwable::class)
     suspend fun recurring(): List<RecurringRow> {
         val enabledByTitle = config.current().recurring.associateBy { it.templateTitle }
         val zone = TimeZone.currentSystemDefault()
@@ -610,6 +658,7 @@ class MemosSession {
         }
     }
 
+    @Throws(Throwable::class)
     suspend fun setRecurring(templateTitle: String, hour: Int, minute: Int, enabled: Boolean) {
         config.update { c ->
             val rest = c.recurring.filterNot { it.templateTitle == templateTitle }
@@ -617,8 +666,10 @@ class MemosSession {
         }
     }
 
+    @Throws(Throwable::class)
     suspend fun weeklyDigest(): Boolean = config.current().weeklyDigest
 
+    @Throws(Throwable::class)
     suspend fun setWeeklyDigest(enabled: Boolean) = config.update { it.copy(weeklyDigest = enabled) }
 
     /**
@@ -629,6 +680,7 @@ class MemosSession {
      * scheduled earlier even with the app closed, but nothing can write a memo while the app is
      * not running. So the alarm tells you, and the next launch catches up.
      */
+    @Throws(Throwable::class)
     suspend fun runDueRecurring(): List<String> {
         val account = db.accountDao().getActive() ?: return emptyList()
         val zone = TimeZone.currentSystemDefault()
@@ -668,6 +720,7 @@ class MemosSession {
      * written a week ago. The alarm is what survives being closed; the words are worked out
      * when there is something to work them out from.
      */
+    @Throws(Throwable::class)
     suspend fun lastDigestDueEpochMs(): Long {
         val zone = TimeZone.currentSystemDefault()
         val next = Schedule.nextWeekly(DayOfWeek.SUNDAY, DIGEST_HOUR, 0, Clock.System.now(), zone)
@@ -675,6 +728,7 @@ class MemosSession {
     }
 
     /** When the digest next goes out, or empty when it is switched off. */
+    @Throws(Throwable::class)
     suspend fun digestNextLabel(): String {
         if (!config.current().weeklyDigest) return ""
         val zone = TimeZone.currentSystemDefault()
@@ -683,6 +737,7 @@ class MemosSession {
     }
 
     /** The digest itself, worked out from the local database by the same code the phone uses. */
+    @Throws(Throwable::class)
     suspend fun digestText(): String? {
         val account = db.accountDao().getActive() ?: return null
         val zone = TimeZone.currentSystemDefault()
@@ -699,6 +754,7 @@ class MemosSession {
     private suspend fun localIdFor(remoteName: String): String =
         accounts.activeAccountOrNull()?.let { memos.ensureLocal(it, remoteName) }.orEmpty()
 
+    @Throws(Throwable::class)
     suspend fun signedInAs(): String? = db.accountDao().getActive()?.let {
         serverVersion = it.serverVersion
         displayName = it.displayName.ifEmpty { it.username }
@@ -722,24 +778,29 @@ class MemosSession {
     // MARK: archive, colour and undo
 
     /** Archived memos, grouped like the timeline. */
+    @Throws(Throwable::class)
     suspend fun archived(): List<TimelineSection> {
         val account = db.accountDao().getActive() ?: return emptyList()
         val byModified = AppleStack.preferences.settings.first().sortByModified
         return group(memos.observeTimeline(account.id, byModified = byModified, state = MemoState.ARCHIVED).first())
     }
 
+    @Throws(Throwable::class)
     suspend fun setArchived(localId: String, archived: Boolean) =
         memos.setState(localId, if (archived) MemoState.ARCHIVED else MemoState.NORMAL)
 
+    @Throws(Throwable::class)
     suspend fun isArchived(localId: String): Boolean =
         memos.observeMemoOnce(localId)?.state == MemoState.ARCHIVED
 
     /** Takes back a delete that has not reached the server yet. */
+    @Throws(Throwable::class)
     suspend fun undoDelete(localId: String): Boolean = memos.undoDelete(localId)
 
     /** The sixteen colours a memo can be tinted, as name and 0xRRGGBB. */
     fun colours(): List<ColourOption> = NoteColour.entries.map { ColourOption(it.name, it.hex) }
 
+    @Throws(Throwable::class)
     suspend fun setColour(localId: String, name: String?) =
         memos.setColour(localId, name?.let { n -> NoteColour.entries.firstOrNull { it.name == n } })
 
@@ -752,6 +813,7 @@ class MemosSession {
      * A memo's comments, refreshed from the server when it can be reached and read from the
      * database either way. Comments are not part of the memo list, so they arrive on demand.
      */
+    @Throws(Throwable::class)
     suspend fun comments(localId: String): List<CommentRow> {
         val account = accounts.activeAccountOrNull() ?: return emptyList()
         val parent = memos.observeMemoOnce(localId)?.remoteName ?: return emptyList()
@@ -769,6 +831,7 @@ class MemosSession {
     }
 
     /** False for a memo the server has not seen yet: a comment needs a parent name. */
+    @Throws(Throwable::class)
     suspend fun addComment(localId: String, text: String): Boolean {
         val account = db.accountDao().getActive() ?: return false
         val parent = memos.observeMemoOnce(localId)?.remoteName ?: return false
@@ -776,6 +839,7 @@ class MemosSession {
         return true
     }
 
+    @Throws(Throwable::class)
     suspend fun reactions(localId: String): List<ReactionRow> {
         val me = db.accountDao().getActive()?.userResourceName
         return memos.observeReactions(localId).first()
@@ -784,6 +848,7 @@ class MemosSession {
             .sortedByDescending { it.count }
     }
 
+    @Throws(Throwable::class)
     suspend fun toggleReaction(localId: String, type: String) {
         val me = db.accountDao().getActive()?.userResourceName ?: return
         memos.toggleReaction(localId, me, type)
@@ -792,6 +857,7 @@ class MemosSession {
     // MARK: references
 
     /** Memos this one points at. */
+    @Throws(Throwable::class)
     suspend fun references(localId: String): List<ReferenceRow> {
         val account = db.accountDao().getActive() ?: return emptyList()
         return memos.observeReferences(localId).first().map { ref ->
@@ -804,6 +870,7 @@ class MemosSession {
     }
 
     /** Memos that point at this one. */
+    @Throws(Throwable::class)
     suspend fun backlinks(localId: String): List<MemoRow> {
         val account = db.accountDao().getActive() ?: return emptyList()
         val remoteName = memos.observeMemoOnce(localId)?.remoteName ?: return emptyList()
@@ -811,19 +878,23 @@ class MemosSession {
     }
 
     /** Synced, top-level memos matching [query], for the reference picker. */
+    @Throws(Throwable::class)
     suspend fun referenceCandidates(query: String): List<MemoRow> {
         val account = db.accountDao().getActive() ?: return emptyList()
         return memos.pickReferenceCandidates(account.id, query).map { it.toRow() }
     }
 
+    @Throws(Throwable::class)
     suspend fun addReference(localId: String, targetLocalId: String) {
         val target = memos.observeMemoOnce(targetLocalId) ?: return
         memos.addReference(localId, target)
     }
 
+    @Throws(Throwable::class)
     suspend fun removeReference(localId: String, remoteName: String) = memos.removeReference(localId, remoteName)
 
     /** Every memo that references or is referenced, and the edges between them. */
+    @Throws(Throwable::class)
     suspend fun referenceGraph(): GraphData {
         val account = db.accountDao().getActive() ?: return GraphData(emptyList(), emptyList())
         val (nodes, edges) = memos.referenceGraph(account.id)
@@ -831,11 +902,13 @@ class MemosSession {
     }
 
     /** Opens a memo by its server name, pulling it if this device does not hold it yet. */
+    @Throws(Throwable::class)
     suspend fun localIdForRemote(remoteName: String): String? =
         accounts.activeAccountOrNull()?.let { memos.ensureLocal(it, remoteName) }
 
     // MARK: share links
 
+    @Throws(Throwable::class)
     suspend fun shares(localId: String): List<ShareRow> {
         val account = accounts.activeAccountOrNull() ?: return emptyList()
         val remoteName = memos.observeMemoOnce(localId)?.remoteName ?: return emptyList()
@@ -845,6 +918,7 @@ class MemosSession {
         }
     }
 
+    @Throws(Throwable::class)
     suspend fun createShare(localId: String, expiresInDays: Int): ShareRow? {
         val account = accounts.activeAccountOrNull() ?: return null
         val remoteName = memos.observeMemoOnce(localId)?.remoteName ?: return null
@@ -853,6 +927,7 @@ class MemosSession {
         return ShareRow(share.name, share.url, share.createTime.friendly(), share.expireTime?.friendlyWithTime(TimeZone.currentSystemDefault()))
     }
 
+    @Throws(Throwable::class)
     suspend fun revokeShare(localId: String, name: String) {
         val account = accounts.activeAccountOrNull() ?: return
         val remoteName = memos.observeMemoOnce(localId)?.remoteName ?: return
@@ -862,11 +937,13 @@ class MemosSession {
     // MARK: shortcuts
 
     /** Saved server-side filters. Running one needs the server; the results are shown from the database. */
+    @Throws(Throwable::class)
     suspend fun shortcuts(): List<ShortcutRow> {
         val account = db.accountDao().getActive() ?: return emptyList()
         return shortcuts.observe(account.id).first().map { ShortcutRow(it.name, it.title, it.filter) }
     }
 
+    @Throws(Throwable::class)
     suspend fun runShortcut(name: String): List<TimelineSection> {
         val account = accounts.activeAccountOrNull() ?: return emptyList()
         val shortcut = shortcuts.observe(account.id).first().firstOrNull { it.name == name } ?: return emptyList()
@@ -875,12 +952,14 @@ class MemosSession {
         return group(shortcuts.observeMemos(account.id, names).first())
     }
 
+    @Throws(Throwable::class)
     suspend fun saveShortcut(name: String?, title: String, filter: String) {
         val account = accounts.activeAccountOrNull() ?: return
         if (name == null) shortcuts.create(account, title, filter)
         else shortcuts.update(account, com.keltruc.mymemos.model.Shortcut(name, title, filter))
     }
 
+    @Throws(Throwable::class)
     suspend fun deleteShortcut(name: String) {
         val account = accounts.activeAccountOrNull() ?: return
         shortcuts.observe(account.id).first().firstOrNull { it.name == name }?.let { shortcuts.delete(account, it) }
@@ -888,12 +967,15 @@ class MemosSession {
 
     // MARK: places
 
+    @Throws(Throwable::class)
     suspend fun setLocation(localId: String, latitude: Double, longitude: Double, placeName: String) =
         memos.setLocation(localId, Location(placeName, latitude, longitude))
 
+    @Throws(Throwable::class)
     suspend fun clearLocation(localId: String) = memos.setLocation(localId, null)
 
     /** Located memos ordered by distance from where the device says it is. */
+    @Throws(Throwable::class)
     suspend fun nearby(latitude: Double, longitude: Double): List<NearbyRow> {
         val account = db.accountDao().getActive() ?: return emptyList()
         return memos.memosWithLocation(account.id).mapNotNull { memo ->
@@ -912,6 +994,7 @@ class MemosSession {
 
     // MARK: sync state
 
+    @Throws(Throwable::class)
     suspend fun syncState(): SyncStatusRow {
         val account = db.accountDao().getActive() ?: return SyncStatusRow(0, 0, 0, null, false, "")
         val state = memos.observeSyncState(account.id).first()
@@ -925,6 +1008,7 @@ class MemosSession {
         )
     }
 
+    @Throws(Throwable::class)
     suspend fun failedOps(): List<FailedOpRow> {
         val account = db.accountDao().getActive() ?: return emptyList()
         return memos.observeFailedOps(account.id).first().map { op ->
@@ -940,20 +1024,24 @@ class MemosSession {
         }
     }
 
+    @Throws(Throwable::class)
     suspend fun retryFailed() {
         val account = db.accountDao().getActive() ?: return
         memos.retryFailed(account.id)
     }
 
     /** Conflict copies the merge could not settle, kept rather than lost. */
+    @Throws(Throwable::class)
     suspend fun conflicts(): List<MemoRow> {
         val account = db.accountDao().getActive() ?: return emptyList()
         return db.memoDao().observeConflicts(account.id).first().map { it.toModel().toRow() }
     }
 
+    @Throws(Throwable::class)
     suspend fun keepConflictCopy(localId: String) = memos.resolveConflict(localId)
 
     /** Signs in again with the password when the device's token has lapsed. */
+    @Throws(Throwable::class)
     suspend fun reauthenticate(password: String): Boolean {
         val account = accounts.activeAccountOrNull() ?: return false
         return runCatching { accounts.reauthenticate(account, password) }.isSuccess
@@ -961,6 +1049,7 @@ class MemosSession {
 
     // MARK: accounts and servers
 
+    @Throws(Throwable::class)
     suspend fun accounts(): List<AccountRow> {
         val active = db.accountDao().getActive()?.id
         return accounts.accounts.first().map {
@@ -975,30 +1064,58 @@ class MemosSession {
         }
     }
 
+    @Throws(Throwable::class)
     suspend fun switchAccount(id: Long) {
         accounts.switchTo(id)
         signedInAs()
     }
 
+    @Throws(Throwable::class)
     suspend fun isAdmin(): Boolean = db.accountDao().getActive()?.role == UserRole.ADMIN.name
 
     /** Servers signed into before, newest first. Only the address is kept. */
+    @Throws(Throwable::class)
     suspend fun knownServers(): List<String> = AppleStack.preferences.settings.first().knownServers
 
+    @Throws(Throwable::class)
     suspend fun rememberServer(url: String) = AppleStack.preferences.rememberServer(url)
 
+    @Throws(Throwable::class)
     suspend fun forgetServer(url: String) = AppleStack.preferences.forgetServer(url)
 
     /** Move ticked task lines below the unticked ones whenever a memo is saved. */
+    @Throws(Throwable::class)
     suspend fun sortCompletedTasks(): Boolean = AppleStack.preferences.settings.first().sortCompletedTasks
 
+    @Throws(Throwable::class)
     suspend fun setSortCompletedTasks(enabled: Boolean) = AppleStack.preferences.setSortCompletedTasks(enabled)
 
     // MARK: tag styles
 
+    /**
+     * How many memos carry each tag, over the whole account rather than whatever the
+     * timeline happens to be showing, most used first. The same counting observeTags does.
+     */
+    @Throws(Throwable::class)
+    suspend fun tagCounts(): List<TagCount> {
+        val account = db.accountDao().getActive() ?: return emptyList()
+        return db.memoDao().observeTagStrings(account.id).first()
+            .flatMap { it.split(com.keltruc.mymemos.database.entity.MemoEntity.TAG_SEPARATOR) }
+            .filter { it.isNotEmpty() && !com.keltruc.mymemos.data.text.ColourTag.isColourTag(it) }
+            .groupingBy { it }.eachCount()
+            .entries.sortedByDescending { it.value }
+            .map { TagCount(it.key, it.value) }
+    }
+
+    /** The emoji offered for a tag, by category; any emoji can still be typed. */
+    fun emojiCatalogue(): List<EmojiGroup> =
+        com.keltruc.mymemos.data.text.EmojiCatalogue.categories.map { (name, emoji) -> EmojiGroup(name, emoji) }
+
+    @Throws(Throwable::class)
     suspend fun tagStyles(): List<TagStyleRow> =
         config.current().tagStyles.map { (tag, style) -> TagStyleRow(tag, style.emoji, style.colour?.name, style.colour?.hex ?: -1L) }
 
+    @Throws(Throwable::class)
     suspend fun setTagStyle(tag: String, emoji: String?, colourName: String?) {
         val colour = colourName?.let { n -> NoteColour.entries.firstOrNull { it.name == n } }
         config.setTagStyle(tag, TagStyle(emoji?.takeIf { it.isNotBlank() }, colour))
@@ -1007,6 +1124,7 @@ class MemosSession {
     // MARK: editor completions
 
     /** Tags starting with [prefix], most used first, for the editor's popup. */
+    @Throws(Throwable::class)
     suspend fun tagSuggestions(prefix: String): List<String> =
         tags().filter { it.startsWith(prefix, ignoreCase = true) && it != prefix }.take(8)
 
@@ -1023,6 +1141,7 @@ class MemosSession {
     }
 
     /** The memos written on one day, for the day-by-day review. [isoDate] is yyyy-MM-dd. */
+    @Throws(Throwable::class)
     suspend fun memosOn(isoDate: String): List<MemoRow> {
         val account = db.accountDao().getActive() ?: return emptyList()
         val day = runCatching { kotlinx.datetime.LocalDate.parse(isoDate) }.getOrNull() ?: return emptyList()
@@ -1030,6 +1149,7 @@ class MemosSession {
     }
 
     /** Ticks or unticks a task line, which edits the memo's text. */
+    @Throws(Throwable::class)
     suspend fun toggleTask(localId: String, lineIndex: Int, checked: Boolean) {
         val memo = memos.observeMemoOnce(localId) ?: return
         if (memo.isLocked) return
@@ -1038,33 +1158,39 @@ class MemosSession {
 
     // MARK: the account on the server
 
+    @Throws(Throwable::class)
     suspend fun profile(): ProfileRow? {
         val account = accounts.activeAccountOrNull() ?: return null
         val user = settings.profile(account)
         return ProfileRow(user.name, user.username, user.displayName, user.email, about = user.description, admin = user.role == UserRole.ADMIN)
     }
 
+    @Throws(Throwable::class)
     suspend fun updateProfile(displayName: String, description: String, email: String) {
         val account = accounts.activeAccountOrNull() ?: return
         settings.updateProfile(account, displayName, description, email)
         signedInAs()
     }
 
+    @Throws(Throwable::class)
     suspend fun changePassword(newPassword: String) {
         val account = accounts.activeAccountOrNull() ?: return
         settings.changePassword(account, newPassword)
     }
 
+    @Throws(Throwable::class)
     suspend fun defaultVisibility(): String {
         val account = accounts.activeAccountOrNull() ?: return "PRIVATE"
         return settings.preferences(account).defaultVisibility.name
     }
 
+    @Throws(Throwable::class)
     suspend fun setDefaultVisibility(visibility: String) {
         val account = accounts.activeAccountOrNull() ?: return
         settings.setDefaultVisibility(account, Visibility.valueOf(visibility))
     }
 
+    @Throws(Throwable::class)
     suspend fun tokens(): List<TokenRow> {
         val account = accounts.activeAccountOrNull() ?: return emptyList()
         val own = settings.ownTokenName(account)
@@ -1082,31 +1208,37 @@ class MemosSession {
     }
 
     /** Returns the new token's value, which the server shows exactly once. */
+    @Throws(Throwable::class)
     suspend fun createToken(description: String, expiresInDays: Int): String {
         val account = accounts.activeAccountOrNull() ?: return ""
         return settings.createToken(account, description, expiresInDays.takeIf { it > 0 })
     }
 
+    @Throws(Throwable::class)
     suspend fun deleteToken(name: String) {
         val account = accounts.activeAccountOrNull() ?: return
         settings.tokens(account).firstOrNull { it.name == name }?.let { settings.deleteToken(account, it) }
     }
 
+    @Throws(Throwable::class)
     suspend fun webhooks(): List<WebhookRow> {
         val account = accounts.activeAccountOrNull() ?: return emptyList()
         return settings.webhooks(account).map { WebhookRow(it.name, it.displayName, it.url, it.createTime.friendly()) }
     }
 
+    @Throws(Throwable::class)
     suspend fun createWebhook(displayName: String, url: String) {
         val account = accounts.activeAccountOrNull() ?: return
         settings.createWebhook(account, displayName, url)
     }
 
+    @Throws(Throwable::class)
     suspend fun deleteWebhook(name: String) {
         val account = accounts.activeAccountOrNull() ?: return
         settings.webhooks(account).firstOrNull { it.name == name }?.let { settings.deleteWebhook(account, it) }
     }
 
+    @Throws(Throwable::class)
     suspend fun notifications(): List<NotificationRow> {
         val account = accounts.activeAccountOrNull() ?: return emptyList()
         return settings.notifications(account).map {
@@ -1123,22 +1255,26 @@ class MemosSession {
         }
     }
 
+    @Throws(Throwable::class)
     suspend fun unreadNotifications(): Int {
         val account = accounts.activeAccountOrNull() ?: return 0
         runCatching { settings.refreshUnreadCount(account) }
         return settings.unreadNotifications.value
     }
 
+    @Throws(Throwable::class)
     suspend fun markNotificationRead(name: String) {
         val account = accounts.activeAccountOrNull() ?: return
         settings.notifications(account).firstOrNull { it.name == name }?.let { settings.markRead(account, it) }
     }
 
+    @Throws(Throwable::class)
     suspend fun deleteNotification(name: String) {
         val account = accounts.activeAccountOrNull() ?: return
         settings.notifications(account).firstOrNull { it.name == name }?.let { settings.deleteNotification(account, it) }
     }
 
+    @Throws(Throwable::class)
     suspend fun stats(): StatsRow? {
         val account = accounts.activeAccountOrNull() ?: return null
         val stats = settings.stats(account)
@@ -1155,32 +1291,38 @@ class MemosSession {
 
     // MARK: administration
 
+    @Throws(Throwable::class)
     suspend fun users(): List<UserRow> {
         val account = accounts.activeAccountOrNull() ?: return emptyList()
         return settings.users(account).map { UserRow(it.name, it.username, it.displayName, it.email, it.role == UserRole.ADMIN) }
     }
 
+    @Throws(Throwable::class)
     suspend fun createUser(username: String, password: String, admin: Boolean) {
         val account = accounts.activeAccountOrNull() ?: return
         settings.createUser(account, username, password, if (admin) "ADMIN" else "USER")
     }
 
+    @Throws(Throwable::class)
     suspend fun setUserArchived(name: String, archived: Boolean) {
         val account = accounts.activeAccountOrNull() ?: return
         settings.users(account).firstOrNull { it.name == name }?.let { settings.setUserArchived(account, it, archived) }
     }
 
+    @Throws(Throwable::class)
     suspend fun deleteUser(name: String) {
         val account = accounts.activeAccountOrNull() ?: return
         settings.users(account).firstOrNull { it.name == name }?.let { settings.deleteUser(account, it) }
     }
 
+    @Throws(Throwable::class)
     suspend fun instanceGeneral(): InstanceRow? {
         val account = accounts.activeAccountOrNull() ?: return null
         val g = settings.instanceGeneral(account)
         return InstanceRow(g.title, g.description, g.disallowRegistration, g.disallowPasswordAuth, g.disallowChangeUsername, g.disallowChangeNickname, g.weekStartDayOffset)
     }
 
+    @Throws(Throwable::class)
     suspend fun updateInstanceGeneral(row: InstanceRow) {
         val account = accounts.activeAccountOrNull() ?: return
         settings.updateInstanceGeneral(
@@ -1189,10 +1331,94 @@ class MemosSession {
         )
     }
 
+    @Throws(Throwable::class)
     suspend fun instanceStats(): InstanceStatsRow? {
         val account = accounts.activeAccountOrNull() ?: return null
         val s = settings.instanceStats(account)
         return InstanceStatsRow(s.databaseDriver, s.databaseBytes, s.localStorageBytes)
+    }
+
+    // MARK: your data
+
+    /** Every memo as Markdown with front matter, plus local attachments, zipped at [path]. */
+    @Throws(Throwable::class)
+    suspend fun exportMarkdown(path: String): Int {
+        val account = db.accountDao().getActive() ?: return 0
+        val exporter = MarkdownExporter(db.memoDao(), AppleStack.attachments)
+        return exporter.export(account.id, AppleFiles.sink(path))
+    }
+
+    /** Markdown files or zips of them, as memos. Private unless a file's front matter says otherwise. */
+    @Throws(Throwable::class)
+    suspend fun importMarkdown(paths: List<String>): ImportResultRow {
+        val account = db.accountDao().getActive() ?: return ImportResultRow(0, 0, 0, listOf("not signed in"))
+        val picked = paths.map { path ->
+            MarkdownImporting.Picked(
+                name = path.substringAfterLast('/'),
+                bytes = AppleFiles.read(path) ?: ByteArray(0),
+                modifiedEpochMs = AppleFiles.modifiedEpochMs(path),
+            )
+        }
+        val result = MarkdownImporting(memos).import(account.id, picked, Visibility.PRIVATE)
+        return ImportResultRow(result.imported, result.skipped, result.duplicates, result.failures)
+    }
+
+    /**
+     * The database, attachment files and settings, zipped and encrypted with [password] at
+     * [path]. Credentials are left out: they are this device's Keychain items and would not
+     * work elsewhere, so a restored app asks you to sign in again. The layout is the one the
+     * Android app writes, so a backup restores on either.
+     */
+    @Throws(Throwable::class)
+    suspend fun backup(path: String, password: String) {
+        // Fold the write-ahead log into the main file so the copy is complete on its own.
+        db.useWriterConnection { it.usePrepared("PRAGMA wal_checkpoint(FULL)") { statement -> statement.step() } }
+        val support = AppleStack.supportDirectory
+        val sink = ByteArraySink()
+        val zip = ZipWriter(sink)
+        zip.entry("db/${MyMemosDatabase.NAME}", AppleFiles.read("$support/${MyMemosDatabase.NAME}") ?: error("no database file"))
+        for (name in AppleFiles.list("$support/attachments")) {
+            AppleFiles.read("$support/attachments/$name")?.let { zip.entry("attachments/$name", it) }
+        }
+        AppleFiles.read("$support/settings.preferences_pb")?.let { zip.entry("settings/settings.preferences_pb", it) }
+        zip.close()
+        if (!AppleFiles.write(path, BackupCipher.encrypt(sink.toByteArray(), password.toCharArray()))) error("could not write $path")
+    }
+
+    /**
+     * Replaces the local data with a backup. Everything is decrypted and unpacked in memory
+     * before a byte of live data is touched, so a wrong password changes nothing. Afterwards
+     * the app has to be relaunched: Room cannot reopen a database swapped underneath it, and
+     * this session is finished.
+     */
+    @Throws(Throwable::class)
+    suspend fun restore(path: String, password: String) {
+        val blob = AppleFiles.read(path) ?: throw BackupCipher.WrongPasswordOrCorrupt()
+        val plain = BackupCipher.decrypt(blob, password.toCharArray())
+        val entries = ZipReader.entries(plain).filter { !it.isDirectory }
+        // A name that climbs out of its folder must not become a path; the check is on the
+        // whole name, since "attachments/../x" is as bad as a leading one.
+        val files = entries.map { entry ->
+            if (entry.name.split('/').any { it == ".." || it.isEmpty() } || entry.name.startsWith("/")) throw BackupCipher.WrongPasswordOrCorrupt()
+            entry.name to entry.bytes
+        }
+        val database = files.firstOrNull { it.first == "db/${MyMemosDatabase.NAME}" }?.second ?: throw BackupCipher.WrongPasswordOrCorrupt()
+
+        db.close()
+        val support = AppleStack.supportDirectory
+        val dbPath = "$support/${MyMemosDatabase.NAME}"
+        listOf(dbPath, "$dbPath-wal", "$dbPath-shm", "$dbPath-journal").forEach(AppleFiles::delete)
+        AppleFiles.write(dbPath, database)
+        AppleFiles.delete("$support/attachments")
+        AppleFiles.makeDirectory("$support/attachments")
+        for ((name, bytes) in files) {
+            when {
+                name.startsWith("attachments/") -> AppleFiles.write("$support/${name}", bytes)
+                name == "settings/settings.preferences_pb" -> AppleFiles.write("$support/settings.preferences_pb", bytes)
+            }
+        }
+        AppleFiles.delete("$support/avatar.bin")
+        AppleFiles.delete("$support/avatar.source")
     }
 
     private companion object {
@@ -1468,6 +1694,10 @@ data class NotificationRow(
 )
 
 data class TagCount(val tag: String, val count: Int)
+
+data class ImportResultRow(val imported: Int, val skipped: Int, val duplicates: Int, val failures: List<String>)
+
+data class EmojiGroup(val name: String, val emoji: List<String>)
 
 data class StatsRow(
     val totalMemos: Int,
