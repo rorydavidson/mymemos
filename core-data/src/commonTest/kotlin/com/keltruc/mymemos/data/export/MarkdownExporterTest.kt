@@ -4,9 +4,9 @@ import com.keltruc.mymemos.model.Memo
 import com.keltruc.mymemos.model.MemoState
 import com.keltruc.mymemos.model.SyncStatus
 import com.keltruc.mymemos.model.Visibility
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 class MarkdownExporterTest {

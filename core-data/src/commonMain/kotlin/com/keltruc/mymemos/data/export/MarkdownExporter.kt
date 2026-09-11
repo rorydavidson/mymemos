@@ -1,62 +1,52 @@
 package com.keltruc.mymemos.data.export
 
-import com.keltruc.mymemos.data.attachments.FileAttachmentStore
+import com.keltruc.mymemos.data.attachments.AttachmentStore
 import com.keltruc.mymemos.data.mapper.toModel
-import com.keltruc.mymemos.data.text.atZone
+import com.keltruc.mymemos.data.zip.ByteSink
+import com.keltruc.mymemos.data.zip.ZipWriter
 import com.keltruc.mymemos.database.dao.MemoDao
 import com.keltruc.mymemos.model.Memo
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.OutputStream
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * Writes every memo as a Markdown file with YAML front matter into a zip, plus any
- * attachment files held locally. Readable by Obsidian and friends.
+ * attachment files held locally. Readable by Obsidian and friends. Where the zip goes is the
+ * platform's business: a content URI on Android, a file the user chose on a Mac or a phone.
  */
 class MarkdownExporter constructor(
     private val memoDao: MemoDao,
-    private val attachmentStore: FileAttachmentStore,
+    private val attachmentStore: AttachmentStore,
 ) {
-    suspend fun export(accountId: Long, out: OutputStream): Int = withContext(Dispatchers.IO) {
+    suspend fun export(accountId: Long, sink: ByteSink): Int {
         val memos = memoDao.allForExport(accountId).map { it.toModel() }
-        ZipOutputStream(out.buffered()).use { zip ->
-            val usedNames = mutableSetOf<String>()
-            for (memo in memos) {
-                val name = uniqueName(fileNameFor(memo), usedNames)
-                zip.putNextEntry(ZipEntry("memos/$name"))
-                zip.write(render(memo).toByteArray())
-                zip.closeEntry()
-                for (a in memo.attachments) {
-                    val file = a.localPath?.let(::File)?.takeIf { it.exists() } ?: attachmentStore.file(a.localId).takeIf { it.exists() } ?: continue
-                    zip.putNextEntry(ZipEntry(attachmentPath(a.localId, a.filename)))
-                    file.inputStream().use { it.copyTo(zip) }
-                    zip.closeEntry()
-                }
+        val zip = ZipWriter(sink)
+        val usedNames = mutableSetOf<String>()
+        for (memo in memos) {
+            val name = uniqueName(fileNameFor(memo), usedNames)
+            zip.entry("memos/$name", render(memo).encodeToByteArray(), memo.updateTime.toEpochMilliseconds())
+            for (a in memo.attachments) {
+                if (!attachmentStore.exists(a.localId)) continue
+                zip.entry(attachmentPath(a.localId, a.filename), attachmentStore.readBytes(a.localId), a.createTime.toEpochMilliseconds())
             }
         }
-        memos.size
+        zip.close()
+        return memos.size
     }
 
     companion object {
-        private val dateFmt: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-
         /**
          * Zip entry for an attachment. The filename comes from the server, so it is reduced to a
          * bare name first: a value like "../../.bashrc" would otherwise write outside the export
          * when unpacked.
          */
         fun attachmentPath(localId: String, filename: String): String {
-            val bare = File(filename.replace('\\', '/')).name.trim().trimStart('.')
+            val bare = filename.replace('\\', '/').substringAfterLast('/').trim().trimStart('.')
             return "attachments/$localId-${bare.ifEmpty { "file" }}"
         }
 
         fun fileNameFor(memo: Memo): String {
-            val day = dateFmt.format(memo.createTime.atZone(ZoneId.systemDefault()))
+            val day = memo.createTime.toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
             val slug = memo.content.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty()
                 .replace(Regex("[#*`\\[\\]()]"), "").trim()
                 .lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-').take(40)

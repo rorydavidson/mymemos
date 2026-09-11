@@ -596,7 +596,7 @@ class MemoRepository constructor(
         /** How long a delete waits before it is sent, which is how long Undo has to work. */
         const val UNDO_WINDOW_MS = 5_000L
 
-        private val tagRegex = Regex("(?<![\\w/])#([\\p{L}\\p{N}_/-]+)")
+        private val tagRegex = Regex("(?<![\\w/])#([\\p{L}\\p{N}_/\\-]+)")
 
         fun extractTags(content: String): List<String> =
             tagRegex.findAll(content).map { it.groupValues[1].trimEnd('/', '-') }

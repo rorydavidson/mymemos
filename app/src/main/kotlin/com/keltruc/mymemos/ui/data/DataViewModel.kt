@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.keltruc.mymemos.backup.BackupManager
 import com.keltruc.mymemos.data.export.BackupCrypto
 import com.keltruc.mymemos.data.export.MarkdownExporter
+import com.keltruc.mymemos.data.export.export
 import com.keltruc.mymemos.data.imports.MarkdownImporter
 import com.keltruc.mymemos.data.repository.AccountRepository
 import com.keltruc.mymemos.model.Visibility
