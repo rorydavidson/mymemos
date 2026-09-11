@@ -276,6 +276,39 @@ extension SessionModel {
         (try? await session.memosOn(isoDate: isoDate)) ?? []
     }
 
+    // MARK: extensions
+
+    /// Anything the share extension left: each becomes a memo. Text opens the editor
+    /// prefilled, as the Android share target does; images go with it.
+    func drainSharedInbox() {
+        #if os(iOS)
+        guard phase != .signedOut, editing == nil else { return }
+        let items = AppGroup.collect()
+        guard let first = items.first else { return }
+        let images = first.images.compactMap { AppGroup.container?.appendingPathComponent("inbox").appendingPathComponent($0) }
+        editing = EditorTarget(localId: nil, initialText: first.text.isEmpty ? nil : first.text, initialImages: images)
+        // Anything beyond the first is written straight away rather than queued behind a sheet.
+        for item in items.dropFirst() where !item.text.isEmpty {
+            Task { await save(editing: nil, text: item.text, visibility: "PRIVATE", pinned: false) }
+        }
+        #endif
+    }
+
+    /// What the widget shows, rewritten whenever the timeline is reloaded.
+    func writeWidgetSnapshot() async {
+        #if os(iOS)
+        let recent = sections.flatMap(\.memos).prefix(10).map {
+            AppGroup.Snapshot.Memo(localId: $0.localId, title: $0.locked ? "Locked memo" : $0.title, time: $0.timeLabel, pinned: $0.pinned)
+        }
+        let groups = (try? await session.openTasks()) ?? []
+        let tasks = groups.flatMap { group in
+            group.tasks.map { AppGroup.Snapshot.Task(memoLocalId: group.memoLocalId, line: Int($0.lineIndex), text: $0.text, due: $0.dueLabel, overdue: $0.overdue) }
+        }.prefix(12)
+        AppGroup.write(AppGroup.Snapshot(recent: Array(recent), tasks: Array(tasks), writtenAt: Date()))
+        WidgetRefresh.reload()
+        #endif
+    }
+
     // MARK: URLs
 
     /// `mymemos://new?content=…&visibility=PRIVATE&pinned=false&open=false` writes a memo,

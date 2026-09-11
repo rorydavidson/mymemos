@@ -586,6 +586,7 @@ final class SessionModel: ObservableObject {
             tags = try await session.tags()
             await loadTagStyles()
             phase = .ready
+            await writeWidgetSnapshot()
         } catch {
             phase = .failed(readable(error))
         }

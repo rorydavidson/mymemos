@@ -69,6 +69,13 @@ targets:
             CFBundleURLSchemes: [mymemos]
         BGTaskSchedulerPermittedIdentifiers:
           - com.keltruc.mymemos.ios.refresh
+    dependencies:
+      - target: MyMemosShare
+      - target: MyMemosWidget
+    entitlements:
+      path: MyMemos.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.keltruc.mymemos]
     preBuildScripts:
       - name: Build the Kotlin framework
         basedOnDependencyAnalysis: false
@@ -76,6 +83,46 @@ targets:
           cd "$SRCROOT/../.."
           export JAVA_HOME="${JAVA_HOME:-/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home}"
           ./gradlew :apple-shared:embedAndSignAppleFrameworkForXcode --console=plain -q
+
+  MyMemosShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ../share/Sources
+      - path: ../../apple/ui/AppGroup.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.keltruc.mymemos.ios.mymemosshare
+        CODE_SIGN_ENTITLEMENTS: Extension.entitlements
+    info:
+      path: ../share/Info.plist
+      properties:
+        CFBundleDisplayName: MyMemos
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsText: true
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsImageWithMaxCount: 10
+
+  MyMemosWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ../widget/Sources
+      - path: ../../apple/ui/AppGroup.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.keltruc.mymemos.ios.mymemoswidget
+        CODE_SIGN_ENTITLEMENTS: Extension.entitlements
+    info:
+      path: ../widget/Info.plist
+      properties:
+        CFBundleDisplayName: MyMemos
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
 
 schemes:
   MyMemos:

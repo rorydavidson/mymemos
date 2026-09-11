@@ -26,7 +26,11 @@ struct MyMemosApp: App {
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .background: BackgroundRefresh.shared.schedule()
-            case .active: if model.phase != .signedOut { Task { await model.sync() } }
+            case .active:
+                if model.phase != .signedOut {
+                    model.drainSharedInbox()
+                    Task { await model.sync() }
+                }
             default: break
             }
         }
@@ -49,6 +53,7 @@ struct RootView: View {
         }
         .task {
             await model.restore()
+            model.drainSharedInbox()
             #if TESTHOOKS
             await TestHooks.run(model)
             #endif

@@ -15,6 +15,7 @@ struct EditorView: View {
 
     let editing: String?
     var initialText: String? = nil
+    var initialImages: [URL] = []
 
     @State private var text = ""
     @State private var visibility = "PRIVATE"
@@ -235,6 +236,9 @@ struct EditorView: View {
         } else if let initialText {
             text = initialText
         }
+        #if os(iOS)
+        pendingPhotos = initialImages
+        #endif
     }
 
     private func save() async {

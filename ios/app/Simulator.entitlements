@@ -14,6 +14,10 @@
     <array>
         <string>LOCAL.com.keltruc.mymemos.ios</string>
     </array>
+    <key>com.apple.security.application-groups</key>
+    <array>
+        <string>group.com.keltruc.mymemos</string>
+    </array>
     <key>com.apple.security.get-task-allow</key>
     <true/>
 </dict>

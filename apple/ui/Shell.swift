@@ -32,6 +32,8 @@ struct ReminderTarget: Identifiable {
 struct EditorTarget: Identifiable {
     let localId: String?
     var initialText: String? = nil
+    /// Images to attach once the memo exists, which is how a share arrives.
+    var initialImages: [URL] = []
     var id: String { localId ?? "new" }
 }
 

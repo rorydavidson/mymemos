@@ -108,6 +108,64 @@ swiftc -O ${EXTRA_FLAGS[@]+"${EXTRA_FLAGS[@]}"} \
     ios/app/Sources/*.swift \
     -o "$APP/MyMemos"
 
+# The share extension and the widget, each its own bundle under PlugIns. Neither links the
+# Kotlin framework: they talk to the app through files in the app group.
+build_extension() {
+    local name=$1 dir=$2 point=$3 principal=$4 extra=$5
+    local appex="$APP/PlugIns/$name.appex"
+    mkdir -p "$appex"
+    cat > "$appex/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key><string>$name</string>
+    <key>CFBundleDisplayName</key><string>MyMemos</string>
+    <key>CFBundleIdentifier</key><string>com.keltruc.mymemos.ios.$(echo "$name" | tr 'A-Z' 'a-z')</string>
+    <key>CFBundleExecutable</key><string>$name</string>
+    <key>CFBundlePackageType</key><string>XPC!</string>
+    <key>CFBundleShortVersionString</key><string>0.1.0</string>
+    <key>CFBundleVersion</key><string>1</string>
+    <key>CFBundleSupportedPlatforms</key><array><string>iPhoneSimulator</string></array>
+    <key>DTPlatformName</key><string>iphonesimulator</string>
+    <key>DTSDKName</key><string>iphonesimulator${SDK_VERSION}</string>
+    <key>MinimumOSVersion</key><string>17.0</string>
+    <key>UIDeviceFamily</key><array><integer>1</integer><integer>2</integer></array>
+    <key>NSExtension</key>
+    <dict>
+        <key>NSExtensionPointIdentifier</key><string>$point</string>
+        $extra
+    </dict>
+</dict>
+</plist>
+PLIST
+    # A share extension is entered through Foundation's NSExtensionMain; a widget's @main is
+    # its own entry point.
+    local entry=()
+    [ -n "$principal" ] && entry=(-Xlinker -e -Xlinker "$principal")
+    swiftc -O \
+        -target arm64-apple-ios17.0-simulator \
+        -sdk "$SDK" \
+        -parse-as-library \
+        -application-extension \
+        ${entry[@]+"${entry[@]}"} \
+        -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __entitlements -Xlinker ios/app/Simulator.entitlements \
+        apple/ui/AppGroup.swift \
+        "$dir"/Sources/*.swift \
+        -o "$appex/$name"
+    codesign --force --sign - "$appex" 2>/dev/null
+}
+
+build_extension MyMemosShare ios/share com.apple.share-services _NSExtensionMain \
+    "<key>NSExtensionPrincipalClass</key><string>ShareViewController</string>
+        <key>NSExtensionAttributes</key><dict><key>NSExtensionActivationRule</key><dict>
+            <key>NSExtensionActivationSupportsText</key><true/>
+            <key>NSExtensionActivationSupportsWebURLWithMaxCount</key><integer>1</integer>
+            <key>NSExtensionActivationSupportsImageWithMaxCount</key><integer>10</integer>
+        </dict></dict>"
+
+build_extension MyMemosWidget ios/widget com.apple.widgetkit-extension "" ""
+
 # Ad hoc is enough for the simulator. The Keychain wants an application identifier, which is
 # why the entitlements above are linked into the binary the way Xcode does it for simulator
 # builds; putting them in the signature instead makes launchd refuse to spawn the app.
