@@ -33,13 +33,13 @@ enum TestHooks {
             switch parts[0] {
             case "open": if let memo = nth(model, arg) { model.open(memo.localId) }
             case "pane":
-                switch arg {
-                case "tasks": model.pane = .tasks
-                case "review": model.pane = .review
-                case "reminders": model.pane = .reminders
-                case "templates": model.pane = .templates
-                default: model.pane = .memos
-                }
+                let panes: [String: SessionModel.Pane] = [
+                    "tasks": .tasks, "review": .review, "reminders": .reminders, "templates": .templates,
+                    "shortcuts": .shortcuts, "tags": .tags, "notifications": .notifications, "profile": .profile,
+                    "stats": .stats, "tokens": .tokens, "webhooks": .webhooks, "adminUsers": .adminUsers, "adminInstance": .adminInstance,
+                ]
+                model.pane = panes[arg] ?? .memos
+            case "archive-view": await model.showArchive(true)
             case "new": model.newMemo()
             case "newtext": model.editing = EditorTarget(localId: nil, initialText: arg)
             case "edit": if let memo = nth(model, arg) { model.editing = EditorTarget(localId: memo.localId) }
