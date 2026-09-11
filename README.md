@@ -1,6 +1,7 @@
 # MyMemos
 
-An Android client for a self-hosted [Memos](https://usememos.com) server. Offline-first:
+A client for a self-hosted [Memos](https://usememos.com) server, for Android, iOS and macOS,
+over one shared data layer. Offline-first:
 memos live in a local Room database, the UI only ever reads from there, and changes are
 queued and pushed when the network returns. Built for Memos v0.30; newer server features
 are gated on the version the server reports.
@@ -155,20 +156,23 @@ Then:
 ./gradlew test
 ```
 
-Every module except `app` is Kotlin Multiplatform, built for `macosArm64` alongside its usual
-target for a macOS client (see `docs/MACOS_PLAN.md`). `./gradlew test` covers everything that
-runs on any machine; the native tests need a Mac:
+Every module except `app` is Kotlin Multiplatform, built for `macosArm64`, `iosArm64` and
+`iosSimulatorArm64` alongside its usual target, for the macOS and iOS clients (see
+`docs/MACOS_PLAN.md` and `ios/README.md`). `./gradlew test` covers everything that runs on any
+machine; the native tests need a Mac:
 
 ```bash
 ./gradlew :core-data:macosArm64Test :core-network:macosArm64Test :core-database:macosArm64Test
 ```
 
-There is an early macOS app under `macos/`. It signs in, syncs into a local Room database and
-lists what is there, using the same sync engine as the phone. It has no Keychain, attachments,
-export or backup yet.
+The macOS app lives under `macos/` and the iOS app under `ios/`; the SwiftUI they have in
+common is in `apple/ui` and the Kotlin framework they both link is `apple/shared`. Both are
+built by script against the same sync engine as the phone. See `macos/README.md` and
+`ios/README.md` for what each does and does not do.
 
 ```bash
 macos/app/build.sh && open macos/app/build/MyMemos.app
+ios/app/build.sh      # a simulator bundle; ios/app/tour.sh screenshots every screen
 ```
 
 The cipher's cross-platform byte compatibility is checked on a real Android runtime, which
@@ -183,10 +187,14 @@ needs an emulator or device attached:
 | Module          | Purpose                                                              |
 |-----------------|----------------------------------------------------------------------|
 | `core-model`    | Plain Kotlin domain types, no Android or framework dependencies. Multiplatform. |
-| `core-network`  | Ktor client for the Memos API, bearer auth, token refresh, persistent cookie storage. Multiplatform (JVM and macOS), tested with Ktor's MockEngine. |
-| `core-database` | Room schema: accounts, memos (with FTS index), attachments, outbox, relations, reactions, shortcuts, templates. Multiplatform (Android and macOS); Android keeps the platform's SQLite, macOS uses Room's bundled driver. |
+| `core-network`  | Ktor client for the Memos API, bearer auth, token refresh, persistent cookie storage. Multiplatform (JVM, macOS and iOS), tested with Ktor's MockEngine. |
+| `core-database` | Room schema: accounts, memos (with FTS index), attachments, outbox, relations, reactions, shortcuts, templates. Multiplatform (Android, macOS and iOS); Android keeps the platform's SQLite, the Apple targets use Room's bundled driver. |
 | `core-data`     | Repositories, sync engine and three-way merge, mappers, credential store, memo cipher, config memo. Multiplatform; the Android half holds the Keystore store, the java.time formatting, and export, import and backup. |
 | `app`           | Jetpack Compose UI (Material 3), navigation, widgets, notifications, view models. |
+| `apple/shared`  | `:apple-shared`, the Kotlin framework the Mac and iOS apps link: `MemosSession`, the Keychain, Application Support paths, and the date labels. One `appleMain` source set for all three Apple targets. |
+| `apple/ui`      | SwiftUI shared by the Mac and iOS apps: the session model and nearly every view. `#if os(macOS)` marks the few places AppKit and UIKit differ. |
+| `macos/app`     | The Mac's own shell: window, sidebar, menu bar, NSTextView editor, build and check scripts. |
+| `ios/app`       | The phone's own shell: tab bar, iPad split view, UITextView editor, background refresh, build and tour scripts, XcodeGen spec. `ios/share` and `ios/widget` are the share extension and the widgets. |
 
 ## Fonts and licences
 

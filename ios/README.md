@@ -3,123 +3,127 @@
 An iPhone and iPad client sharing its data layer with the Android and macOS apps: the same
 sync engine, outbox, three-way merge, Room database and memo cipher, in `core-model`,
 `core-network`, `core-database` and `core-data`. Only the interface and the platform seams
-are written again, and much of the interface is shared with the Mac.
+are written again, and most of the interface is shared with the Mac through `apple/ui`.
 
-Requires iOS 17 on an iPhone or iPad. Building needs Xcode 26 and XcodeGen.
+Requires iOS 17 on an iPhone or iPad. Building needs Xcode 26; XcodeGen only for the Xcode
+project.
 
 ## Building and running
 
 ```bash
-ios/app/build.sh              # generates the project and builds for the simulator
-open ios/app/MyMemos.xcodeproj
+ios/app/build.sh                      # a simulator bundle at ios/app/build/MyMemos.app
+xcrun simctl install booted ios/app/build/MyMemos.app
+xcrun simctl launch booted com.keltruc.mymemos.ios
 ```
 
-`ios/app/project.yml` is the source of truth for the Xcode project, which is generated and
-git-ignored. The Kotlin framework is built from a run-script phase in the project through
-Gradle's `embedAndSignAppleFrameworkForXcode`, so opening the project in Xcode and pressing
-Run is enough.
+`build.sh` works the way `macos/app/build.sh` does: Gradle builds the Kotlin framework for
+`iosSimulatorArm64`, `swiftc` compiles `apple/ui` plus `ios/app/Sources` against the
+simulator SDK, `actool` compiles the icon, and the share extension and widget are compiled
+into `PlugIns`. It needs the SDK and nothing else.
 
-Running on a device needs a signing team: set `DEVELOPMENT_TEAM` in `project.yml` or in
-Xcode's Signing pane. The simulator needs none.
+That matters because `xcodebuild` refuses to build for iOS at all until a simulator runtime
+matching the SDK has been downloaded (Xcode 26.6 wants iOS 26.5; a machine with only 26.2
+gets "iOS 26.5 is not installed"). The script does not care: the app it builds runs on
+whichever runtime is there.
 
-## The plan, and what it decided
+`ios/app/project.yml` describes the same app, its extensions and the Gradle run-script phase
+for XcodeGen, for working in Xcode and for a device. Generate it with `xcodegen generate`;
+the `.xcodeproj` is git-ignored. A device needs a signing team: set `DEVELOPMENT_TEAM` in
+`project.yml` or in Xcode's Signing pane. Xcode writes the Keychain and app-group
+entitlements itself; the script build links `Simulator.entitlements` into the binary as a
+`__TEXT,__entitlements` section, because iOS refuses Keychain access to an app with no
+application identifier even on the simulator, and launchd refuses an ad hoc signature that
+carries one.
 
-Drafted 11 September 2026. The aim is an iPhone and iPad client with the Android app's
-features, as far as the platform allows, built the way the macOS client was: the same Kotlin
-data layer underneath, SwiftUI on top. Corrections are recorded here as each phase lands, the
-way `docs/MACOS_PLAN.md` did it.
+## Looking at it without touching it
 
-### Decisions taken
+```bash
+MEMOS_SERVER=http://localhost:5230 MEMOS_USER=tester MEMOS_PASSWORD=… ios/app/tour.sh
+```
+
+Nothing on a build machine can tap a simulator, and the accessibility route needs
+permissions an agent session does not have. `tour.sh` builds with `TESTHOOKS=1`, which
+compiles in `TestHooks.swift`: a driver that reads `MYMEMOS_TEST_SIGNIN` and
+`MYMEMOS_TEST_STEPS` from the launch environment and works the session model directly, so
+each screen can be launched into and screenshotted from outside. The steps cover opening,
+editing, ticking, reacting, commenting, colouring, archiving, deleting, the library screens
+and a `mymemos://` URL. Screenshots land in `ios/app/build/tour/`. The bundle it installs is
+not one to keep: no installable build has the hooks.
+
+Use a throwaway server. A Memos v0.30 container on `localhost:5230` is what this was built
+against; the app allows plain http to local addresses (`NSAllowsLocalNetworking`) for that
+and for a server on the home network, and nothing else.
+
+## What it does
+
+Everything the Android app does except export, import and encrypted backup. Sign in with
+several accounts and remembered servers; the timeline with folding headers, compact rows,
+sort by last changed, search, tag filters and the archive; the editor with the formatting
+bar, list continuation, `#tag` and `@date` completions, templates and photos; rendered
+Markdown with live checkboxes; pin, visibility, colours, archive and delete with Undo;
+locked memos; attachments; location on request, and Nearby; comments, reactions, references
+with backlinks and public share links; tasks with due dates; reminders, recurring templates
+and the weekly digest as notifications, a tap opening the memo; review with the streak, the
+heatmap, day by day with keep or archive, on this day, journey and the graph; shortcuts;
+the sync sheet with failed operations, conflict copies and signing in again; tag emoji and
+colours; the profile, password, default visibility, tokens, webhooks, notifications and
+statistics; for an admin, users and instance settings; background refresh; a share
+extension; recent-memos and open-tasks widgets; and `mymemos://new?content=…` and
+`mymemos://memo/<id>` for automation, the shape of the Android intent.
+
+On an iPad it is three columns, as on the Mac. On a phone it is the three tabs Android has,
+with the library behind the menu on the memos tab.
+
+## Not built, and why
+
+- **Export, import and encrypted backup.** The exporter and importer live in
+  `core-data/androidMain` on `java.util.zip` and `java.time`, and the backup streams AES-GCM
+  in a way CryptoKit cannot. Moving them needs an `expect`/`actual` zip and a format
+  decision, which is its own piece of work. The Mac lacks them for the same reason.
+- **Dynamic colour**, which is an Android 12 wallpaper feature with no iOS equivalent.
+- **Geofenced reminders**, which Android does not have either.
+
+## Not verified on a screen
+
+Everything above was built, launched and screenshotted on an iPhone 17 Pro and an iPad Pro
+simulator against a local Memos v0.30 server, through the tour. What the tour cannot reach:
+
+- **The share extension in a real share sheet.** The extension is registered (pluginkit
+  lists it) and the handoff was proven by writing an item into the app group's inbox and
+  watching the editor open with it; the sheet itself was never shown, since nothing can
+  share into the simulator from another app without tapping.
+- **The widgets on a home screen.** They compile, are registered, and the snapshot they read
+  is written with the right contents; adding a widget needs a long press nobody could make.
+- **Background refresh actually running.** iOS decides when; the design does not depend on
+  it. `xcrun simctl` cannot trigger a BGAppRefreshTask from outside Xcode's debugger.
+- **A photo attached from the picker, and location capture.** Both need a tap on a system
+  sheet. The code paths after the tap are the same ones the file importer and the Kotlin
+  side already exercise.
+- **The cipher on a phone.** The Mac's `check-cipher.sh` proves the CryptoKit half agrees
+  with Android, and the same Swift is compiled here, but no locked memo has been opened on
+  iOS yet.
+
+## The plan, as it turned out
+
+Drafted 11 September 2026 and built the same day in five phases. The decisions:
 
 - **One framework for every Apple target.** `macos/shared` became `apple/shared`
-  (`:apple-shared`), built for `macosArm64`, `iosArm64` and `iosSimulatorArm64` from a single
-  `appleMain` source set. Nothing in it was specific to a Mac: Foundation, the Security
-  framework, Room's bundled driver and DataStore behave the same on a phone. The four
-  `core-*` modules gained the two iOS targets, and their `macosArm64Main` actuals moved to
-  `appleMain`. The one genuine difference, the device name used to label a minted token,
-  keeps a per-platform actual. `MacCrypto` is now `HostCrypto`, because it is no longer the
-  Mac's.
-- **Shared SwiftUI where a view is the same view.** `apple/ui/` holds the Swift the two apps
-  have in common: the session model, theme, Markdown renderer, map, tasks, review, reminders,
-  templates, notifications and the CryptoKit half of the cipher. Where AppKit and UIKit
-  disagree the file says so with `#if os(macOS)`. The macOS app compiles `apple/ui` plus its
-  own `macos/app/Sources`; the iOS app compiles `apple/ui` plus `ios/app/Sources`. This is the
-  same rule the Kotlin side follows: one implementation of anything that decides something.
-- **Xcode project generated, not committed.** `project.yml` drives XcodeGen; the `.xcodeproj`
-  is ignored, so there is no merge conflict magnet in the repository.
-- **Simulator first, device by Team ID.** Nothing in this repository can sign for a device.
-- **iOS 17 and later.** `NavigationSplitView` on iPad, `NavigationStack` on iPhone, and the
-  `PhotosPicker` the editor wants all settle at 17.
-- **Location is allowed on iOS.** The macOS client refuses to ask the machine where it is,
-  which was the right call for a desktop. The Android app captures a location on request and
-  offers Nearby, and the phone is the device where that makes sense, so iOS matches Android:
-  CoreLocation on demand, reverse geocoded with `CLGeocoder`, nothing in the background. Map
-  tiles stay OpenStreetMap behind the same off-by-default switch.
+  (`:apple-shared`), one `appleMain` source set built for `macosArm64`, `iosArm64` and
+  `iosSimulatorArm64`. The `core-*` modules gained the two iOS targets and their macOS
+  actuals moved to `appleMain`; only the device name that labels a minted token kept a
+  per-platform actual. `MacCrypto` became `HostCrypto`.
+- **Shared SwiftUI where a view is the same view.** `apple/ui` holds the session model,
+  theme, Markdown renderer, map, every list and sheet; `#if os(macOS)` marks the few AppKit
+  and UIKit differences, and `Platform.swift` names the recurring ones.
+- **Location is allowed on iOS**, on request, as on Android, though the Mac still never asks.
+- **A phone's editor** wraps `UITextView` with smart quotes and dashes off and autocorrect
+  left on, the same trade the Android editor makes; the shared continuation logic copes with
+  autocorrect recasing a word.
+- **Kotlin property names.** `description` cannot be used: Kotlin/Native exports it under
+  another name because `NSObject` has one, and Swift silently reads the object dump.
+- **Suspend functions returning Bool or Int** arrive in Swift boxed (`KotlinBoolean`,
+  `KotlinInt`), so every such call is unwrapped with `as? Bool` or `Int(truncating:)`.
 
-### What Android has, and where iOS gets it
-
-| Android feature | Shared code | iOS |
-|---|---|---|
-| Sign in, several accounts, remembered servers | `AccountRepository`, `AppPreferences` | Phase C, D |
-| Timeline with folding headers, compact rows, sort by modified | `TimelineGrouping`, `MemoTitle` | Phase C |
-| Search, tag filter, archive view | `MemoRepository` | Phase C, D |
-| Editor: toolbar, list continuation, tag and `@date` completion, templates | `MarkdownContinuation`, `DueDateParser.suggest` | Phase C |
-| Rendered Markdown with live checkboxes | `TaskLine` | Phase C |
-| Pin, visibility, archive, delete with undo, colours | `MemoRepository` | Phase C, D |
-| Locked memos | `MemoCipher`, CryptoKit provider | Phase C |
-| Attachments from the photo picker and files | `AttachmentStore` | Phase C |
-| Location capture and clear | `MemoRepository.setLocation` | Phase D |
-| Comments, reactions, references, backlinks, share links | `MemoRepository`, `ShareRepository` | Phase D |
-| Tasks screen with due dates | `TaskLine`, `DueDateParser` | Phase C |
-| Reminders, recurring templates, weekly digest | `ConfigRepository`, `Schedule`, `Digest` | Phase C |
-| Review: streak, heatmap, on this day, nearby, journey, graph | `MemoRepository` | Phase C, D |
-| Shortcuts (CEL filters) | `ShortcutRepository` | Phase D |
-| Sync status, failed ops, conflicts | `SyncState` | Phase D |
-| Tag styles (emoji and colour) | `ConfigRepository.setTagStyle` | Phase D |
-| Account: profile, password, default visibility, tokens, webhooks, notifications, stats | `AccountSettingsRepository` | Phase D |
-| Admin: users, instance settings | `AccountSettingsRepository` | Phase D |
-| Background sync | `BackgroundSync` seam | Phase E, `BGAppRefreshTask` |
-| Share sheet target | Android share intent | Phase E, share extension |
-| Widgets and quick capture | Glance widgets | Phase E, WidgetKit |
-| Automation intent | `CREATE_MEMO` | Phase E, `mymemos://` URL scheme |
-| Export, import, encrypted backup | Android-only `java.util.zip` code | Not in this plan; see below |
-
-### Layout
-
-```
-apple/shared     :apple-shared, the Kotlin framework, appleMain only
-apple/ui         SwiftUI shared by both apps
-macos/app        the Mac app: build.sh, checks, Mac-only views
-ios/app          the iOS app: project.yml, iOS-only views, resources
-```
-
-### Phases
-
-- **A: the framework builds for iOS.** Targets added, actuals moved, module renamed. Done
-  when `:apple-shared:linkDebugFrameworkIosSimulatorArm64` produces a framework and
-  `macos/app/build.sh` still produces a working Mac app.
-- **B: the shared SwiftUI.** The portable files move to `apple/ui`. Done when the Mac app
-  builds and its four CI checks pass.
-- **C: the iOS app, first cut.** Everything the Mac app does today, on a phone. Done when it
-  builds for the simulator and can be driven through sign in, sync, write and read.
-- **D: the rest of Android.** The `MemosSession` surface grows to cover what `core-data`
-  already knows how to do. Each is a small Kotlin addition and a screen. The Mac gains the
-  Kotlin side for free and can pick up the screens later.
-- **E: what only a phone can do.** Background refresh, the share extension, a widget, a URL
-  scheme.
-
-### Risks and things left out
-
-- **Export, import and backup** stay Android-only. The exporter and importer live in
-  `core-data/androidMain` on `java.util.zip` and `java.time`. Moving them to `commonMain`
-  needs an `expect`/`actual` zip, and the encrypted backup streams AES-GCM in a way CryptoKit
-  cannot. Both are design decisions rather than typing, and belong in their own piece of work.
-- **The editor on a phone.** `UITextView` behaves differently from `NSTextView` around
-  Return: the shared continuation logic runs after the newline lands, which is the same on
-  both, but autocorrect and smart punctuation have to be switched off or Markdown is
-  corrupted the same way the Mac editor found.
-- **A background task never runs when you want it to.** `BGAppRefreshTask` is at the
-  system's discretion. The design already copes: the outbox pushes on the next launch, and
-  reminders are scheduled notifications rather than background work.
-- **Three apps, one server, one encryption format.** The cipher parity check should be run on
-  iOS too before locked memos are trusted there.
+Corrections to the first draft: Xcode's destination check (above) turned the Xcode project
+from the build into an option; and CoreSimulator was so slow to answer `simctl list` on this
+machine that the device ids were taken from `~/Library/Developer/CoreSimulator/Devices`.

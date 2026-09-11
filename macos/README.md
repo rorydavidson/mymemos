@@ -12,9 +12,11 @@ Requires macOS 15 on Apple silicon.
 macos/app/build.sh && open macos/app/build/MyMemos.app
 ```
 
-`macos/shared` is the Kotlin framework the app links against. `macos/app` is the SwiftUI
-application, built by script rather than an Xcode project, because the Swift side is a handful
-of files and one less thing to keep in step is worth having.
+`apple/shared` is the Kotlin framework the app links against, shared with the iOS app.
+`apple/ui` is the SwiftUI the two apps have in common, and `macos/app` is what only the Mac
+has: the window, sidebar, menu bar and NSTextView editor. It is built by script rather than an
+Xcode project, because the Swift side is a handful of files and one less thing to keep in step
+is worth having.
 
 ## Checks
 

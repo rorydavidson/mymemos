@@ -63,6 +63,11 @@ jobs:
       - name: Build the macOS app
         run: macos/app/build.sh
 
+      # The iOS app, built for the simulator with swiftc the same way, so a change to the
+      # shared SwiftUI that only breaks on UIKit is caught here rather than on a phone.
+      - name: Build the iOS app
+        run: ios/app/build.sh
+
       # These check things whose failure is silent: a cipher that stopped agreeing with
       # Android, a font that quietly fell back, an appearance that would not persist, a list
       # continuation that returned nil and did nothing.
@@ -82,3 +87,11 @@ jobs:
         with:
           name: macos-app
           path: MyMemos.app.tar.gz
+
+      - name: Archive the iOS simulator bundle
+        run: tar -czf MyMemos-ios-simulator.app.tar.gz -C ios/app/build MyMemos.app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-app
+          path: MyMemos-ios-simulator.app.tar.gz
