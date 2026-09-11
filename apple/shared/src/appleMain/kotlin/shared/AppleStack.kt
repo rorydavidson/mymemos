@@ -127,13 +127,16 @@ internal object AppleStack {
 
     /**
      * The app decides how to catch up when it is not running: nothing on a Mac, a background
-     * refresh task on iOS. Set once at startup; until then the app syncs only while open.
+     * refresh task on iOS. The scheduler holds this object for good, so the app's own
+     * implementation is plugged in behind it rather than replacing it.
      */
-    var background: BackgroundSync = object : BackgroundSync {
-        override fun enqueueRetry(full: Boolean) = Unit
-        override fun ensurePeriodic() = Unit
-        override fun cancelAll() = Unit
+    val background: BackgroundSync = object : BackgroundSync {
+        override fun enqueueRetry(full: Boolean) { backgroundHandler?.enqueueRetry(full) }
+        override fun ensurePeriodic() { backgroundHandler?.ensurePeriodic() }
+        override fun cancelAll() { backgroundHandler?.cancelAll() }
     }
+
+    var backgroundHandler: BackgroundSync? = null
 
     val widgets: WidgetRefresher = WidgetRefresher.None
 

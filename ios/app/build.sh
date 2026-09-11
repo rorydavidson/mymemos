@@ -77,6 +77,12 @@ cat > "$APP/Info.plist" <<PLIST
     <!-- A self-hosted server on the home network is often plain http. Only local addresses. -->
     <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
     <key>UIBackgroundModes</key><array><string>fetch</string></array>
+    <!-- mymemos://new?content=... and mymemos://memo/<id>, the Android automation intent's shape. -->
+    <key>CFBundleURLTypes</key>
+    <array><dict>
+        <key>CFBundleURLName</key><string>com.keltruc.mymemos</string>
+        <key>CFBundleURLSchemes</key><array><string>mymemos</string></array>
+    </dict></array>
     <key>BGTaskSchedulerPermittedIdentifiers</key><array><string>com.keltruc.mymemos.ios.refresh</string></array>
 </dict>
 </plist>

@@ -7,14 +7,28 @@ import Shared
 
 @main
 struct MyMemosApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var model = SessionModel()
-
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
             RootView(model: model)
                 .preferredColorScheme(model.appearance.colorScheme)
                 .tint(Theme.accent)
+                .onAppear {
+                    delegate.model = model
+                    BackgroundRefresh.shared.model = model
+                    model.session.setBackgroundSync(handler: BackgroundRefresh.shared)
+                }
+                .onOpenURL { url in Task { await model.handle(url: url) } }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .background: BackgroundRefresh.shared.schedule()
+            case .active: if model.phase != .signedOut { Task { await model.sync() } }
+            default: break
+            }
         }
     }
 }

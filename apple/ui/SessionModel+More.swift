@@ -276,6 +276,40 @@ extension SessionModel {
         (try? await session.memosOn(isoDate: isoDate)) ?? []
     }
 
+    // MARK: URLs
+
+    /// `mymemos://new?content=…&visibility=PRIVATE&pinned=false&open=false` writes a memo,
+    /// or opens the editor prefilled when `open` is true; `mymemos://memo/<id>` opens one by
+    /// local id or server name. The same shapes as the Android automation intent, so a
+    /// Shortcut written for one platform reads the same on the other.
+    func handle(url: URL) async {
+        guard url.scheme == "mymemos", phase != .signedOut else { return }
+        let parts = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        func query(_ name: String) -> String? { parts?.queryItems?.first { $0.name == name }?.value }
+
+        switch url.host {
+        case "new":
+            let content = query("content") ?? ""
+            if query("open") == "true" || content.isEmpty {
+                editing = EditorTarget(localId: nil, initialText: content.isEmpty ? nil : content)
+                return
+            }
+            let visibility = ["PRIVATE", "PROTECTED", "PUBLIC"].contains(query("visibility") ?? "") ? query("visibility")! : "PRIVATE"
+            let id = await save(editing: nil, text: content, visibility: visibility, pinned: query("pinned") == "true")
+            if let id { open(id) }
+        case "memo":
+            let id = url.lastPathComponent
+            if memo(id) != nil { open(id) } else { await openRemote(id.hasPrefix("memos/") ? id : "memos/\(id)") }
+        default:
+            break
+        }
+    }
+
+    /// A notification the user tapped names its memo; open it.
+    func handleNotification(userInfo: [AnyHashable: Any]) {
+        if let id = userInfo[Notifications.memoKey] as? String, !id.isEmpty { open(id) }
+    }
+
     /// Kotlin exceptions arrive as NSError carrying the Kotlin one; say what it said.
     func readableMessage(_ error: Error) -> String {
         let nsError = error as NSError

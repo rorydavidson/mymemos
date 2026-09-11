@@ -108,6 +108,14 @@ class MemosSession {
     var displayName: String = ""
         private set
 
+    /**
+     * How to catch up when the app is not running. iOS hands in a BGTaskScheduler wrapper;
+     * the Mac has nothing to hand in and syncs while open.
+     */
+    fun setBackgroundSync(handler: com.keltruc.mymemos.data.sync.BackgroundSync?) {
+        AppleStack.backgroundHandler = handler
+    }
+
     /** Confirms the address really is a Memos server before anyone types a password at it. */
     suspend fun probe(serverUrl: String): String {
         val version = registry.anonymousApi(serverUrl).getInstanceProfile().version

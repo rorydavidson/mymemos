@@ -500,7 +500,8 @@ final class SessionModel: ObservableObject {
             notifications.postNow(
                 id: "reminder.late.\(reminder.id)",
                 title: "Memo reminder",
-                body: reminder.note.isEmpty ? reminder.memoTitle : reminder.note
+                body: reminder.note.isEmpty ? reminder.memoTitle : reminder.note,
+                memoLocalId: reminder.memoLocalId
             )
             await removeReminder(reminder.id)
         }

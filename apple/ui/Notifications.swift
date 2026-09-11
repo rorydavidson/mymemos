@@ -71,6 +71,7 @@ final class Notifications: ObservableObject {
                 id: Self.reminderPrefix + reminder.id,
                 title: "Memo reminder",
                 body: reminder.note.isEmpty ? reminder.memoTitle : reminder.note,
+                memoLocalId: reminder.memoLocalId,
                 trigger: UNCalendarNotificationTrigger(
                     dateMatching: Calendar.current.dateComponents(
                         [.year, .month, .day, .hour, .minute], from: fireAt
@@ -107,16 +108,20 @@ final class Notifications: ObservableObject {
     }
 
     /// Posts something now, for work the app has just caught up on.
-    func postNow(id: String, title: String, body: String) {
+    func postNow(id: String, title: String, body: String, memoLocalId: String? = nil) {
         guard permission == .allowed else { return }
-        add(id: id, title: title, body: body, trigger: nil)
+        add(id: id, title: title, body: body, memoLocalId: memoLocalId, trigger: nil)
     }
 
-    private func add(id: String, title: String, body: String, trigger: UNNotificationTrigger?) {
+    /// The key a tapped notification carries so the app can open the memo it was about.
+    static let memoKey = "memoLocalId"
+
+    private func add(id: String, title: String, body: String, memoLocalId: String? = nil, trigger: UNNotificationTrigger?) {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         content.sound = .default
+        if let memoLocalId, !memoLocalId.isEmpty { content.userInfo = [Self.memoKey: memoLocalId] }
         centre.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
     }
 

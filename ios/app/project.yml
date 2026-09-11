@@ -64,6 +64,9 @@ targets:
           NSAllowsLocalNetworking: true
         UIBackgroundModes:
           - fetch
+        CFBundleURLTypes:
+          - CFBundleURLName: com.keltruc.mymemos
+            CFBundleURLSchemes: [mymemos]
         BGTaskSchedulerPermittedIdentifiers:
           - com.keltruc.mymemos.ios.refresh
     preBuildScripts:
