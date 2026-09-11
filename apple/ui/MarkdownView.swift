@@ -9,6 +9,9 @@ import SwiftUI
 struct MarkdownView: View {
     let text: String
     var lineLimit: Int?
+    /// Called with the source line and the new state when a task's box is tapped. Nil leaves
+    /// the boxes as pictures, which is what a preview wants.
+    var onToggleTask: ((Int, Bool) -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -55,11 +58,17 @@ struct MarkdownView: View {
             }
             .padding(.leading, CGFloat(depth) * 18)
 
-        case let .task(depth, done, content):
+        case let .task(depth, done, content, line):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: done ? "checkmark.square.fill" : "square")
-                    .font(.system(size: 14))
-                    .foregroundStyle(done ? Theme.accent : Theme.inkSoft.opacity(0.75))
+                Button {
+                    onToggleTask?(line, !done)
+                } label: {
+                    Image(systemName: done ? "checkmark.square.fill" : "square")
+                        .font(.system(size: onToggleTask == nil ? 14 : 18))
+                        .foregroundStyle(done ? Theme.accent : Theme.inkSoft.opacity(0.75))
+                }
+                .buttonStyle(.plain)
+                .disabled(onToggleTask == nil)
                 Text(inline(content))
                     .font(Type.body)
                     .strikethrough(done, color: Theme.inkSoft)
@@ -109,7 +118,8 @@ enum Block {
     case quote(String)
     case bullet(Int, String)
     case numbered(Int, String, String)
-    case task(Int, Bool, String)
+    /// Depth, done, content, and the line of the source text the task sits on.
+    case task(Int, Bool, String, Int)
     case code(String)
     case rule
 
@@ -159,7 +169,7 @@ enum Block {
                 continue
             }
             if let task = taskItem(trimmed) {
-                blocks.append(.task(depth, task.done, task.content))
+                blocks.append(.task(depth, task.done, task.content, index))
                 index += 1
                 continue
             }

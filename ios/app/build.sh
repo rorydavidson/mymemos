@@ -90,7 +90,7 @@ printf 'APPL????' > "$APP/PkgInfo"
 EXTRA_FLAGS=()
 [ "${TESTHOOKS:-0}" = "1" ] && EXTRA_FLAGS+=(-D TESTHOOKS)
 
-swiftc -O "${EXTRA_FLAGS[@]}" \
+swiftc -O ${EXTRA_FLAGS[@]+"${EXTRA_FLAGS[@]}"} \
     -target arm64-apple-ios17.0-simulator \
     -sdk "$SDK" \
     -F "$FRAMEWORK_DIR" \

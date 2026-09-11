@@ -33,6 +33,10 @@ struct RootView: View {
             set: { if $0 == nil { model.settingReminderFor = nil } }
         )) { target in
             ReminderSheet(model: model, memoLocalId: target.id)
+        }        .alert("MyMemos", isPresented: Binding(get: { model.notice != nil }, set: { if !$0 { model.notice = nil } })) {
+            Button("OK") { model.notice = nil }
+        } message: {
+            Text(model.notice ?? "")
         }
     }
 

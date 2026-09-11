@@ -8,10 +8,16 @@ struct MemosScreen: View {
 
     enum Library: Hashable { case reminders, templates, settings }
 
+    private var title: String {
+        if let shortcut = model.activeShortcut { return shortcut.title }
+        if model.showArchived { return "Archive" }
+        return model.activeTag.map { "#\($0)" } ?? "Memos"
+    }
+
     var body: some View {
         NavigationStack {
             MemoListView(model: model, selection: $model.selection)
-                .navigationTitle(model.activeTag.map { "#\($0)" } ?? "Memos")
+                .navigationTitle(title)
                 .navigationBarTitleDisplayMode(.large)
                 .searchable(text: $model.query, prompt: "Search memos")
                 .refreshable { await model.sync() }
@@ -71,6 +77,12 @@ struct MemosToolbar: ToolbarContent {
                 }
 
                 Section {
+                    Toggle(isOn: Binding(
+                        get: { model.showArchived },
+                        set: { on in model.showArchived = on; model.activeShortcut = nil; Task { await model.reload() } }
+                    )) {
+                        Label("Archive", systemImage: "archivebox")
+                    }
                     Toggle(isOn: Binding(
                         get: { model.compactList },
                         set: { enabled in Task { await model.setCompactList(enabled) } }

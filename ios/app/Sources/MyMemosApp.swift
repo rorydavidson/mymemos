@@ -52,6 +52,10 @@ struct RootView: View {
         )) { target in
             ReminderSheet(model: model, memoLocalId: target.id)
                 .presentationDetents([.medium])
+        }        .alert("MyMemos", isPresented: Binding(get: { model.notice != nil }, set: { if !$0 { model.notice = nil } })) {
+            Button("OK") { model.notice = nil }
+        } message: {
+            Text(model.notice ?? "")
         }
     }
 }
@@ -134,7 +138,10 @@ struct SplitShell: View {
 
     private var title: String {
         switch model.pane {
-        case .memos: return model.activeTag.map { "#\($0)" } ?? "Memos"
+        case .memos:
+            if let shortcut = model.activeShortcut { return shortcut.title }
+            if model.showArchived { return "Archive" }
+            return model.activeTag.map { "#\($0)" } ?? "Memos"
         case .tasks: return "Tasks"
         case .review: return "Review"
         case .reminders: return "Reminders"

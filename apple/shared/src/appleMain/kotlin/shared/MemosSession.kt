@@ -41,6 +41,20 @@ import kotlinx.datetime.toInstant
 import kotlin.uuid.Uuid
 import kotlin.time.Duration.Companion.days
 import kotlinx.serialization.json.Json
+import com.keltruc.mymemos.data.mapper.toModel
+import com.keltruc.mymemos.data.repository.ShareRepository
+import com.keltruc.mymemos.data.repository.ShortcutRepository
+import com.keltruc.mymemos.model.Location
+import com.keltruc.mymemos.model.MemoState
+import com.keltruc.mymemos.model.NoteColour
+import com.keltruc.mymemos.model.TagStyle
+import com.keltruc.mymemos.model.UserRole
+import com.keltruc.mymemos.model.InstanceGeneral
+import kotlin.math.asin
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
+import kotlin.math.PI
 
 /**
  * What the macOS app talks to. Deliberately small and concrete: Swift gets suspend functions
@@ -84,6 +98,10 @@ class MemosSession {
     private val config = ConfigRepository(db.memoDao(), memos, accounts, settings)
 
     private val templates = TemplateRepository(db.templateDao())
+
+    private val shares = ShareRepository(registry, json)
+
+    private val shortcuts = ShortcutRepository(db, db.shortcutDao(), db.memoDao(), registry, engine, json)
 
     var serverVersion: String = ""
         private set
@@ -148,6 +166,9 @@ class MemosSession {
             longitude = memo.location?.longitude ?: 0.0,
             hasPlace = memo.location != null,
             bodyBelowTitle = if (memo.isLocked) "" else MemoTitle.withoutTitleLine(memo.displayContent),
+            bodyLineOffset = if (memo.isLocked) 0 else memo.displayContent.lines().size - MemoTitle.withoutTitleLine(memo.displayContent).lines().size,
+            archived = memo.state == MemoState.ARCHIVED,
+            onServer = memo.remoteName != null,
         )
     }
 
@@ -689,6 +710,476 @@ class MemosSession {
         return read == "ok"
     }
 
+
+    // MARK: archive, colour and undo
+
+    /** Archived memos, grouped like the timeline. */
+    suspend fun archived(): List<TimelineSection> {
+        val account = db.accountDao().getActive() ?: return emptyList()
+        val byModified = AppleStack.preferences.settings.first().sortByModified
+        return group(memos.observeTimeline(account.id, byModified = byModified, state = MemoState.ARCHIVED).first())
+    }
+
+    suspend fun setArchived(localId: String, archived: Boolean) =
+        memos.setState(localId, if (archived) MemoState.ARCHIVED else MemoState.NORMAL)
+
+    suspend fun isArchived(localId: String): Boolean =
+        memos.observeMemoOnce(localId)?.state == MemoState.ARCHIVED
+
+    /** Takes back a delete that has not reached the server yet. */
+    suspend fun undoDelete(localId: String): Boolean = memos.undoDelete(localId)
+
+    /** The sixteen colours a memo can be tinted, as name and 0xRRGGBB. */
+    fun colours(): List<ColourOption> = NoteColour.entries.map { ColourOption(it.name, it.hex) }
+
+    suspend fun setColour(localId: String, name: String?) =
+        memos.setColour(localId, name?.let { n -> NoteColour.entries.firstOrNull { it.name == n } })
+
+    // MARK: comments and reactions
+
+    /** The nine reactions the Android app offers first. Any emoji works; these are the shortcuts. */
+    val quickReactions: List<String> = listOf("👍", "❤️", "😂", "😮", "😢", "🎉", "👀", "🔥", "✅")
+
+    /**
+     * A memo's comments, refreshed from the server when it can be reached and read from the
+     * database either way. Comments are not part of the memo list, so they arrive on demand.
+     */
+    suspend fun comments(localId: String): List<CommentRow> {
+        val account = accounts.activeAccountOrNull() ?: return emptyList()
+        val parent = memos.observeMemoOnce(localId)?.remoteName ?: return emptyList()
+        runCatching { memos.refreshComments(account, parent) }
+        return memos.observeComments(account.id, parent).first().map { comment ->
+            CommentRow(
+                localId = comment.localId,
+                creator = comment.creator?.substringAfterLast('/').orEmpty(),
+                mine = comment.creator == null || comment.creator == account.userResourceName,
+                body = comment.displayContent,
+                dateLabel = comment.createTime.friendly(),
+                pending = comment.remoteName == null,
+            )
+        }
+    }
+
+    /** False for a memo the server has not seen yet: a comment needs a parent name. */
+    suspend fun addComment(localId: String, text: String): Boolean {
+        val account = db.accountDao().getActive() ?: return false
+        val parent = memos.observeMemoOnce(localId)?.remoteName ?: return false
+        memos.addComment(account.id, parent, text, Visibility.PRIVATE)
+        return true
+    }
+
+    suspend fun reactions(localId: String): List<ReactionRow> {
+        val me = db.accountDao().getActive()?.userResourceName
+        return memos.observeReactions(localId).first()
+            .groupBy { it.reactionType }
+            .map { (type, list) -> ReactionRow(type, list.size, list.any { it.creator == me }) }
+            .sortedByDescending { it.count }
+    }
+
+    suspend fun toggleReaction(localId: String, type: String) {
+        val me = db.accountDao().getActive()?.userResourceName ?: return
+        memos.toggleReaction(localId, me, type)
+    }
+
+    // MARK: references
+
+    /** Memos this one points at. */
+    suspend fun references(localId: String): List<ReferenceRow> {
+        val account = db.accountDao().getActive() ?: return emptyList()
+        return memos.observeReferences(localId).first().map { ref ->
+            ReferenceRow(
+                remoteName = ref.relatedRemoteName,
+                snippet = ref.relatedSnippet.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty(),
+                localId = db.memoDao().getByRemoteName(account.id, ref.relatedRemoteName)?.localId,
+            )
+        }
+    }
+
+    /** Memos that point at this one. */
+    suspend fun backlinks(localId: String): List<MemoRow> {
+        val account = db.accountDao().getActive() ?: return emptyList()
+        val remoteName = memos.observeMemoOnce(localId)?.remoteName ?: return emptyList()
+        return memos.observeBacklinks(account.id, remoteName).first().map { it.toRow() }
+    }
+
+    /** Synced, top-level memos matching [query], for the reference picker. */
+    suspend fun referenceCandidates(query: String): List<MemoRow> {
+        val account = db.accountDao().getActive() ?: return emptyList()
+        return memos.pickReferenceCandidates(account.id, query).map { it.toRow() }
+    }
+
+    suspend fun addReference(localId: String, targetLocalId: String) {
+        val target = memos.observeMemoOnce(targetLocalId) ?: return
+        memos.addReference(localId, target)
+    }
+
+    suspend fun removeReference(localId: String, remoteName: String) = memos.removeReference(localId, remoteName)
+
+    /** Every memo that references or is referenced, and the edges between them. */
+    suspend fun referenceGraph(): GraphData {
+        val account = db.accountDao().getActive() ?: return GraphData(emptyList(), emptyList())
+        val (nodes, edges) = memos.referenceGraph(account.id)
+        return GraphData(nodes.map { it.toRow() }, edges.map { GraphEdge(it.first, it.second) })
+    }
+
+    /** Opens a memo by its server name, pulling it if this device does not hold it yet. */
+    suspend fun localIdForRemote(remoteName: String): String? =
+        accounts.activeAccountOrNull()?.let { memos.ensureLocal(it, remoteName) }
+
+    // MARK: share links
+
+    suspend fun shares(localId: String): List<ShareRow> {
+        val account = accounts.activeAccountOrNull() ?: return emptyList()
+        val remoteName = memos.observeMemoOnce(localId)?.remoteName ?: return emptyList()
+        val zone = TimeZone.currentSystemDefault()
+        return shares.list(account, remoteName).map {
+            ShareRow(it.name, it.url, it.createTime.friendly(), it.expireTime?.friendlyWithTime(zone))
+        }
+    }
+
+    suspend fun createShare(localId: String, expiresInDays: Int): ShareRow? {
+        val account = accounts.activeAccountOrNull() ?: return null
+        val remoteName = memos.observeMemoOnce(localId)?.remoteName ?: return null
+        val expires = if (expiresInDays > 0) Clock.System.now() + expiresInDays.days else null
+        val share = shares.create(account, remoteName, expires)
+        return ShareRow(share.name, share.url, share.createTime.friendly(), share.expireTime?.friendlyWithTime(TimeZone.currentSystemDefault()))
+    }
+
+    suspend fun revokeShare(localId: String, name: String) {
+        val account = accounts.activeAccountOrNull() ?: return
+        val remoteName = memos.observeMemoOnce(localId)?.remoteName ?: return
+        shares.list(account, remoteName).firstOrNull { it.name == name }?.let { shares.delete(account, it) }
+    }
+
+    // MARK: shortcuts
+
+    /** Saved server-side filters. Running one needs the server; the results are shown from the database. */
+    suspend fun shortcuts(): List<ShortcutRow> {
+        val account = db.accountDao().getActive() ?: return emptyList()
+        return shortcuts.observe(account.id).first().map { ShortcutRow(it.name, it.title, it.filter) }
+    }
+
+    suspend fun runShortcut(name: String): List<TimelineSection> {
+        val account = accounts.activeAccountOrNull() ?: return emptyList()
+        val shortcut = shortcuts.observe(account.id).first().firstOrNull { it.name == name } ?: return emptyList()
+        val names = shortcuts.run(account, shortcut)
+        if (names.isEmpty()) return emptyList()
+        return group(shortcuts.observeMemos(account.id, names).first())
+    }
+
+    suspend fun saveShortcut(name: String?, title: String, filter: String) {
+        val account = accounts.activeAccountOrNull() ?: return
+        if (name == null) shortcuts.create(account, title, filter)
+        else shortcuts.update(account, com.keltruc.mymemos.model.Shortcut(name, title, filter))
+    }
+
+    suspend fun deleteShortcut(name: String) {
+        val account = accounts.activeAccountOrNull() ?: return
+        shortcuts.observe(account.id).first().firstOrNull { it.name == name }?.let { shortcuts.delete(account, it) }
+    }
+
+    // MARK: places
+
+    suspend fun setLocation(localId: String, latitude: Double, longitude: Double, placeName: String) =
+        memos.setLocation(localId, Location(placeName, latitude, longitude))
+
+    suspend fun clearLocation(localId: String) = memos.setLocation(localId, null)
+
+    /** Located memos ordered by distance from where the device says it is. */
+    suspend fun nearby(latitude: Double, longitude: Double): List<NearbyRow> {
+        val account = db.accountDao().getActive() ?: return emptyList()
+        return memos.memosWithLocation(account.id).mapNotNull { memo ->
+            val place = memo.location ?: return@mapNotNull null
+            NearbyRow(memo.toRow(), place.placeholder, distanceMetres(latitude, longitude, place.latitude, place.longitude))
+        }.sortedBy { it.metres }
+    }
+
+    private fun distanceMetres(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val r = 6_371_000.0
+        val dLat = (lat2 - lat1) * PI / 180
+        val dLon = (lon2 - lon1) * PI / 180
+        val a = sin(dLat / 2) * sin(dLat / 2) + cos(lat1 * PI / 180) * cos(lat2 * PI / 180) * sin(dLon / 2) * sin(dLon / 2)
+        return 2 * r * asin(sqrt(a))
+    }
+
+    // MARK: sync state
+
+    suspend fun syncState(): SyncStatusRow {
+        val account = db.accountDao().getActive() ?: return SyncStatusRow(0, 0, 0, null, false, "")
+        val state = memos.observeSyncState(account.id).first()
+        return SyncStatusRow(
+            pending = state.pendingCount,
+            failed = state.failedCount,
+            conflicts = state.conflictCount,
+            lastError = state.lastError,
+            authExpired = state.authExpired,
+            lastSuccessLabel = state.lastSuccess?.friendlyWithTime(TimeZone.currentSystemDefault()).orEmpty(),
+        )
+    }
+
+    suspend fun failedOps(): List<FailedOpRow> {
+        val account = db.accountDao().getActive() ?: return emptyList()
+        return memos.observeFailedOps(account.id).first().map { op ->
+            val memo = memos.observeMemoOnce(op.memoLocalId)
+            FailedOpRow(
+                id = op.id,
+                memoLocalId = op.memoLocalId,
+                memoTitle = memo?.let { m -> if (m.isLocked) "Locked memo" else MemoTitle.of(m.displayContent) ?: m.firstLine() }.orEmpty(),
+                type = op.type.lowercase().replace('_', ' '),
+                error = op.error.orEmpty(),
+                attempts = op.attempts,
+            )
+        }
+    }
+
+    suspend fun retryFailed() {
+        val account = db.accountDao().getActive() ?: return
+        memos.retryFailed(account.id)
+    }
+
+    /** Conflict copies the merge could not settle, kept rather than lost. */
+    suspend fun conflicts(): List<MemoRow> {
+        val account = db.accountDao().getActive() ?: return emptyList()
+        return db.memoDao().observeConflicts(account.id).first().map { it.toModel().toRow() }
+    }
+
+    suspend fun keepConflictCopy(localId: String) = memos.resolveConflict(localId)
+
+    /** Signs in again with the password when the device's token has lapsed. */
+    suspend fun reauthenticate(password: String): Boolean {
+        val account = accounts.activeAccountOrNull() ?: return false
+        return runCatching { accounts.reauthenticate(account, password) }.isSuccess
+    }
+
+    // MARK: accounts and servers
+
+    suspend fun accounts(): List<AccountRow> {
+        val active = db.accountDao().getActive()?.id
+        return accounts.accounts.first().map {
+            AccountRow(
+                id = it.id,
+                serverUrl = it.serverUrl,
+                username = it.username,
+                displayName = it.displayName.ifEmpty { it.username },
+                active = it.id == active,
+                admin = it.role == UserRole.ADMIN,
+            )
+        }
+    }
+
+    suspend fun switchAccount(id: Long) {
+        accounts.switchTo(id)
+        signedInAs()
+    }
+
+    suspend fun isAdmin(): Boolean = db.accountDao().getActive()?.role == UserRole.ADMIN.name
+
+    /** Servers signed into before, newest first. Only the address is kept. */
+    suspend fun knownServers(): List<String> = AppleStack.preferences.settings.first().knownServers
+
+    suspend fun rememberServer(url: String) = AppleStack.preferences.rememberServer(url)
+
+    suspend fun forgetServer(url: String) = AppleStack.preferences.forgetServer(url)
+
+    /** Move ticked task lines below the unticked ones whenever a memo is saved. */
+    suspend fun sortCompletedTasks(): Boolean = AppleStack.preferences.settings.first().sortCompletedTasks
+
+    suspend fun setSortCompletedTasks(enabled: Boolean) = AppleStack.preferences.setSortCompletedTasks(enabled)
+
+    // MARK: tag styles
+
+    suspend fun tagStyles(): List<TagStyleRow> =
+        config.current().tagStyles.map { (tag, style) -> TagStyleRow(tag, style.emoji, style.colour?.name, style.colour?.hex ?: -1L) }
+
+    suspend fun setTagStyle(tag: String, emoji: String?, colourName: String?) {
+        val colour = colourName?.let { n -> NoteColour.entries.firstOrNull { it.name == n } }
+        config.setTagStyle(tag, TagStyle(emoji?.takeIf { it.isNotBlank() }, colour))
+    }
+
+    // MARK: editor completions
+
+    /** Tags starting with [prefix], most used first, for the editor's popup. */
+    suspend fun tagSuggestions(prefix: String): List<String> =
+        tags().filter { it.startsWith(prefix, ignoreCase = true) && it != prefix }.take(8)
+
+    /**
+     * Completions for an `@` date, from the same parser the tasks screen reads, so a completion
+     * can never mean a different day than it shows.
+     */
+    fun dateSuggestions(prefix: String): List<DateSuggestionRow> {
+        val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
+        val labels = AppleDueDateLabels()
+        return DueDateParser.suggest(prefix, today).map {
+            DateSuggestionRow(token = it.token, hint = if (it.showsDate) labels.hint(it.date) else "")
+        }
+    }
+
+    /** Ticks or unticks a task line, which edits the memo's text. */
+    suspend fun toggleTask(localId: String, lineIndex: Int, checked: Boolean) {
+        val memo = memos.observeMemoOnce(localId) ?: return
+        if (memo.isLocked) return
+        TaskLine.toggle(memo.content, lineIndex, checked)?.let { memos.updateContent(localId, it) }
+    }
+
+    // MARK: the account on the server
+
+    suspend fun profile(): ProfileRow? {
+        val account = accounts.activeAccountOrNull() ?: return null
+        val user = settings.profile(account)
+        return ProfileRow(user.name, user.username, user.displayName, user.email, user.description, user.role == UserRole.ADMIN)
+    }
+
+    suspend fun updateProfile(displayName: String, description: String, email: String) {
+        val account = accounts.activeAccountOrNull() ?: return
+        settings.updateProfile(account, displayName, description, email)
+        signedInAs()
+    }
+
+    suspend fun changePassword(newPassword: String) {
+        val account = accounts.activeAccountOrNull() ?: return
+        settings.changePassword(account, newPassword)
+    }
+
+    suspend fun defaultVisibility(): String {
+        val account = accounts.activeAccountOrNull() ?: return "PRIVATE"
+        return settings.preferences(account).defaultVisibility.name
+    }
+
+    suspend fun setDefaultVisibility(visibility: String) {
+        val account = accounts.activeAccountOrNull() ?: return
+        settings.setDefaultVisibility(account, Visibility.valueOf(visibility))
+    }
+
+    suspend fun tokens(): List<TokenRow> {
+        val account = accounts.activeAccountOrNull() ?: return emptyList()
+        val own = settings.ownTokenName(account)
+        val zone = TimeZone.currentSystemDefault()
+        return settings.tokens(account).map {
+            TokenRow(
+                name = it.name,
+                description = it.description,
+                createdLabel = it.createdAt.friendly(),
+                expiresLabel = it.expiresAt?.friendlyWithTime(zone) ?: "Never",
+                lastUsedLabel = it.lastUsedAt?.friendlyWithTime(zone) ?: "Never",
+                thisDevice = it.name == own,
+            )
+        }
+    }
+
+    /** Returns the new token's value, which the server shows exactly once. */
+    suspend fun createToken(description: String, expiresInDays: Int): String {
+        val account = accounts.activeAccountOrNull() ?: return ""
+        return settings.createToken(account, description, expiresInDays.takeIf { it > 0 })
+    }
+
+    suspend fun deleteToken(name: String) {
+        val account = accounts.activeAccountOrNull() ?: return
+        settings.tokens(account).firstOrNull { it.name == name }?.let { settings.deleteToken(account, it) }
+    }
+
+    suspend fun webhooks(): List<WebhookRow> {
+        val account = accounts.activeAccountOrNull() ?: return emptyList()
+        return settings.webhooks(account).map { WebhookRow(it.name, it.displayName, it.url, it.createTime.friendly()) }
+    }
+
+    suspend fun createWebhook(displayName: String, url: String) {
+        val account = accounts.activeAccountOrNull() ?: return
+        settings.createWebhook(account, displayName, url)
+    }
+
+    suspend fun deleteWebhook(name: String) {
+        val account = accounts.activeAccountOrNull() ?: return
+        settings.webhooks(account).firstOrNull { it.name == name }?.let { settings.deleteWebhook(account, it) }
+    }
+
+    suspend fun notifications(): List<NotificationRow> {
+        val account = accounts.activeAccountOrNull() ?: return emptyList()
+        return settings.notifications(account).map {
+            NotificationRow(
+                name = it.name,
+                sender = it.senderUsername,
+                unread = it.unread,
+                dateLabel = it.createTime.friendlyWithTime(TimeZone.currentSystemDefault()),
+                type = it.type.lowercase().replace('_', ' '),
+                memoRemoteName = it.memoRemoteName,
+                memoSnippet = it.memoSnippet,
+                relatedSnippet = it.relatedSnippet,
+            )
+        }
+    }
+
+    suspend fun unreadNotifications(): Int {
+        val account = accounts.activeAccountOrNull() ?: return 0
+        runCatching { settings.refreshUnreadCount(account) }
+        return settings.unreadNotifications.value
+    }
+
+    suspend fun markNotificationRead(name: String) {
+        val account = accounts.activeAccountOrNull() ?: return
+        settings.notifications(account).firstOrNull { it.name == name }?.let { settings.markRead(account, it) }
+    }
+
+    suspend fun deleteNotification(name: String) {
+        val account = accounts.activeAccountOrNull() ?: return
+        settings.notifications(account).firstOrNull { it.name == name }?.let { settings.deleteNotification(account, it) }
+    }
+
+    suspend fun stats(): StatsRow? {
+        val account = accounts.activeAccountOrNull() ?: return null
+        val stats = settings.stats(account)
+        return StatsRow(
+            totalMemos = stats.totalMemos,
+            links = stats.links,
+            code = stats.code,
+            todos = stats.todos,
+            undone = stats.undone,
+            tagCounts = stats.tagCounts.entries.sortedByDescending { it.value }.map { TagCount(it.key, it.value) },
+            activeDays = stats.createdTimes.map { it.toLocalDateTime(TimeZone.currentSystemDefault()).date }.toSet().size,
+        )
+    }
+
+    // MARK: administration
+
+    suspend fun users(): List<UserRow> {
+        val account = accounts.activeAccountOrNull() ?: return emptyList()
+        return settings.users(account).map { UserRow(it.name, it.username, it.displayName, it.email, it.role == UserRole.ADMIN) }
+    }
+
+    suspend fun createUser(username: String, password: String, admin: Boolean) {
+        val account = accounts.activeAccountOrNull() ?: return
+        settings.createUser(account, username, password, if (admin) "ADMIN" else "USER")
+    }
+
+    suspend fun setUserArchived(name: String, archived: Boolean) {
+        val account = accounts.activeAccountOrNull() ?: return
+        settings.users(account).firstOrNull { it.name == name }?.let { settings.setUserArchived(account, it, archived) }
+    }
+
+    suspend fun deleteUser(name: String) {
+        val account = accounts.activeAccountOrNull() ?: return
+        settings.users(account).firstOrNull { it.name == name }?.let { settings.deleteUser(account, it) }
+    }
+
+    suspend fun instanceGeneral(): InstanceRow? {
+        val account = accounts.activeAccountOrNull() ?: return null
+        val g = settings.instanceGeneral(account)
+        return InstanceRow(g.title, g.description, g.disallowRegistration, g.disallowPasswordAuth, g.disallowChangeUsername, g.disallowChangeNickname, g.weekStartDayOffset)
+    }
+
+    suspend fun updateInstanceGeneral(row: InstanceRow) {
+        val account = accounts.activeAccountOrNull() ?: return
+        settings.updateInstanceGeneral(
+            account,
+            InstanceGeneral(row.title, row.description, row.disallowRegistration, row.disallowPasswordAuth, row.disallowChangeUsername, row.disallowChangeNickname, row.weekStartDayOffset),
+        )
+    }
+
+    suspend fun instanceStats(): InstanceStatsRow? {
+        val account = accounts.activeAccountOrNull() ?: return null
+        val s = settings.instanceStats(account)
+        return InstanceStatsRow(s.databaseDriver, s.databaseBytes, s.localStorageBytes)
+    }
+
     private companion object {
         /** Sunday evening, late enough that the week is genuinely over. */
         const val DIGEST_HOUR = 18
@@ -780,6 +1271,11 @@ data class MemoDetail(
     val hasPlace: Boolean,
     /** The text without the line the title came from, so a view showing both does not repeat it. */
     val bodyBelowTitle: String,
+    /** How many lines [bodyBelowTitle] dropped from the front, so a task's line index maps back. */
+    val bodyLineOffset: Int,
+    val archived: Boolean,
+    /** False while the memo is still in the outbox: comments, shares and reminders need a server name. */
+    val onServer: Boolean,
 )
 
 /**
@@ -862,3 +1358,120 @@ data class MemoRow(
     val timeLabel: String,
     val dateLabel: String,
 )
+
+// MARK: - Rows for the Phase D surface
+
+data class ColourOption(val name: String, val hex: Long)
+
+data class CommentRow(
+    val localId: String,
+    val creator: String,
+    val mine: Boolean,
+    val body: String,
+    val dateLabel: String,
+    /** Not on the server yet. */
+    val pending: Boolean,
+)
+
+data class ReactionRow(val type: String, val count: Int, val mine: Boolean)
+
+/** A memo this one points at; [localId] is null until this device has pulled it. */
+data class ReferenceRow(val remoteName: String, val snippet: String, val localId: String?)
+
+data class GraphEdge(val from: String, val to: String)
+
+data class GraphData(val nodes: List<MemoRow>, val edges: List<GraphEdge>)
+
+data class ShareRow(val name: String, val url: String, val createdLabel: String, val expiresLabel: String?)
+
+data class ShortcutRow(val name: String, val title: String, val filter: String)
+
+data class NearbyRow(val row: MemoRow, val placeName: String, val metres: Double)
+
+data class SyncStatusRow(
+    val pending: Int,
+    val failed: Int,
+    val conflicts: Int,
+    val lastError: String?,
+    val authExpired: Boolean,
+    val lastSuccessLabel: String,
+)
+
+data class FailedOpRow(
+    val id: Long,
+    val memoLocalId: String,
+    val memoTitle: String,
+    val type: String,
+    val error: String,
+    val attempts: Int,
+)
+
+data class AccountRow(
+    val id: Long,
+    val serverUrl: String,
+    val username: String,
+    val displayName: String,
+    val active: Boolean,
+    val admin: Boolean,
+)
+
+data class TagStyleRow(val tag: String, val emoji: String?, val colourName: String?, val colourHex: Long)
+
+data class DateSuggestionRow(val token: String, val hint: String)
+
+data class ProfileRow(
+    val name: String,
+    val username: String,
+    val displayName: String,
+    val email: String,
+    val description: String,
+    val admin: Boolean,
+)
+
+data class TokenRow(
+    val name: String,
+    val description: String,
+    val createdLabel: String,
+    val expiresLabel: String,
+    val lastUsedLabel: String,
+    val thisDevice: Boolean,
+)
+
+data class WebhookRow(val name: String, val displayName: String, val url: String, val createdLabel: String)
+
+data class NotificationRow(
+    val name: String,
+    val sender: String,
+    val unread: Boolean,
+    val dateLabel: String,
+    val type: String,
+    val memoRemoteName: String,
+    val memoSnippet: String,
+    val relatedSnippet: String,
+)
+
+data class TagCount(val tag: String, val count: Int)
+
+data class StatsRow(
+    val totalMemos: Int,
+    val links: Int,
+    val code: Int,
+    val todos: Int,
+    val undone: Int,
+    val tagCounts: List<TagCount>,
+    val activeDays: Int,
+)
+
+data class UserRow(val name: String, val username: String, val displayName: String, val email: String, val admin: Boolean)
+
+data class InstanceRow(
+    val title: String,
+    val description: String,
+    val disallowRegistration: Boolean,
+    val disallowPasswordAuth: Boolean,
+    val disallowChangeUsername: Boolean,
+    val disallowChangeNickname: Boolean,
+    val weekStartDayOffset: Int,
+)
+
+data class InstanceStatsRow(val databaseDriver: String, val databaseBytes: Long, val localStorageBytes: Long)

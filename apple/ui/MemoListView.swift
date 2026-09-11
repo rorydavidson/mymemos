@@ -25,10 +25,11 @@ struct MemoListView: View {
                                     if model.compactList {
                                         CompactMemoRowView(memo: memo, selected: selection == memo.localId)
                                     } else {
-                                        MemoRowView(memo: memo, selected: selection == memo.localId)
+                                        MemoRowView(memo: memo, selected: selection == memo.localId, styles: model.tagStyles)
                                     }
                                 }
                                 .onTapGesture { selection = memo.localId }
+                                .contextMenu { RowMenu(model: model, memo: memo) }
                                 .padding(.horizontal, 10)
                             }
                         }
@@ -46,17 +47,39 @@ struct MemoListView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Theme.canvas)
+        .overlay(alignment: .bottom) { UndoBanner(model: model).animation(.easeInOut, value: model.undoable) }
         .overlay(alignment: .center) {
             if model.sections.isEmpty && !model.isBusy {
                 EmptyState(
-                    icon: model.query.isEmpty ? "tray" : "magnifyingglass",
-                    title: model.query.isEmpty ? "No memos yet" : "Nothing found",
-                    detail: model.query.isEmpty
-                        ? Hint.firstMemo
-                        : "No memo matches “\(model.query)”."
+                    icon: model.showArchived ? "archivebox" : (model.query.isEmpty ? "tray" : "magnifyingglass"),
+                    title: model.showArchived ? "Nothing archived" : (model.query.isEmpty ? "No memos yet" : "Nothing found"),
+                    detail: model.showArchived
+                        ? "Archive a memo from its menu and it will wait here."
+                        : (model.query.isEmpty ? Hint.firstMemo : "No memo matches “\(model.query)”.")
                 )
             }
         }
+    }
+}
+
+/// What a long press (or a right click) offers on a row: the same things Android's does.
+struct RowMenu: View {
+    @ObservedObject var model: SessionModel
+    let memo: MemoRow
+
+    var body: some View {
+        Button("Edit", systemImage: "pencil") { model.editing = EditorTarget(localId: memo.localId) }
+            .disabled(memo.locked)
+        Button(memo.pinned ? "Unpin" : "Pin", systemImage: memo.pinned ? "pin.slash" : "pin") {
+            Task { await model.setPinned(memo.localId, !memo.pinned) }
+        }
+        Button(model.showArchived ? "Unarchive" : "Archive", systemImage: model.showArchived ? "tray.and.arrow.up" : "archivebox") {
+            Task { await model.setArchived(memo.localId, !model.showArchived) }
+        }
+        ColourMenu(current: memo.colourHex) { name in Task { await model.setColour(memo.localId, name) } }
+        Button("Remind me…", systemImage: "bell") { model.settingReminderFor = memo.localId }
+        Divider()
+        Button("Delete", systemImage: "trash", role: .destructive) { Task { await model.delete(memo.localId) } }
     }
 }
 
@@ -96,6 +119,7 @@ private struct SectionHeader: View {
 struct MemoRowView: View {
     let memo: MemoRow
     var selected = false
+    var styles: [String: TagStyleRow] = [:]
 
     @Environment(\.colorScheme) private var scheme
     @State private var hovering = false
@@ -130,7 +154,7 @@ struct MemoRowView: View {
 
                 if !memo.tags.isEmpty || hasBadges {
                     HStack(spacing: 6) {
-                        ForEach(memo.tags.prefix(3), id: \.self) { TagChip(tag: $0) }
+                        ForEach(memo.tags.prefix(3), id: \.self) { TagChip(tag: $0, style: styles[$0]) }
                         if memo.tags.count > 3 {
                             Text("+\(memo.tags.count - 3)")
                                 .font(Type.rowMeta).foregroundStyle(Theme.inkSoft)

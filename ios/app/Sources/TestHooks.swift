@@ -48,6 +48,22 @@ enum TestHooks {
             case "password": await model.usePassword(arg, remember: false)
             case "reveal": if let memo = nth(model, arg) { await model.reveal(memo.localId) }
             case "lock": if let memo = nth(model, arg) { await model.lock(memo.localId) }
+            case "react":
+                let bits = arg.split(separator: ",").map(String.init)
+                if bits.count == 2, let memo = nth(model, bits[0]) { await model.toggleReaction(memo.localId, bits[1]) }
+            case "comment":
+                let bits = arg.split(separator: ",", maxSplits: 1).map(String.init)
+                if bits.count == 2, let memo = nth(model, bits[0]) { await model.addComment(memo.localId, bits[1]) }
+            case "archive": if let memo = nth(model, arg) { await model.setArchived(memo.localId, true) }
+            case "archived": model.showArchived = true; await model.reload()
+            case "colour":
+                let bits = arg.split(separator: ",").map(String.init)
+                if bits.count == 2, let memo = nth(model, bits[0]) { await model.setColour(memo.localId, bits[1]) }
+            case "tick":
+                let bits = arg.split(separator: ",").map(String.init)
+                if bits.count == 2, let memo = nth(model, bits[0]), let line = Int(bits[1]) { await model.toggleTask(memo.localId, line: line, checked: true) }
+            case "delete": if let memo = nth(model, arg) { await model.delete(memo.localId) }
+            case "sync": await model.sync()
             case "wait": try? await Task.sleep(for: .seconds(Double(arg) ?? 1))
             default: break
             }

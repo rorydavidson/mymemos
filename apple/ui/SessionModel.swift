@@ -64,6 +64,31 @@ final class SessionModel: ObservableObject {
     @Published var streak = 0
     @Published var avatar: PlatformImage?
 
+    // What Android calls the rest of the app: archive, undo, the social layer, shortcuts,
+    // sync state, accounts and tag styles. Loaded on demand; nothing here is on the launch path.
+    @Published var showArchived = false
+    @Published var undoable: Undoable?
+    @Published var comments: [CommentRow] = []
+    @Published var reactions: [ReactionRow] = []
+    @Published var references: [ReferenceRow] = []
+    @Published var backlinks: [MemoRow] = []
+    @Published var shortcuts: [ShortcutRow] = []
+    /// A shortcut whose results the timeline is showing instead of the timeline.
+    @Published var activeShortcut: ShortcutRow?
+    @Published var syncStatus: SyncStatusRow?
+    @Published var failedOps: [FailedOpRow] = []
+    @Published var conflicts: [MemoRow] = []
+    @Published var accounts: [AccountRow] = []
+    @Published var tagStyles: [String: TagStyleRow] = [:]
+    @Published var isAdmin = false
+    @Published var unreadNotifications = 0
+    @Published var sortCompletedTasks = false
+    @Published var graph: GraphData?
+    @Published var nearby: [NearbyRow] = []
+    @Published var nearbyFailure: String?
+    /// A one-line notice for something that could not be done, shown briefly.
+    @Published var notice: String?
+
     /// Per-device, so it lives in UserDefaults rather than the synced settings memo.
     @Published var appearance: Appearance = .system {
         didSet {
@@ -327,10 +352,15 @@ final class SessionModel: ObservableObject {
         await sync()
     }
 
+    /// Deletes, and offers Undo for a memo the server had, since that one waits a few seconds
+    /// before it is sent. One that never synced is gone at once and Undo is not offered.
     func delete(_ localId: String) async {
-        _ = try? await session.delete(localId: localId)
+        let title = memo(localId).map { $0.locked ? "Locked memo" : $0.title } ?? "Memo"
+        let canUndo = ((try? await session.delete(localId: localId)) as? Bool) ?? false
+        if selection == localId { selection = nil }
+        undoable = canUndo ? Undoable(localId: localId, kind: .deleted, title: title) : nil
         await reload()
-        await sync()
+        if !canUndo { await sync() }
     }
 
     // MARK: reminders, templates and the digest
@@ -479,6 +509,7 @@ final class SessionModel: ObservableObject {
         }
         sortByModified = ((try? await session.sortByModified()) as? Bool) ?? false
         compactList = ((try? await session.compactList()) as? Bool) ?? false
+        sortCompletedTasks = ((try? await session.sortCompletedTasks()) as? Bool) ?? false
         mapTiles = ((try? await session.mapTilesEnabled()) as? Bool) ?? false
         await TileLoader.shared.setEnabled(mapTiles)
         phase = .working("Looking for a saved account")
@@ -488,9 +519,12 @@ final class SessionModel: ObservableObject {
         }
         displayName = who
         serverVersion = session.serverVersion
+        isAdmin = ((try? await session.isAdmin()) as? Bool) ?? false
         Task { await loadAvatar() }
         await reload()
         await sync()
+        await loadShortcuts()
+        await loadAccounts()
         await refreshNotificationPermission()
         await loadTemplates()
         await loadSchedules()
@@ -522,6 +556,7 @@ final class SessionModel: ObservableObject {
             }
             lastSynced = Date()
             await reload()
+            await loadSyncStatus()
         } catch {
             phase = .failed(readable(error))
         }
@@ -530,11 +565,19 @@ final class SessionModel: ObservableObject {
     /// Reads the local database. Everything on screen comes from here, never from the network.
     func reload() async {
         do {
-            let found = query.trimmingCharacters(in: .whitespaces).isEmpty
-                ? try await session.timeline()
-                : try await session.search(query: query)
+            let found: [TimelineSection]
+            if let shortcut = activeShortcut {
+                found = try await session.runShortcut(name: shortcut.name)
+            } else if showArchived {
+                found = try await session.archived()
+            } else if query.trimmingCharacters(in: .whitespaces).isEmpty {
+                found = try await session.timeline()
+            } else {
+                found = try await session.search(query: query)
+            }
             sections = filtered(found)
             tags = try await session.tags()
+            await loadTagStyles()
             phase = .ready
         } catch {
             phase = .failed(readable(error))

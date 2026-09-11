@@ -5,16 +5,55 @@ import Shared
 struct TagChip: View {
     let tag: String
     var selected: Bool = false
+    /// The emoji and colour the user gave this tag, which follow them between devices.
+    var style: TagStyleRow? = nil
+
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        Text("#\(tag)")
-            .font(Type.rowMeta)
-            .foregroundStyle(selected ? Theme.card : Theme.onAccentSoft)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(
-                Capsule().fill(selected ? Theme.accent : Theme.accentSoft)
-            )
+        HStack(spacing: 3) {
+            if let emoji = style?.emoji, !emoji.isEmpty { Text(emoji) }
+            Text("#\(tag)")
+        }
+        .font(Type.rowMeta)
+        .foregroundStyle(selected ? Theme.card : Theme.onAccentSoft)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(fill))
+    }
+
+    private var fill: Color {
+        if selected { return Theme.accent }
+        if let hex = style?.colourHex, hex >= 0, let tint = Color.memoTint(hex, isDark: scheme == .dark) { return tint }
+        return Theme.accentSoft
+    }
+}
+
+/// A banner for something that can still be taken back, which goes away on its own.
+struct UndoBanner: View {
+    @ObservedObject var model: SessionModel
+
+    var body: some View {
+        if let undoable = model.undoable {
+            HStack(spacing: 12) {
+                Text(undoable.message).font(Type.rowBody).foregroundStyle(Theme.card).lineLimit(1)
+                Spacer()
+                Button("Undo") { Task { await model.undo() } }
+                    .font(Type.rowTitle)
+                    .foregroundStyle(Theme.accentSoft)
+                    .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Theme.ink, in: RoundedRectangle(cornerRadius: 10))
+            .shadow(color: .black.opacity(0.2), radius: 8, y: 3)
+            .padding(12)
+            .task(id: undoable.id) {
+                try? await Task.sleep(for: .seconds(5))
+                await model.dismissUndo()
+            }
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
     }
 }
 
