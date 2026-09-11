@@ -82,7 +82,7 @@ struct AdminInstanceView: View {
     @State private var general: InstanceRow?
     @State private var stats: InstanceStatsRow?
     @State private var title = ""
-    @State private var description = ""
+    @State private var about = ""
     @State private var disallowRegistration = false
     @State private var disallowPasswordAuth = false
     @State private var disallowChangeUsername = false
@@ -96,7 +96,7 @@ struct AdminInstanceView: View {
             if let general {
                 Section("Instance") {
                     TextField("Title", text: $title)
-                    TextField("Description", text: $description, axis: .vertical).lineLimit(2...4)
+                    TextField("Description", text: $about, axis: .vertical).lineLimit(2...4)
                     Picker("Week starts on", selection: $weekStart) {
                         Text("Sunday").tag(0)
                         Text("Monday").tag(1)
@@ -114,7 +114,7 @@ struct AdminInstanceView: View {
                         Task {
                             do {
                                 try await model.session.updateInstanceGeneral(row: InstanceRow(
-                                    title: title, description: description,
+                                    title: title, about: about,
                                     disallowRegistration: disallowRegistration, disallowPasswordAuth: disallowPasswordAuth,
                                     disallowChangeUsername: disallowChangeUsername, disallowChangeNickname: disallowChangeNickname,
                                     weekStartDayOffset: Int32(weekStart)
@@ -145,7 +145,7 @@ struct AdminInstanceView: View {
                 general = try await model.session.instanceGeneral()
                 if let general {
                     title = general.title
-                    description = general.description
+                    about = general.about
                     disallowRegistration = general.disallowRegistration
                     disallowPasswordAuth = general.disallowPasswordAuth
                     disallowChangeUsername = general.disallowChangeUsername

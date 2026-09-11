@@ -41,6 +41,7 @@ enum TestHooks {
                 default: model.pane = .memos
                 }
             case "new": model.newMemo()
+            case "newtext": model.editing = EditorTarget(localId: nil, initialText: arg)
             case "edit": if let memo = nth(model, arg) { model.editing = EditorTarget(localId: memo.localId) }
             case "compact": await model.setCompactList(true)
             case "query": model.query = arg; await model.reload()

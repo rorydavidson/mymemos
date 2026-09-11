@@ -1,5 +1,8 @@
 import SwiftUI
 import Shared
+#if os(iOS)
+import PhotosUI
+#endif
 
 /// Writing a memo.
 ///
@@ -20,6 +23,13 @@ struct EditorView: View {
     @State private var saving = false
     @State private var loaded = false
     @State private var pendingEdit: EditorEdit?
+    @State private var currentWord: String?
+    @State private var tagSuggestions: [String] = []
+    #if os(iOS)
+    @State private var pickedPhotos: [PhotosPickerItem] = []
+    /// Photos picked for a memo that does not exist yet, attached once it does.
+    @State private var pendingPhotos: [URL] = []
+    #endif
 
     private var isNew: Bool { editing == nil }
 
@@ -57,6 +67,13 @@ struct EditorView: View {
             FormatBar { pendingEdit = $0 }
             Divider()
 
+            if let word = currentWord {
+                SuggestionBar(word: word, tags: tagSuggestions, dates: model.dateSuggestions(String(word.dropFirst()))) {
+                    pendingEdit = .replaceWord($0)
+                }
+                Divider()
+            }
+
             #if os(macOS)
             HStack(spacing: 0) {
                 editor
@@ -75,10 +92,18 @@ struct EditorView: View {
         #endif
         .background(Theme.canvas)
         .task { await load() }
+        .task(id: currentWord) {
+            guard let word = currentWord, word.hasPrefix("#") else { tagSuggestions = []; return }
+            tagSuggestions = await model.tagSuggestions(String(word.dropFirst()))
+        }
+        #if os(iOS)
+        .onChange(of: pickedPhotos) { _, items in Task { await stagePhotos(items) } }
+        #endif
     }
 
     // MARK: Pieces
 
+    #if os(iOS)
     /// Visibility, pin and preview on a phone: the buttons that are not Cancel or Save.
     private var options: some View {
         HStack(spacing: 14) {
@@ -88,6 +113,7 @@ struct EditorView: View {
                 Text("Public").tag("PUBLIC")
             }
             .labelsHidden()
+            .fixedSize()
 
             Spacer()
 
@@ -100,10 +126,31 @@ struct EditorView: View {
                 Image(systemName: showPreview ? "eye.fill" : "eye")
             }
             .toggleStyle(.button)
+
+            PhotosPicker(selection: $pickedPhotos, matching: .images) {
+                Image(systemName: pendingPhotos.isEmpty ? "photo" : "photo.badge.checkmark")
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
     }
+
+    /// Copies picked photos to temporary files so they can be attached like any other file.
+    private func stagePhotos(_ items: [PhotosPickerItem]) async {
+        for item in items {
+            guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
+            let ext = item.supportedContentTypes.first?.preferredFilenameExtension ?? "jpg"
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("photo-\(UUID().uuidString).\(ext)")
+            guard (try? data.write(to: url)) != nil else { continue }
+            if let editing {
+                await model.attach(editing, urls: [url])
+            } else {
+                pendingPhotos.append(url)
+            }
+        }
+        pickedPhotos = []
+    }
+    #endif
 
     private var toolbar: some View {
         HStack(spacing: 12) {
@@ -148,7 +195,7 @@ struct EditorView: View {
 
     private var editor: some View {
         ZStack(alignment: .topLeading) {
-            MarkdownEditor(text: $text, pendingEdit: $pendingEdit, session: model.session)
+            MarkdownEditor(text: $text, pendingEdit: $pendingEdit, currentWord: $currentWord, session: model.session)
 
             if text.isEmpty {
                 Text("Write something. The buttons above add Markdown, or type it yourself.")
@@ -193,7 +240,14 @@ struct EditorView: View {
     private func save() async {
         saving = true
         defer { saving = false }
-        await model.save(editing: editing, text: text, visibility: visibility, pinned: pinned)
+        let localId = await model.save(editing: editing, text: text, visibility: visibility, pinned: pinned)
+        #if os(iOS)
+        if let localId, !pendingPhotos.isEmpty {
+            await model.attach(localId, urls: pendingPhotos)
+            pendingPhotos = []
+        }
+        #endif
+        _ = localId
         dismiss()
     }
 }

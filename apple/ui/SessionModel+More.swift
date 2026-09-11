@@ -271,6 +271,11 @@ extension SessionModel {
         graph = try? await session.referenceGraph()
     }
 
+    /// The memos of one day, for the day-by-day review. yyyy-MM-dd.
+    func memosOn(_ isoDate: String) async -> [MemoRow] {
+        (try? await session.memosOn(isoDate: isoDate)) ?? []
+    }
+
     /// Kotlin exceptions arrive as NSError carrying the Kotlin one; say what it said.
     func readableMessage(_ error: Error) -> String {
         let nsError = error as NSError

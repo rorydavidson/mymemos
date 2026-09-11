@@ -327,20 +327,26 @@ final class SessionModel: ObservableObject {
 
     /// Writes land in the local database and the outbox first, so this works with the network
     /// off; the sync afterwards is the push, not the save.
-    func save(editing: String?, text: String, visibility: String, pinned: Bool) async {
+    /// Returns the memo's local id, so a new memo can have things attached to it afterwards.
+    @discardableResult
+    func save(editing: String?, text: String, visibility: String, pinned: Bool) async -> String? {
         do {
+            let localId: String?
             if let editing {
                 try await session.updateContent(localId: editing, content: text)
                 if model(editing)?.pinned != pinned {
                     try await session.setPinned(localId: editing, pinned: pinned)
                 }
+                localId = editing
             } else {
-                _ = try await session.create(content: text, visibility: visibility, pinned: pinned)
+                localId = try await session.create(content: text, visibility: visibility, pinned: pinned)
             }
             await reload()
             await sync()
+            return localId
         } catch {
             phase = .failed(readable(error))
+            return nil
         }
     }
 

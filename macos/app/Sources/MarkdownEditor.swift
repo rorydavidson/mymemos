@@ -12,6 +12,8 @@ struct MarkdownEditor: NSViewRepresentable {
     @Binding var text: String
     /// Set to ask the view to apply an edit; cleared once it has.
     @Binding var pendingEdit: EditorEdit?
+    /// The `#tag` or `@date` under the cursor, for the completion bar. Nil when there is none.
+    @Binding var currentWord: String?
     let session: MemosSession
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -89,13 +91,22 @@ struct MarkdownEditor: NSViewRepresentable {
             snapshot(view)
         }
 
+        private func reportWord(_ view: NSTextView) {
+            let word = EditorEdit.wordAtCursor(in: view.string, cursor: view.selectedRange().location)?.0
+            if parent.currentWord != word { DispatchQueue.main.async { self.parent.currentWord = word } }
+        }
+
         private func snapshot(_ view: NSTextView) {
             previousText = view.string
             previousCursor = view.selectedRange().location
+            reportWord(view)
         }
 
         func apply(_ edit: EditorEdit, to view: NSTextView) {
-            let range = view.selectedRange()
+            var range = view.selectedRange()
+            if case .replaceWord = edit, let (_, wordRange) = EditorEdit.wordAtCursor(in: view.string, cursor: range.location) {
+                range = wordRange
+            }
             let text = view.string as NSString
             let selected = text.substring(with: range)
             let (replacement, cursorOffset) = edit.apply(to: selected, wholeText: view.string, at: range)

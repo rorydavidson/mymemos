@@ -11,7 +11,7 @@ struct ProfileView: View {
     @State private var profile: ProfileRow?
     @State private var displayName = ""
     @State private var email = ""
-    @State private var description = ""
+    @State private var about = ""
     @State private var defaultVisibility = "PRIVATE"
     @State private var newPassword = ""
     @State private var confirmPassword = ""
@@ -25,17 +25,17 @@ struct ProfileView: View {
                     LabeledContent("Username", value: profile.username)
                     TextField("Display name", text: $displayName)
                     TextField("Email", text: $email)
-                    TextField("About you", text: $description, axis: .vertical).lineLimit(2...4)
+                    TextField("About you", text: $about, axis: .vertical).lineLimit(2...4)
                     Button("Save profile") {
                         Task {
                             do {
-                                try await model.session.updateProfile(displayName: displayName, description: description, email: email)
+                                try await model.session.updateProfile(displayName: displayName, description: about, email: email)
                                 model.displayName = displayName.isEmpty ? profile.username : displayName
                                 saved = true
                             } catch { failure = model.readableMessage(error) }
                         }
                     }
-                    .disabled(displayName == profile.displayName && email == profile.email && description == profile.description)
+                    .disabled(displayName == profile.displayName && email == profile.email && about == profile.about)
                 }
 
                 Section {
@@ -90,7 +90,7 @@ struct ProfileView: View {
                 profile = try await model.session.profile()
                 displayName = profile?.displayName ?? ""
                 email = profile?.email ?? ""
-                description = profile?.description ?? ""
+                about = profile?.about ?? ""
                 defaultVisibility = try await model.session.defaultVisibility()
             } catch { failure = model.readableMessage(error) }
         }
@@ -114,7 +114,7 @@ struct TokensView: View {
             ForEach(tokens, id: \.name) { token in
                 VStack(alignment: .leading, spacing: 3) {
                     HStack {
-                        Text(token.description.isEmpty ? "Token" : token.description).font(Type.rowTitle)
+                        Text(token.label.isEmpty ? "Token" : token.label).font(Type.rowTitle)
                         if token.thisDevice {
                             Text("this device").font(Type.rowMeta).foregroundStyle(Theme.accent)
                         }

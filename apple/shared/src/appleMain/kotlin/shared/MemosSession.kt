@@ -1014,6 +1014,13 @@ class MemosSession {
         }
     }
 
+    /** The memos written on one day, for the day-by-day review. [isoDate] is yyyy-MM-dd. */
+    suspend fun memosOn(isoDate: String): List<MemoRow> {
+        val account = db.accountDao().getActive() ?: return emptyList()
+        val day = runCatching { kotlinx.datetime.LocalDate.parse(isoDate) }.getOrNull() ?: return emptyList()
+        return memos.observeCreatedOn(account.id, day, TimeZone.currentSystemDefault()).first().map { it.toRow() }
+    }
+
     /** Ticks or unticks a task line, which edits the memo's text. */
     suspend fun toggleTask(localId: String, lineIndex: Int, checked: Boolean) {
         val memo = memos.observeMemoOnce(localId) ?: return
@@ -1026,7 +1033,7 @@ class MemosSession {
     suspend fun profile(): ProfileRow? {
         val account = accounts.activeAccountOrNull() ?: return null
         val user = settings.profile(account)
-        return ProfileRow(user.name, user.username, user.displayName, user.email, user.description, user.role == UserRole.ADMIN)
+        return ProfileRow(user.name, user.username, user.displayName, user.email, about = user.description, admin = user.role == UserRole.ADMIN)
     }
 
     suspend fun updateProfile(displayName: String, description: String, email: String) {
@@ -1057,7 +1064,7 @@ class MemosSession {
         return settings.tokens(account).map {
             TokenRow(
                 name = it.name,
-                description = it.description,
+                label = it.description,
                 createdLabel = it.createdAt.friendly(),
                 expiresLabel = it.expiresAt?.friendlyWithTime(zone) ?: "Never",
                 lastUsedLabel = it.lastUsedAt?.friendlyWithTime(zone) ?: "Never",
@@ -1170,7 +1177,7 @@ class MemosSession {
         val account = accounts.activeAccountOrNull() ?: return
         settings.updateInstanceGeneral(
             account,
-            InstanceGeneral(row.title, row.description, row.disallowRegistration, row.disallowPasswordAuth, row.disallowChangeUsername, row.disallowChangeNickname, row.weekStartDayOffset),
+            InstanceGeneral(row.title, row.about, row.disallowRegistration, row.disallowPasswordAuth, row.disallowChangeUsername, row.disallowChangeNickname, row.weekStartDayOffset),
         )
     }
 
@@ -1419,18 +1426,20 @@ data class TagStyleRow(val tag: String, val emoji: String?, val colourName: Stri
 
 data class DateSuggestionRow(val token: String, val hint: String)
 
+// `description` is avoided as a property name throughout: Kotlin/Native exports it under
+// another name because NSObject already has one, and Swift then reads the object dump.
 data class ProfileRow(
     val name: String,
     val username: String,
     val displayName: String,
     val email: String,
-    val description: String,
+    val about: String,
     val admin: Boolean,
 )
 
 data class TokenRow(
     val name: String,
-    val description: String,
+    val label: String,
     val createdLabel: String,
     val expiresLabel: String,
     val lastUsedLabel: String,
@@ -1466,7 +1475,7 @@ data class UserRow(val name: String, val username: String, val displayName: Stri
 
 data class InstanceRow(
     val title: String,
-    val description: String,
+    val about: String,
     val disallowRegistration: Boolean,
     val disallowPasswordAuth: Boolean,
     val disallowChangeUsername: Boolean,
