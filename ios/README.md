@@ -56,7 +56,7 @@ and for a server on the home network, and nothing else.
 
 ## What it does
 
-Everything the Android app does except export, import and encrypted backup. Sign in with
+Everything the Android app does. Sign in with
 several accounts and remembered servers; the timeline with folding headers, compact rows,
 sort by last changed, search, tag filters and the archive; the editor with the formatting
 bar, list continuation, `#tag` and `@date` completions, templates and photos; rendered
@@ -67,9 +67,12 @@ and the weekly digest as notifications, a tap opening the memo; review with the 
 heatmap, day by day with keep or archive, on this day, journey and the graph; shortcuts;
 the sync sheet with failed operations, conflict copies and signing in again; tag emoji and
 colours; the profile, password, default visibility, tokens, webhooks, notifications and
-statistics; for an admin, users and instance settings; background refresh; a share
-extension; recent-memos and open-tasks widgets; and `mymemos://new?content=…` and
-`mymemos://memo/<id>` for automation, the shape of the Android intent.
+statistics; for an admin, users and instance settings; export as a zip of Markdown with
+front matter, import of Markdown files and zips, and an encrypted backup and restore in the
+same file format Android writes, so a backup moves between a phone and a Mac; background
+refresh; a share extension; recent-memos and open-tasks widgets; and
+`mymemos://new?content=…` and `mymemos://memo/<id>` for automation, the shape of the
+Android intent.
 
 On an iPad it is three columns, as on the Mac. On a phone it is the three tabs Android has,
 with the library behind the menu on the memos tab.
@@ -152,10 +155,6 @@ disclosure beyond the credits already in the app.
 
 ## Not built, and why
 
-- **Export, import and encrypted backup.** The exporter and importer live in
-  `core-data/androidMain` on `java.util.zip` and `java.time`, and the backup streams AES-GCM
-  in a way CryptoKit cannot. Moving them needs an `expect`/`actual` zip and a format
-  decision, which is its own piece of work. The Mac lacks them for the same reason.
 - **Dynamic colour**, which is an Android 12 wallpaper feature with no iOS equivalent.
 - **Geofenced reminders**, which Android does not have either.
 
@@ -178,6 +177,13 @@ simulator against a local Memos v0.30 server, through the tour. What the tour ca
 - **The cipher on a phone.** The Mac's `check-cipher.sh` proves the CryptoKit half agrees
   with Android, and the same Swift is compiled here, but no locked memo has been opened on
   iOS yet.
+- **A backup crossing platforms.** The one-shot cipher and Android's streaming one are
+  proven to read each other's bytes in a JVM test, the zip codec is proven against
+  `java.util.zip` both ways, and export, re-import, backup and restore were run on the
+  simulator (a wrong password reports and changes nothing; a right one restores and the
+  relaunched app shows everything). What has not been done is restoring a backup made on
+  a phone onto a Mac or the reverse. The database file is portable and the layout is the
+  same, so it should work; do it once before relying on it.
 
 ## The plan, as it turned out
 
@@ -199,6 +205,13 @@ Drafted 11 September 2026 and built the same day in five phases. The decisions:
   another name because `NSObject` has one, and Swift silently reads the object dump.
 - **Suspend functions returning Bool or Int** arrive in Swift boxed (`KotlinBoolean`,
   `KotlinInt`), so every such call is unwrapped with `as? Bool` or `Int(truncating:)`.
+- **Every public suspend function on `MemosSession` carries `@Throws(Throwable::class)`.**
+  Without it a Kotlin exception crossing into Swift ends the process rather than arriving
+  as an error; a restore with the wrong password was the first thing to prove it, and
+  Swift's `try await` had been catching nothing until then.
+- **Kotlin/Native's regex engine** mishandles `\p{L}` inside a negated character class and
+  read a trailing hyphen in `[…_/-]` as a range. Tags with hyphens had been extracted wrongly
+  on the Mac; shared code now escapes or filters instead, with tests on both compilers.
 
 Corrections to the first draft: Xcode's destination check (above) turned the Xcode project
 from the build into an option; and CoreSimulator was so slow to answer `simctl list` on this

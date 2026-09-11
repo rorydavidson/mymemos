@@ -46,6 +46,7 @@ struct LibrarySidebar: View {
                 row("Statistics", "chart.bar", count: nil, .pane(.stats))
                 row("Access tokens", "key", count: nil, .pane(.tokens))
                 row("Webhooks", "arrow.up.forward.app", count: nil, .pane(.webhooks))
+                row("Your data", "externaldrive", count: nil, .pane(.data))
             }
 
             if model.isAdmin {

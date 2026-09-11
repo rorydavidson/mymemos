@@ -190,7 +190,36 @@ extension SessionModel {
         case .webhooks: return "Webhooks"
         case .adminUsers: return "Users"
         case .adminInstance: return "Instance"
+        case .data: return "Your data"
         }
+    }
+
+    // MARK: your data
+
+    /// Each returns a sentence for the screen, or throws with one.
+    func exportMarkdown(to path: String) async throws -> String {
+        let count = try await session.exportMarkdown(path: path)
+        return "Exported \(count) memo\(count.intValue == 1 ? "" : "s")"
+    }
+
+    func importMarkdown(_ paths: [String]) async throws -> String {
+        let result = try await session.importMarkdown(paths: paths)
+        await reload()
+        await sync()
+        var text = "Imported \(result.imported) memo\(result.imported == 1 ? "" : "s")"
+        if result.duplicates > 0 { text += ", \(result.duplicates) already here" }
+        if result.skipped > 0 { text += ", \(result.skipped) had no Markdown in them" }
+        if let first = result.failures.first { text += ". \(result.failures.count) failed: \(first)" }
+        return text
+    }
+
+    func backup(to path: String, password: String) async throws {
+        try await session.backup(path: path, password: password)
+    }
+
+    /// After this the session is dead: the caller relaunches the app.
+    func restore(from path: String, password: String) async throws {
+        try await session.restore(path: path, password: password)
     }
 
     func saveShortcut(name: String?, title: String, filter: String) async -> Bool {

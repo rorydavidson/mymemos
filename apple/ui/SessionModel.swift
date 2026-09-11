@@ -106,6 +106,7 @@ final class SessionModel: ObservableObject {
         case shortcuts, tags, notifications
         case profile, stats, tokens, webhooks
         case adminUsers, adminInstance
+        case data
     }
 
     /// The sync sheet, opened from the toolbar, the menu bar or the library menu.

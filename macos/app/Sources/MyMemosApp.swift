@@ -116,6 +116,8 @@ struct RootView: View {
             return model.unreadNotifications == 0 ? "Nothing unread" : "\(model.unreadNotifications) unread"
         case .profile, .stats, .tokens, .webhooks, .adminUsers, .adminInstance:
             return "From the server"
+        case .data:
+            return "Export, import, backup and restore"
         }
     }
 }

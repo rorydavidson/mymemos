@@ -25,6 +25,10 @@ struct SettingsView: View {
             AccountsSection(model: model)
 
             #if os(iOS)
+            Section("Your data") {
+                NavigationLink("Export, import, backup and restore") { DataView(model: model).navigationTitle("Your data") }
+            }
+
             Section("Editor") {
                 NavigationLink("Templates") { TemplatesView(model: model).navigationTitle("Templates") }
                 NavigationLink("Tags") { TagsView(model: model).navigationTitle("Tags") }

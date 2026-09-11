@@ -41,6 +41,8 @@ struct PaneContent: View {
             AdminUsersView(model: model)
         case .adminInstance:
             AdminInstanceView(model: model)
+        case .data:
+            DataView(model: model)
         }
     }
 }

@@ -70,6 +70,8 @@ struct Sidebar: View {
                         selected: model.pane == .tokens) { model.pane = .tokens }
                     row("Webhooks", "arrow.up.forward.app", count: nil,
                         selected: model.pane == .webhooks) { model.pane = .webhooks }
+                    row("Your data", "externaldrive", count: nil,
+                        selected: model.pane == .data) { model.pane = .data }
 
                     if model.isAdmin {
                         header("Administration").padding(.top, 14)

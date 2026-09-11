@@ -15,7 +15,10 @@ Re-sign before merging if signed history matters:
 `git rebase --exec 'git commit --amend --no-edit -S' main`.
 
 The one piece of Android work still outstanding is item 3 below, locked notes keeping a
-readable title. It was deliberately left until last because it changes a stored format, and it
+readable title. Two shared fixes from the same day matter to Android too: `#follow-up` style
+tags were extracted as `follow` on the Apple platforms (Kotlin/Native's regex engine read the
+trailing hyphen as a range), and the exporter, import parser and their tests now live in
+`commonMain`; Android's behaviour is unchanged and its tests moved with them. It was deliberately left until last because it changes a stored format, and it
 now has three places waiting on it rather than two.
 
 ## Where things stand
@@ -78,6 +81,9 @@ should be a small one.
 - **Entitlements on the simulator** have to be a linker section, not part of the signature.
 - **CoreSimulator can hang `simctl list`** for minutes on this Mac. Device ids are on disk
   under `~/Library/Developer/CoreSimulator/Devices/*/device.plist`.
+- **A Kotlin exception crossing into Swift ends the process** unless the suspend function
+  carries `@Throws(Throwable::class)`. Every public suspend function on `MemosSession` now
+  does. Before that, every `try? await session.…` in the Swift was catching nothing.
 - **Nothing can tap the simulator from an agent session.** The native panel needs
   `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`, and `osascript` is
   denied assistive access. `tour.sh` and its `TESTHOOKS` driver exist because of this.
@@ -89,7 +95,8 @@ should be a small one.
 
 ### Not verified
 
-The list in `ios/README.md`, plus one thing worth a real phone: whether `thisDevice` ever
+The list in `ios/README.md`, including a backup restored across platforms, plus one thing
+worth a real phone: whether `thisDevice` ever
 comes up true in the tokens list. Every token the tour minted showed false, which suggests
 `mintedTokenName()` is not being stored on sign-in against a v0.30 server, or the name the
 server returns at creation does not match the one it lists. Android has the same code path,
@@ -224,10 +231,10 @@ Worth knowing before trusting any of it:
 
 ### Not built on macOS
 
-Comments and reactions, which Rory explicitly deprioritised. The account and admin screens.
-Export, import and encrypted backup, which need a multiplatform zip that nothing provides well.
 Nearby is deliberately absent: it ranks memos by distance from where you are, and this app does
-not ask the machine where it is. No Apple location service is used at all, by choice.
+not ask the machine where it is. No Apple location service is used at all, by choice. Everything
+else the Android app does, the Mac now does too; comments, reactions, the account and admin
+screens and export, import and backup arrived with the iOS work of 11 September.
 
 ## Security review, 8 September 2026
 
