@@ -97,7 +97,17 @@ final class SessionModel: ObservableObject {
         }
     }
 
-    enum Pane: Hashable { case memos, tasks, review, reminders, templates }
+    /// The content column's screens. `memos` also covers the archive and a shortcut's results,
+    /// which are the timeline with a different source.
+    enum Pane: Hashable {
+        case memos, tasks, review, reminders, templates
+        case shortcuts, tags, notifications
+        case profile, stats, tokens, webhooks
+        case adminUsers, adminInstance
+    }
+
+    /// The sync sheet, opened from the toolbar, the menu bar or the library menu.
+    @Published var showingSyncStatus = false
 
     /// The editor needs it directly for list continuation, which happens per keystroke and
     /// should not go through the model.
@@ -564,6 +574,7 @@ final class SessionModel: ObservableObject {
             lastSynced = Date()
             await reload()
             await loadSyncStatus()
+            await refreshUnread()
         } catch {
             phase = .failed(readable(error))
         }

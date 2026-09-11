@@ -22,9 +22,9 @@ struct SettingsView: View {
                 #endif
             }
 
-            #if os(iOS)
             AccountsSection(model: model)
 
+            #if os(iOS)
             Section("Editor") {
                 NavigationLink("Templates") { TemplatesView(model: model).navigationTitle("Templates") }
                 NavigationLink("Tags") { TagsView(model: model).navigationTitle("Tags") }

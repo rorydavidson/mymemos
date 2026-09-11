@@ -74,6 +74,82 @@ extension; recent-memos and open-tasks widgets; and `mymemos://new?content=…` 
 On an iPad it is three columns, as on the Mac. On a phone it is the three tabs Android has,
 with the library behind the menu on the memos tab.
 
+## Getting it onto your own iPhone and iPad
+
+The simulator bundle cannot go on a device: it is built for the simulator's architecture
+and signed by nobody. A device build goes through Xcode, and Xcode needs three things this
+repository cannot supply.
+
+1. **The iOS platform in Xcode.** Xcode › Settings › Components, download iOS 26.5 (the
+   version matching Xcode 26.6's SDK). Until it is there `xcodebuild` refuses every iOS
+   destination, device included; that is the same wall the script build steps round for
+   the simulator.
+2. **An Apple ID signed into Xcode**, under Xcode › Settings › Accounts. A free Apple ID
+   gives a "Personal Team" that can sign for your own devices, with limits that matter here:
+   the app expires after seven days and has to be run from Xcode again, and a personal team
+   **cannot use App Groups**, which the share extension and the widgets need. On a free
+   team, build the app target alone and leave the two extensions out. The Apple Developer
+   Program (99 USD a year) removes both limits and is required for TestFlight and the
+   App Store anyway.
+3. **Developer Mode on the phone** (Settings › Privacy & Security › Developer Mode, iOS 16
+   and later) and, the first time, trusting the Mac when the phone asks.
+
+Then:
+
+```bash
+brew install xcodegen                 # once
+# put your team id in ios/app/project.yml: DEVELOPMENT_TEAM: "ABCDE12345"
+cd ios/app && xcodegen generate && open MyMemos.xcodeproj
+```
+
+In Xcode pick your iPhone (or iPad) as the run destination and press Run. Xcode builds the
+Kotlin framework through the project's run-script phase, registers the bundle ids, makes
+the provisioning profiles, and installs. The bundle ids are `com.keltruc.mymemos.ios` and
+two suffixed ones for the extensions; if they clash with someone else's registration change
+`bundleIdPrefix` and the three identifiers in `project.yml`. The app group id
+`group.com.keltruc.mymemos` in `Extension.entitlements`, `project.yml` and `AppGroup.swift`
+has to change with them.
+
+The Keychain, app group and background-refresh entitlements are written by Xcode from the
+capabilities the project declares; `Simulator.entitlements` is not used for a device.
+
+## TestFlight and the App Store
+
+Everything above with a paid team, plus the paperwork. In order:
+
+1. **App Store Connect.** Create the app record: name, primary language, bundle id (the
+   app's; the extensions ride along), SKU. The name "MyMemos" may already be taken on the
+   store; the display name can differ from the record's name.
+2. **Archive.** Xcode › Product › Archive with "Any iOS Device" selected, then Distribute
+   App › App Store Connect. `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in
+   `project.yml` are the version and build; every upload needs a higher build number.
+3. **TestFlight.** The uploaded build appears after processing; add yourself as an internal
+   tester and it is on your phone through the TestFlight app within minutes, with a 90-day
+   life and no seven-day re-signing. This is the right place to stop for a personal app.
+4. **The privacy manifest** is already in the bundle (`Resources/PrivacyInfo.xcprivacy`).
+   It declares no tracking and no collected data, on the grounds that everything goes to a
+   server the user chose, and lists the two API categories the app touches. Read it before
+   submitting and change it if you disagree with that reading.
+5. **Export compliance.** `ITSAppUsesNonExemptEncryption` is already `false`, but the app
+   does encrypt locked memos with AES-GCM. Standard algorithms used for data protection are
+   exempt from the export documentation Apple asks about, and that is what `false` claims;
+   it may still oblige a yearly self-classification report to the US Bureau of Industry and
+   Security. Decide that with the rules in front of you rather than on this paragraph.
+6. **The listing.** Screenshots for the 6.9-inch iPhone and 13-inch iPad (the tour's
+   `ios/app/build/tour/*.png` are the right size for the phone), a 1024 icon (already in
+   the asset catalogue), a description leading with offline-first and self-hosted, a
+   support URL and a privacy policy URL saying the same things the Play listing says: data
+   goes only to the server the user configures, credentials sit in the Keychain, nothing is
+   collected. Category Productivity, age rating from the questionnaire (it comes out 4+).
+7. **App Review.** The reviewer needs a Memos server to sign in to: give a throwaway account
+   on a test instance, never your own, in the review notes, and say what the `mymemos://`
+   scheme is for so it does not look undeclared. The share extension and widgets need no
+   extra declaration. Location and notifications already have their usage strings.
+
+Google Sans Flex under the OFL, commonmark's absence on iOS (the Swift renderer is the
+app's own), OpenStreetMap tiles behind an off-by-default switch: none of these needs a
+disclosure beyond the credits already in the app.
+
 ## Not built, and why
 
 - **Export, import and encrypted backup.** The exporter and importer live in

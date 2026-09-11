@@ -33,6 +33,9 @@ struct RootView: View {
             set: { if $0 == nil { model.settingReminderFor = nil } }
         )) { target in
             ReminderSheet(model: model, memoLocalId: target.id)
+        }
+        .sheet(isPresented: $model.showingSyncStatus) {
+            SyncStatusView(model: model)
         }        .alert("MyMemos", isPresented: Binding(get: { model.notice != nil }, set: { if !$0 { model.notice = nil } })) {
             Button("OK") { model.notice = nil }
         } message: {
@@ -84,31 +87,11 @@ struct RootView: View {
         }
     }
 
-    @ViewBuilder
     private var content: some View {
-        switch model.pane {
-        case .memos:
-            MemoListView(model: model, selection: $model.selection)
-        case .tasks:
-            TasksView(model: model) { model.open($0) }
-        case .review:
-            ReviewView(model: model) { model.open($0) }
-        case .reminders:
-            RemindersView(model: model) { model.open($0) }
-        case .templates:
-            TemplatesView(model: model)
-        }
+        PaneContent(model: model)
     }
 
-    private var title: String {
-        switch model.pane {
-        case .memos: return model.activeTag.map { "#\($0)" } ?? "Memos"
-        case .tasks: return "Tasks"
-        case .review: return "Review"
-        case .reminders: return "Reminders"
-        case .templates: return "Templates"
-        }
-    }
+    private var title: String { model.paneTitle }
 
     private var subtitle: String {
         if case let .working(what) = model.phase { return what }
@@ -125,6 +108,14 @@ struct RootView: View {
         case .templates:
             let daily = model.recurring.filter(\.enabled).count
             return daily == 0 ? "\(model.templates.count) saved" : "\(model.templates.count) saved, \(daily) daily"
+        case .shortcuts:
+            return model.shortcuts.count == 1 ? "1 shortcut" : "\(model.shortcuts.count) shortcuts"
+        case .tags:
+            return model.tags.count == 1 ? "1 tag" : "\(model.tags.count) tags"
+        case .notifications:
+            return model.unreadNotifications == 0 ? "Nothing unread" : "\(model.unreadNotifications) unread"
+        case .profile, .stats, .tokens, .webhooks, .adminUsers, .adminInstance:
+            return "From the server"
         }
     }
 }
