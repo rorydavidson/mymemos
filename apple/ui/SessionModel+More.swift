@@ -147,7 +147,50 @@ extension SessionModel {
         activeShortcut = shortcut
         showArchived = false
         activeTag = nil
+        pane = .memos
         await reload()
+    }
+
+    /// The archive, or the timeline again.
+    func showArchive(_ archived: Bool) async {
+        showArchived = archived
+        activeShortcut = nil
+        activeTag = nil
+        pane = .memos
+        await reload()
+    }
+
+    /// The plain timeline: no tag, no shortcut, no archive.
+    func showAllMemos() async {
+        let changed = showArchived || activeShortcut != nil || activeTag != nil
+        showArchived = false
+        activeShortcut = nil
+        activeTag = nil
+        pane = .memos
+        if changed { await reload() }
+    }
+
+    /// The words above a content column for each pane.
+    var paneTitle: String {
+        switch pane {
+        case .memos:
+            if let shortcut = activeShortcut { return shortcut.title }
+            if showArchived { return "Archive" }
+            return activeTag.map { "#\($0)" } ?? "Memos"
+        case .tasks: return "Tasks"
+        case .review: return "Review"
+        case .reminders: return "Reminders"
+        case .templates: return "Templates"
+        case .shortcuts: return "Shortcuts"
+        case .tags: return "Tags"
+        case .notifications: return "Notifications"
+        case .profile: return "Profile"
+        case .stats: return "Statistics"
+        case .tokens: return "Access tokens"
+        case .webhooks: return "Webhooks"
+        case .adminUsers: return "Users"
+        case .adminInstance: return "Instance"
+        }
     }
 
     func saveShortcut(name: String?, title: String, filter: String) async -> Bool {
@@ -173,6 +216,11 @@ extension SessionModel {
         syncStatus = try? await session.syncState()
         failedOps = (try? await session.failedOps()) ?? []
         conflicts = (try? await session.conflicts()) ?? []
+    }
+
+    /// The server's unread count, for the badge. Best effort: offline it stays as it was.
+    func refreshUnread() async {
+        if let count = try? await session.unreadNotifications() { unreadNotifications = Int(truncating: count) }
     }
 
     func retryFailed() async {

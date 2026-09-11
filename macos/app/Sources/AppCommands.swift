@@ -33,6 +33,9 @@ struct AppCommands: Commands {
             Button("Sync Now") { Task { await model.sync() } }
                 .keyboardShortcut("r")
                 .disabled(model.isBusy || model.phase == .signedOut)
+            Button("Sync Status…") { model.showingSyncStatus = true }
+                .keyboardShortcut("r", modifiers: [.command, .shift])
+                .disabled(model.phase == .signedOut)
         }
 
         // Memo: everything that acts on the one selected.
@@ -46,6 +49,13 @@ struct AppCommands: Commands {
                 Task { await model.setPinned(memo.localId, !memo.pinned) }
             }
             .keyboardShortcut("p", modifiers: [.command, .shift])
+            .disabled(model.selectedMemo == nil)
+
+            Button(model.showArchived ? "Unarchive" : "Archive") {
+                guard let memo = model.selectedMemo else { return }
+                Task { await model.setArchived(memo.localId, !model.showArchived) }
+            }
+            .keyboardShortcut("a", modifiers: [.command, .shift])
             .disabled(model.selectedMemo == nil)
 
             Divider()
@@ -98,7 +108,7 @@ struct AppCommands: Commands {
                 ForEach(Appearance.allCases) { Text($0.title).tag($0) }
             }
             Divider()
-            Button("All Memos") { model.pane = .memos; model.activeTag = nil }
+            Button("All Memos") { Task { await model.showAllMemos() } }
                 .keyboardShortcut("1", modifiers: .command)
             Button("Tasks") { model.pane = .tasks }
                 .keyboardShortcut("2", modifiers: .command)
@@ -108,6 +118,14 @@ struct AppCommands: Commands {
                 .keyboardShortcut("4", modifiers: .command)
             Button("Templates") { model.pane = .templates }
                 .keyboardShortcut("5", modifiers: .command)
+            Button("Archive") { Task { await model.showArchive(true) } }
+                .keyboardShortcut("6", modifiers: .command)
+            Button("Shortcuts") { model.pane = .shortcuts }
+                .keyboardShortcut("7", modifiers: .command)
+            Button("Tags") { model.pane = .tags }
+                .keyboardShortcut("8", modifiers: .command)
+            Button("Notifications") { model.pane = .notifications }
+                .keyboardShortcut("9", modifiers: .command)
 
             Divider()
 

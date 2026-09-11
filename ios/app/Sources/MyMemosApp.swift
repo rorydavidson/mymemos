@@ -138,35 +138,17 @@ struct SplitShell: View {
 
     @ViewBuilder
     private var content: some View {
-        switch model.pane {
-        case .memos:
+        if model.pane == .memos {
             MemoListView(model: model, selection: $model.selection)
                 .searchable(text: $model.query, prompt: "Search memos")
                 .refreshable { await model.sync() }
                 .toolbar { MemosToolbar(model: model) }
-        case .tasks:
-            TasksView(model: model) { model.open($0) }
-        case .review:
-            ReviewView(model: model) { model.open($0) }
-        case .reminders:
-            RemindersView(model: model) { model.open($0) }
-        case .templates:
-            TemplatesView(model: model)
+        } else {
+            PaneContent(model: model)
         }
     }
 
-    private var title: String {
-        switch model.pane {
-        case .memos:
-            if let shortcut = model.activeShortcut { return shortcut.title }
-            if model.showArchived { return "Archive" }
-            return model.activeTag.map { "#\($0)" } ?? "Memos"
-        case .tasks: return "Tasks"
-        case .review: return "Review"
-        case .reminders: return "Reminders"
-        case .templates: return "Templates"
-        }
-    }
+    private var title: String { model.paneTitle }
 }
 
 /// One memo, pushed onto a phone's navigation stack.

@@ -16,10 +16,14 @@ struct Sidebar: View {
                 VStack(alignment: .leading, spacing: 2) {
                     header("Library")
 
+                    let timeline = model.pane == .memos && !model.showArchived && model.activeShortcut == nil
                     row("All memos", "tray.full", count: model.memoCount,
-                        selected: model.pane == .memos && model.activeTag == nil) {
-                        model.pane = .memos
-                        model.activeTag = nil
+                        selected: timeline && model.activeTag == nil) {
+                        Task { await model.showAllMemos() }
+                    }
+                    row("Archive", "archivebox", count: nil,
+                        selected: model.pane == .memos && model.showArchived) {
+                        Task { await model.showArchive(true) }
                     }
                     row("Tasks", "checklist", count: model.openTaskCount,
                         selected: model.pane == .tasks) { model.pane = .tasks }
@@ -29,16 +33,50 @@ struct Sidebar: View {
                         selected: model.pane == .reminders) { model.pane = .reminders }
                     row("Templates", "doc.on.doc", count: nil,
                         selected: model.pane == .templates) { model.pane = .templates }
+                    row("Notifications", "bell.badge", count: model.unreadNotifications == 0 ? nil : model.unreadNotifications,
+                        selected: model.pane == .notifications) { model.pane = .notifications }
+
+                    header("Shortcuts").padding(.top, 14)
+                    ForEach(model.shortcuts, id: \.name) { shortcut in
+                        row(shortcut.title, "line.3.horizontal.decrease.circle", count: nil,
+                            selected: model.pane == .memos && model.activeShortcut?.name == shortcut.name) {
+                            Task { await model.showShortcut(model.activeShortcut?.name == shortcut.name ? nil : shortcut) }
+                        }
+                    }
+                    row(model.shortcuts.isEmpty ? "Add a shortcut" : "Manage shortcuts", "slider.horizontal.3", count: nil,
+                        selected: model.pane == .shortcuts) { model.pane = .shortcuts }
 
                     if !model.tags.isEmpty {
                         header("Tags").padding(.top, 14)
                         ForEach(model.tags, id: \.self) { tag in
                             row("#\(tag)", "number", count: model.count(forTag: tag),
-                                selected: model.activeTag == tag) {
+                                selected: timeline && model.activeTag == tag) {
                                 model.activeTag = model.activeTag == tag ? nil : tag
+                                model.showArchived = false
+                                model.activeShortcut = nil
                                 model.pane = .memos
                             }
                         }
+                        row("Tag styles", "paintpalette", count: nil,
+                            selected: model.pane == .tags) { model.pane = .tags }
+                    }
+
+                    header("Account").padding(.top, 14)
+                    row("Profile", "person.crop.circle", count: nil,
+                        selected: model.pane == .profile) { model.pane = .profile }
+                    row("Statistics", "chart.bar", count: nil,
+                        selected: model.pane == .stats) { model.pane = .stats }
+                    row("Access tokens", "key", count: nil,
+                        selected: model.pane == .tokens) { model.pane = .tokens }
+                    row("Webhooks", "arrow.up.forward.app", count: nil,
+                        selected: model.pane == .webhooks) { model.pane = .webhooks }
+
+                    if model.isAdmin {
+                        header("Administration").padding(.top, 14)
+                        row("Users", "person.2", count: nil,
+                            selected: model.pane == .adminUsers) { model.pane = .adminUsers }
+                        row("Instance", "server.rack", count: nil,
+                            selected: model.pane == .adminInstance) { model.pane = .adminInstance }
                     }
                 }
                 .padding(.horizontal, 8)
