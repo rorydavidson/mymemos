@@ -4,7 +4,7 @@ import Shared
 @main
 struct EditorCheck {
     static func main() async throws {
-        MacCrypto.shared.provider = AppleCrypto()
+        HostCrypto.shared.provider = AppleCrypto()
         let session = MemosSession()
         var failures = 0
 

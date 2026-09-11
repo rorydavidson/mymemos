@@ -76,7 +76,7 @@ final class SessionModel: ObservableObject {
 
     init() {
         // The shared cipher has no AES-GCM of its own on this platform; hand it CryptoKit's.
-        MacCrypto.shared.provider = AppleCrypto()
+        HostCrypto.shared.provider = AppleCrypto()
         let stored = UserDefaults.standard.string(forKey: "appearance") ?? Appearance.system.rawValue
         appearance = Appearance(rawValue: stored) ?? .system
     }

@@ -3,13 +3,16 @@ plugins {
 }
 
 /**
- * The framework the macOS app links against. It exists to give Swift a small, concrete
+ * The framework the macOS and iOS apps link against. It exists to give Swift a small, concrete
  * surface over the shared Kotlin: Swift cannot use a generic Flow bridge, and suspend
  * functions arrive as async only when they hang off a plain class.
+ *
+ * One source set, `appleMain`, serves all three targets: nothing in it is specific to a Mac
+ * or a phone, since Foundation, Security and Room behave the same on both.
  */
 kotlin {
-    macosArm64 {
-        binaries.framework {
+    listOf(macosArm64(), iosArm64(), iosSimulatorArm64()).forEach { target ->
+        target.binaries.framework {
             baseName = "Shared"
             isStatic = true
             // Without this the header carries only this module's own types, and the app
@@ -20,7 +23,7 @@ kotlin {
     }
 
     sourceSets {
-        macosArm64Main.dependencies {
+        appleMain.dependencies {
             api(project(":core-model"))
             api(project(":core-network"))
             api(project(":core-data"))

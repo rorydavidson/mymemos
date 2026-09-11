@@ -9,7 +9,7 @@ import platform.Foundation.currentLocale
 
 /** The macOS half of [DueDateParser]: naming a due date in the reader's language. */
 @OptIn(ExperimentalForeignApi::class)
-internal class MacDueDateLabels : DueDateParser.Labels {
+internal class AppleDueDateLabels : DueDateParser.Labels {
 
     private fun formatter(template: String) = NSDateFormatter().apply {
         locale = NSLocale.currentLocale

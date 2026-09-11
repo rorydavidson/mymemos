@@ -5,9 +5,9 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 JAVA_HOME=${JAVA_HOME:-/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home} \
-    ./gradlew :macos-shared:linkDebugFrameworkMacosArm64 --console=plain -q
+    ./gradlew :apple-shared:linkDebugFrameworkMacosArm64 --console=plain -q
 
-FRAMEWORK_DIR="macos/shared/build/bin/macosArm64/debugFramework"
+FRAMEWORK_DIR="apple/shared/build/bin/macosArm64/debugFramework"
 APP="macos/app/build/MyMemos.app"
 
 rm -rf "$APP"

@@ -53,27 +53,27 @@ import kotlinx.serialization.json.Json
 class MemosSession {
 
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false; encodeDefaults = false }
-    private val db = MacStack.database
-    private val registry = MacStack.registry
+    private val db = AppleStack.database
+    private val registry = AppleStack.registry
 
     private val engine = SyncEngine(
         db, db.accountDao(), db.memoDao(), db.attachmentDao(), db.pendingOpDao(),
-        db.relationDao(), db.reactionDao(), db.shortcutDao(), registry, MacStack.attachments,
-        MacStack.widgets, MacStack.preferences, json,
+        db.relationDao(), db.reactionDao(), db.shortcutDao(), registry, AppleStack.attachments,
+        AppleStack.widgets, AppleStack.preferences, json,
     )
 
-    private val scheduler = SyncScheduler(engine, db.accountDao(), MacStack.background)
+    private val scheduler = SyncScheduler(engine, db.accountDao(), AppleStack.background)
 
     private val memos = MemoRepository(
         db, db.memoDao(), db.attachmentDao(), db.pendingOpDao(), db.relationDao(),
-        db.reactionDao(), registry, MacStack.attachments, engine, scheduler,
-        MacStack.preferences, MacStack.widgets, json,
+        db.reactionDao(), registry, AppleStack.attachments, engine, scheduler,
+        AppleStack.preferences, AppleStack.widgets, json,
     )
 
     private val passwords = PasswordSession(KeychainPassword())
 
     private val accounts = AccountRepository(
-        db.accountDao(), db.memoDao(), db.attachmentDao(), MacStack.attachments,
+        db.accountDao(), db.memoDao(), db.attachmentDao(), AppleStack.attachments,
         passwords,
         registry, json,
     )
@@ -119,7 +119,7 @@ class MemosSession {
      */
     suspend fun timeline(): List<TimelineSection> {
         val account = db.accountDao().getActive() ?: return emptyList()
-        val byModified = MacStack.preferences.settings.first().sortByModified
+        val byModified = AppleStack.preferences.settings.first().sortByModified
         return group(memos.observeTimeline(account.id, byModified = byModified).first())
     }
 
@@ -157,22 +157,22 @@ class MemosSession {
     suspend fun signOut() {
         val account = db.accountDao().getActive() ?: return
         accounts.activeAccount.first()?.let { accounts.signOut(it) }
-        MacStack.attachments.delete(account.userResourceName)
+        AppleStack.attachments.delete(account.userResourceName)
         passwords.forget()
     }
 
     /** Order the timeline by when memos were last changed rather than when they were written. */
-    suspend fun sortByModified(): Boolean = MacStack.preferences.settings.first().sortByModified
+    suspend fun sortByModified(): Boolean = AppleStack.preferences.settings.first().sortByModified
 
-    suspend fun setSortByModified(enabled: Boolean) = MacStack.preferences.setSortByModified(enabled)
+    suspend fun setSortByModified(enabled: Boolean) = AppleStack.preferences.setSortByModified(enabled)
 
     /**
      * One line per memo instead of a card, for scanning a long timeline rather than reading
      * it. Local to this Mac: it is a view preference, not something to follow you about.
      */
-    suspend fun compactList(): Boolean = MacStack.preferences.settings.first().compactList
+    suspend fun compactList(): Boolean = AppleStack.preferences.settings.first().compactList
 
-    suspend fun setCompactList(enabled: Boolean) = MacStack.preferences.setCompactList(enabled)
+    suspend fun setCompactList(enabled: Boolean) = AppleStack.preferences.setCompactList(enabled)
 
     // MARK: tasks
 
@@ -184,7 +184,7 @@ class MemosSession {
     suspend fun openTasks(): List<TaskGroup> {
         val account = db.accountDao().getActive() ?: return emptyList()
         val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
-        val labels = MacDueDateLabels()
+        val labels = AppleDueDateLabels()
 
         return memos.observeMemosWithOpenTasks(account.id).first()
             .filter { !it.isLocked }
@@ -289,7 +289,7 @@ class MemosSession {
             is AvatarSource.Url -> {
                 // Avatars are full-size uploads rather than thumbnails, so this one is well
                 // over a megabyte for a circle drawn at 26 points. Fetch it once and keep it.
-                MacStack.cachedAvatar(source.url)?.let { return it }
+                AppleStack.cachedAvatar(source.url)?.let { return it }
 
                 val client = if (source.sameOrigin) {
                     registry.client(account.serverUrl, account.userResourceName)
@@ -299,7 +299,7 @@ class MemosSession {
                 runCatching { client.get(source.url).readRawBytes() }
                     .onFailure { println("W/Avatar: could not fetch ${source.url}: $it") }
                     .getOrNull()
-                    ?.also { MacStack.cacheAvatar(source.url, it) }
+                    ?.also { AppleStack.cacheAvatar(source.url, it) }
             }
         }
     }
@@ -314,9 +314,9 @@ class MemosSession {
      * memo's location asks openstreetmap.org for the tiles around it, which tells them roughly
      * where you are. With it off nothing is drawn and nothing leaves the device.
      */
-    suspend fun mapTilesEnabled(): Boolean = MacStack.preferences.settings.first().mapTiles
+    suspend fun mapTilesEnabled(): Boolean = AppleStack.preferences.settings.first().mapTiles
 
-    suspend fun setMapTiles(enabled: Boolean) = MacStack.preferences.setMapTiles(enabled)
+    suspend fun setMapTiles(enabled: Boolean) = AppleStack.preferences.setMapTiles(enabled)
 
     /** Every memo that carries a location, newest first, for the journey map. */
     suspend fun locatedMemos(): List<PlacedMemo> {
@@ -362,7 +362,7 @@ class MemosSession {
      * hand the credential to whoever controls an attachment's link.
      */
     suspend fun attachmentBytes(memoLocalId: String, attachmentLocalId: String): ByteArray? {
-        val store = MacStack.attachments
+        val store = AppleStack.attachments
         if (store.exists(attachmentLocalId)) return store.readBytes(attachmentLocalId)
 
         val account = db.accountDao().getActive() ?: return null
@@ -378,7 +378,7 @@ class MemosSession {
 
     /** Records a file the user picked. The upload rides the outbox like every other change. */
     suspend fun attach(memoLocalId: String, sourcePath: String, filename: String, mimeType: String): Boolean {
-        val staged = MacStack.attachments.stage(sourcePath, filename, mimeType) ?: return false
+        val staged = AppleStack.attachments.stage(sourcePath, filename, mimeType) ?: return false
         memos.addAttachment(memoLocalId, staged)
         return true
     }
@@ -478,12 +478,12 @@ class MemosSession {
     private fun group(all: List<Memo>): List<TimelineSection> {
         val zone = TimeZone.currentSystemDefault()
         val today = Clock.System.todayIn(zone)
-        val labels = MacTimelineLabels()
+        val labels = AppleTimelineLabels()
         return TimelineGrouping.group(
             memos = all,
             today = today,
             zone = zone,
-            firstDayOfWeek = MacTimelineLabels.firstDayOfWeek(),
+            firstDayOfWeek = AppleTimelineLabels.firstDayOfWeek(),
         ).map { group ->
             TimelineSection(
                 key = group.key,
@@ -511,7 +511,7 @@ class MemosSession {
 
     /** A template's body with today's date and time written into it, ready to edit. */
     fun expandTemplate(body: String): String =
-        TemplateRepository.expand(body, MacTemplateValues())
+        TemplateRepository.expand(body, AppleTemplateValues())
 
     // MARK: reminders and recurring templates
     //
@@ -614,7 +614,7 @@ class MemosSession {
             val dueToday = today.atTime(LocalTime(entry.hour.toInt(), entry.minute.toInt())).toInstant(zone)
             if (dueToday > now) continue
 
-            val body = TemplateRepository.expand(template.body, MacTemplateValues())
+            val body = TemplateRepository.expand(template.body, AppleTemplateValues())
             val writtenToday = memos.observeCreatedOn(account.id, today, zone).first()
                 .map { Schedule.firstLine(it.content) }
             if (!Schedule.shouldCreate(Schedule.firstLine(body), writtenToday)) continue
@@ -663,7 +663,7 @@ class MemosSession {
             today = Clock.System.todayIn(zone),
             zone = zone,
         )
-        return Digest.text(summary, MacDigestLabels())
+        return Digest.text(summary, AppleDigestLabels())
     }
 
     /** A reminder's memo, if this Mac has a local copy of it yet. */
@@ -715,7 +715,7 @@ class MemosSession {
 
     private fun Instant.friendlyWithTime(zone: TimeZone): String {
         val local = toLocalDateTime(zone)
-        val day = MacTimelineLabels().label(
+        val day = AppleTimelineLabels().label(
             TimelineGrouping.Bucket.Day(local.date),
             Clock.System.todayIn(zone),
         )

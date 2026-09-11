@@ -15,7 +15,7 @@ import platform.Foundation.currentLocale
  * so they come out in the reader's language, the same job `java.time` does on Android.
  */
 @OptIn(ExperimentalForeignApi::class)
-internal class MacTimelineLabels : TimelineGrouping.Labels {
+internal class AppleTimelineLabels : TimelineGrouping.Labels {
 
     private fun formatter(template: String) = NSDateFormatter().apply {
         locale = NSLocale.currentLocale

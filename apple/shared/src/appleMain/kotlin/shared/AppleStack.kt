@@ -29,12 +29,13 @@ import platform.Foundation.NSURL
 import platform.Foundation.NSUserDomainMask
 
 /**
- * Everything core-data needs, built for a Mac. On Android this is a Hilt module; here it is
- * a handful of constructor calls, which is rather the point of core-data no longer knowing
- * about either.
+ * Everything core-data needs, built for a Mac or an iPhone. On Android this is a Hilt module;
+ * here it is a handful of constructor calls, which is rather the point of core-data no longer
+ * knowing about either. Application Support is the right home on both platforms: on iOS it
+ * sits inside the app's own sandbox, on macOS under the user's Library.
  */
 @OptIn(ExperimentalForeignApi::class)
-internal object MacStack {
+internal object AppleStack {
 
     val supportDirectory: String by lazy {
         val base = NSFileManager.defaultManager.URLForDirectory(
@@ -122,10 +123,13 @@ internal object MacStack {
         )
     }
 
-    val attachments: MacAttachmentStore by lazy { MacAttachmentStore(supportDirectory) }
+    val attachments: AppleAttachmentStore by lazy { AppleAttachmentStore(supportDirectory) }
 
-    /** No background scheduling yet: the app syncs while it is open. */
-    val background: BackgroundSync = object : BackgroundSync {
+    /**
+     * The app decides how to catch up when it is not running: nothing on a Mac, a background
+     * refresh task on iOS. Set once at startup; until then the app syncs only while open.
+     */
+    var background: BackgroundSync = object : BackgroundSync {
         override fun enqueueRetry(full: Boolean) = Unit
         override fun ensurePeriodic() = Unit
         override fun cancelAll() = Unit

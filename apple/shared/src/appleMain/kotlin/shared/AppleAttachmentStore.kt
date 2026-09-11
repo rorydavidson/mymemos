@@ -22,7 +22,7 @@ import kotlin.uuid.Uuid
  * expectations hold: it asks whether a file is there and for its bytes, nothing more.
  */
 @OptIn(ExperimentalForeignApi::class)
-internal class MacAttachmentStore(supportDirectory: String) : AttachmentStore {
+internal class AppleAttachmentStore(supportDirectory: String) : AttachmentStore {
 
     private val dir = "$supportDirectory/attachments".also {
         NSFileManager.defaultManager.createDirectoryAtPath(it, true, null, null)

@@ -8,7 +8,7 @@ package com.keltruc.mymemos.data.crypto
 internal actual object AesGcm {
 
     private val provider: CryptoProvider
-        get() = MacCrypto.provider
+        get() = HostCrypto.provider
             ?: throw IllegalStateException("No CryptoProvider set; locked memos cannot be opened.")
 
     actual fun randomBytes(size: Int): ByteArray = provider.randomBytes(size)

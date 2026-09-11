@@ -8,6 +8,8 @@ kotlin {
 
     jvm()
     macosArm64()
+    iosArm64()
+    iosSimulatorArm64()
 
     sourceSets {
         commonMain.dependencies {
@@ -25,7 +27,8 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
         }
         jvmMain.dependencies { api(libs.ktor.client.okhttp) }
-        macosArm64Main.dependencies { api(libs.ktor.client.darwin) }
+        // One Darwin engine serves macOS and iOS alike.
+        appleMain.dependencies { api(libs.ktor.client.darwin) }
     }
 }
 

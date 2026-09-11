@@ -31,7 +31,7 @@ struct CipherCheck {
     }
 
     static func main() {
-        MacCrypto.shared.provider = AppleCrypto()
+        HostCrypto.shared.provider = AppleCrypto()
         var failures = 0
 
         for v in vectors {

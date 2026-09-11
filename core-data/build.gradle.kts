@@ -18,6 +18,8 @@ kotlin {
         withHostTestBuilder {}.configure {}
     }
     macosArm64()
+    iosArm64()
+    iosSimulatorArm64()
 
     sourceSets {
         commonMain.dependencies {
@@ -29,7 +31,7 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.datastore.preferences.core)
         }
-        macosArm64Main.dependencies {
+        appleMain.dependencies {
             implementation(project(":core-database"))
         }
         androidMain.dependencies {

@@ -13,7 +13,7 @@ import platform.Foundation.currentLocale
  * to the shared code rather than formatted inside it.
  */
 @OptIn(ExperimentalForeignApi::class)
-internal class MacTemplateValues(private val now: NSDate = NSDate()) : TemplateValues {
+internal class AppleTemplateValues(private val now: NSDate = NSDate()) : TemplateValues {
 
     private fun formatter(build: NSDateFormatter.() -> Unit) = NSDateFormatter().apply {
         locale = NSLocale.currentLocale

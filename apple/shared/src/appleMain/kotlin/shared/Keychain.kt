@@ -26,6 +26,8 @@ import platform.Security.SecItemAdd
 import platform.Security.SecItemCopyMatching
 import platform.Security.SecItemDelete
 import platform.Security.errSecSuccess
+import platform.Security.kSecAttrAccessible
+import platform.Security.kSecAttrAccessibleAfterFirstUnlock
 import platform.Security.kSecAttrAccount
 import platform.Security.kSecAttrService
 import platform.Security.kSecClass
@@ -36,7 +38,7 @@ import platform.Security.kSecReturnData
 import platform.Security.kSecValueData
 
 /**
- * The macOS Keychain, which is where a credential belongs on this platform.
+ * The Keychain, which is where a credential belongs on a Mac and on an iPhone alike.
  *
  * Everything is one generic-password item per key under a single service, mirroring how the
  * Android side namespaces its encrypted preferences, so an account's token and its cookies sit
@@ -64,6 +66,9 @@ internal object Keychain {
         val item = query(key)
         val data = (value as NSString).dataUsingEncoding(NSUTF8StringEncoding) ?: return
         CFDictionaryAddValue(item, kSecValueData, CFBridgingRetain(data))
+        // A background refresh on iOS runs with the phone locked; a token it cannot read is a
+        // sync that quietly never happens. macOS ignores this on the login keychain.
+        CFDictionaryAddValue(item, kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlock)
         SecItemAdd(item as CFDictionaryRef, null)
         CFRelease(item)
     }

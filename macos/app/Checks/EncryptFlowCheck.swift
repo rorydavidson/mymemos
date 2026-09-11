@@ -4,7 +4,7 @@ import Shared
 @main
 struct EncryptFlowCheck {
     static func main() async throws {
-        MacCrypto.shared.provider = AppleCrypto()
+        HostCrypto.shared.provider = AppleCrypto()
         let session = MemosSession()
         guard (try await session.signedInAs()) != nil else { print("not signed in"); return }
 

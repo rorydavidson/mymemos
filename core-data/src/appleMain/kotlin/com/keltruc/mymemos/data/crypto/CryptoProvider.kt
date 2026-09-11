@@ -20,7 +20,7 @@ interface CryptoProvider {
     fun open(key: ByteArray, nonce: ByteArray, sealed: ByteArray): ByteArray?
 }
 
-/** Set once at startup, before anything tries to open a locked memo. */
-object MacCrypto {
+/** Set once at startup by the host app, macOS or iOS, before anything tries to open a locked memo. */
+object HostCrypto {
     var provider: CryptoProvider? = null
 }
