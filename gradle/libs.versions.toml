@@ -31,6 +31,7 @@ glance = "1.2.0"
 commonmark = "0.30.0"
 splashscreen = "1.2.0"
 windowSizeClass = "1.4.0"
+window = "1.5.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -90,6 +91,7 @@ glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", versi
 glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "glance" }
 commonmark = { group = "org.commonmark", name = "commonmark", version.ref = "commonmark" }
 splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "splashscreen" }
+androidx-window = { group = "androidx.window", name = "window", version.ref = "window" }
 material3-window-size = { group = "androidx.compose.material3", name = "material3-window-size-class", version.ref = "windowSizeClass" }
 commonmark-tables = { group = "org.commonmark", name = "commonmark-ext-gfm-tables", version.ref = "commonmark" }
 commonmark-strikethrough = { group = "org.commonmark", name = "commonmark-ext-gfm-strikethrough", version.ref = "commonmark" }

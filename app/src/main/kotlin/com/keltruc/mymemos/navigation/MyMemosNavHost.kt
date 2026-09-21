@@ -1,5 +1,6 @@
 package com.keltruc.mymemos.navigation
 
+import android.graphics.Rect
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -9,6 +10,8 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -19,6 +22,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.getValue
@@ -88,13 +92,17 @@ import kotlinx.serialization.Serializable
 /** How the top-level screens share the window with an open memo. */
 enum class PaneLayout {
     Single,
-    // An unfolded phone: split down the middle, which is where the hinge is.
+    // Too narrow to give the memo the larger share without squeezing the list.
     EvenSplit,
     WideDetail,
 }
 
+/**
+ * @param hinge the fold's bounds in window pixels when it runs top to bottom. With one, the
+ * panes meet at the hinge whatever [paneLayout] would have weighted them.
+ */
 @Composable
-fun MyMemosNavHost(paneLayout: PaneLayout = PaneLayout.Single) {
+fun MyMemosNavHost(paneLayout: PaneLayout = PaneLayout.Single, hinge: Rect? = null) {
     val twoPane = paneLayout != PaneLayout.Single
     val navController = rememberNavController()
     var paneMemo by rememberSaveable { mutableStateOf<String?>(null) }
@@ -161,6 +169,7 @@ fun MyMemosNavHost(paneLayout: PaneLayout = PaneLayout.Single) {
                 if (twoPane) {
                     ListDetailPanes(
                         listWeight = if (paneLayout == PaneLayout.EvenSplit) 0.5f else 0.42f,
+                        hinge = hinge,
                         navBar = navBar,
                         list = list,
                     ) {
@@ -285,15 +294,19 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.betweenTopLevel():
 @Composable
 private fun ListDetailPanes(
     listWeight: Float,
+    hinge: Rect?,
     navBar: @Composable () -> Unit,
     list: @Composable () -> Unit,
     detail: @Composable () -> Unit,
 ) {
+    val density = LocalDensity.current
     Row(Modifier.fillMaxSize()) {
-        Scaffold(modifier = Modifier.weight(listWeight), bottomBar = navBar) { padding ->
+        val listModifier = if (hinge != null) Modifier.width(with(density) { hinge.left.toDp() }) else Modifier.weight(listWeight)
+        Scaffold(modifier = listModifier, bottomBar = navBar) { padding ->
             Box(Modifier.padding(bottom = padding.calculateBottomPadding())) { list() }
         }
-        VerticalDivider()
-        Box(Modifier.weight(1f - listWeight).fillMaxSize().background(MaterialTheme.colorScheme.background)) { detail() }
+        // A hinge with width hides what is under it; a seamless fold reports none and gets the line.
+        if (hinge != null && hinge.width() > 0) Spacer(Modifier.width(with(density) { hinge.width().toDp() })) else VerticalDivider()
+        Box(Modifier.weight(1f).fillMaxSize().background(MaterialTheme.colorScheme.background)) { detail() }
     }
 }
