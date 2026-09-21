@@ -16,6 +16,7 @@ import com.keltruc.mymemos.data.prefs.AppPreferences
 import com.keltruc.mymemos.data.prefs.Settings
 import com.keltruc.mymemos.navigation.IntentRouter
 import com.keltruc.mymemos.navigation.MyMemosNavHost
+import com.keltruc.mymemos.navigation.PaneLayout
 import com.keltruc.mymemos.ui.components.LocalMapTiles
 import com.keltruc.mymemos.ui.theme.MyMemosTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -37,7 +38,13 @@ class MainActivity : ComponentActivity() {
             val sizeClass = calculateWindowSizeClass(this)
             MyMemosTheme(dynamicColor = settings.dynamicColour) {
                 CompositionLocalProvider(LocalMapTiles provides settings.mapTiles) {
-                    MyMemosNavHost(twoPane = sizeClass.widthSizeClass == WindowWidthSizeClass.Expanded)
+                    // Medium is where an unfolded phone lands; Expanded is tablets and landscape phones.
+                    val paneLayout = when (sizeClass.widthSizeClass) {
+                        WindowWidthSizeClass.Expanded -> PaneLayout.WideDetail
+                        WindowWidthSizeClass.Medium -> PaneLayout.EvenSplit
+                        else -> PaneLayout.Single
+                    }
+                    MyMemosNavHost(paneLayout)
                 }
             }
         }
