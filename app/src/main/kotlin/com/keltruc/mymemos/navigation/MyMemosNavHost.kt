@@ -1,5 +1,7 @@
 package com.keltruc.mymemos.navigation
 
+import android.graphics.Rect
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -8,6 +10,8 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -18,6 +22,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.getValue
@@ -55,6 +60,8 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.foundation.layout.padding
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.keltruc.mymemos.ui.templates.TemplatesScreen
@@ -82,8 +89,21 @@ import kotlinx.serialization.Serializable
 @Serializable object TemplatesRoute
 @Serializable object DataRoute
 
+/** How the top-level screens share the window with an open memo. */
+enum class PaneLayout {
+    Single,
+    // Too narrow to give the memo the larger share without squeezing the list.
+    EvenSplit,
+    WideDetail,
+}
+
+/**
+ * @param hinge the fold's bounds in window pixels when it runs top to bottom. With one, the
+ * panes meet at the hinge whatever [paneLayout] would have weighted them.
+ */
 @Composable
-fun MyMemosNavHost(twoPane: Boolean = false) {
+fun MyMemosNavHost(paneLayout: PaneLayout = PaneLayout.Single, hinge: Rect? = null) {
+    val twoPane = paneLayout != PaneLayout.Single
     val navController = rememberNavController()
     var paneMemo by rememberSaveable { mutableStateOf<String?>(null) }
     val sessionViewModel: SessionViewModel = hiltViewModel()
@@ -112,78 +132,93 @@ fun MyMemosNavHost(twoPane: Boolean = false) {
             val tagStyles by sessionViewModel.tagStyles.collectAsStateWithLifecycle()
             val backStack by navController.currentBackStackEntryAsState()
             val destination = backStack?.destination
-            val topLevel = destination?.let { d -> d.hasRoute(TimelineRoute::class) || d.hasRoute(TasksRoute::class) || d.hasRoute(ReviewRoute::class) } == true
+            val topLevel = destination.isTopLevel()
             fun go(route: Any) = navController.navigate(route) {
                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
             }
-            CompositionLocalProvider(LocalTagStyles provides tagStyles) {
-            Scaffold(
-                bottomBar = {
-                    if (topLevel) {
-                        NavigationBar {
-                            NavigationBarItem(selected = destination?.hasRoute(TimelineRoute::class) == true, onClick = { go(TimelineRoute) }, icon = { Icon(Icons.Default.Notes, null) }, label = { Text(stringResource(R.string.nav_memos)) })
-                            NavigationBarItem(selected = destination?.hasRoute(TasksRoute::class) == true, onClick = { go(TasksRoute) }, icon = { Icon(Icons.Default.CheckCircle, null) }, label = { Text(stringResource(R.string.nav_tasks)) })
-                            NavigationBarItem(selected = destination?.hasRoute(ReviewRoute::class) == true, onClick = { go(ReviewRoute) }, icon = { Icon(Icons.Default.CalendarMonth, null) }, label = { Text(stringResource(R.string.nav_review)) })
+            val openMemo: (String) -> Unit = { if (twoPane) paneMemo = it else navController.navigate(MemoDetailRoute(it)) }
+
+            // Folding or unfolding keeps the open memo in front: it moves between the right
+            // pane and its own screen rather than being dropped.
+            LaunchedEffect(twoPane) {
+                val current = navController.currentBackStackEntry
+                val pane = paneMemo
+                if (!twoPane && pane != null) {
+                    paneMemo = null
+                    navController.navigate(MemoDetailRoute(pane))
+                } else if (twoPane && current?.destination?.hasRoute(MemoDetailRoute::class) == true &&
+                    navController.previousBackStackEntry?.destination.isTopLevel()
+                ) {
+                    paneMemo = current.toRoute<MemoDetailRoute>().localId
+                    navController.popBackStack()
+                }
+            }
+
+            val navBar: @Composable () -> Unit = {
+                NavigationBar {
+                    NavigationBarItem(selected = destination?.hasRoute(TimelineRoute::class) == true, onClick = { go(TimelineRoute) }, icon = { Icon(Icons.Default.Notes, null) }, label = { Text(stringResource(R.string.nav_memos)) })
+                    NavigationBarItem(selected = destination?.hasRoute(TasksRoute::class) == true, onClick = { go(TasksRoute) }, icon = { Icon(Icons.Default.CheckCircle, null) }, label = { Text(stringResource(R.string.nav_tasks)) })
+                    NavigationBarItem(selected = destination?.hasRoute(ReviewRoute::class) == true, onClick = { go(ReviewRoute) }, icon = { Icon(Icons.Default.CalendarMonth, null) }, label = { Text(stringResource(R.string.nav_review)) })
+                }
+            }
+            // In two panes the bar sits under the left pane only, so the memo gets the full height.
+            val barUnderWindow = topLevel && !twoPane
+            val topLevelPanes: @Composable (@Composable () -> Unit) -> Unit = { list ->
+                if (twoPane) {
+                    ListDetailPanes(
+                        listWeight = if (paneLayout == PaneLayout.EvenSplit) 0.5f else 0.42f,
+                        hinge = hinge,
+                        navBar = navBar,
+                        list = list,
+                    ) {
+                        val id = paneMemo
+                        if (id == null) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(stringResource(R.string.pane_placeholder), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        } else {
+                            MemoDetailScreen(
+                                localId = id,
+                                onBack = { paneMemo = null },
+                                onEdit = { navController.navigate(EditorRoute(id)) },
+                                onOpenMemo = { paneMemo = it },
+                                showBack = false,
+                            )
                         }
                     }
-                },
+                } else {
+                    list()
+                }
+            }
+            CompositionLocalProvider(LocalTagStyles provides tagStyles) {
+            Scaffold(
+                bottomBar = { if (barUnderWindow) navBar() },
             ) { padding ->
             NavHost(
                 navController,
                 startDestination = TimelineRoute,
-                modifier = Modifier.padding(bottom = if (topLevel) padding.calculateBottomPadding() else 0.dp),
-                enterTransition = { fadeIn(tween(220)) + slideInHorizontally(tween(260)) { it / 8 } },
+                modifier = Modifier.padding(bottom = if (barUnderWindow) padding.calculateBottomPadding() else 0.dp),
+                // Between tabs in two panes the bar and the open memo stay put, so nothing slides.
+                enterTransition = { if (twoPane && betweenTopLevel()) fadeIn(tween(220)) else fadeIn(tween(220)) + slideInHorizontally(tween(260)) { it / 8 } },
                 exitTransition = { fadeOut(tween(160)) },
                 popEnterTransition = { fadeIn(tween(220)) },
-                popExitTransition = { fadeOut(tween(160)) + slideOutHorizontally(tween(260)) { it / 8 } },
+                popExitTransition = { if (twoPane && betweenTopLevel()) fadeOut(tween(160)) else fadeOut(tween(160)) + slideOutHorizontally(tween(260)) { it / 8 } },
             ) {
                 composable<TimelineRoute> {
-                    if (twoPane) {
-                        Row(Modifier.fillMaxSize()) {
-                            Box(Modifier.weight(0.42f)) {
-                                TimelineScreen(
-                                    onOpenMemo = { paneMemo = it },
-                                    onNewMemo = { navController.navigate(EditorRoute()) },
-                                    onEditMemo = { navController.navigate(EditorRoute(it)) },
-                                    onSettings = { navController.navigate(SettingsRoute) },
-                                    onManageShortcuts = { navController.navigate(ShortcutsRoute) },
-                                    onNotifications = { navController.navigate(NotificationsRoute) },
-                                    onReview = { go(ReviewRoute) },
-                                    onTagSettings = { navController.navigate(TagsRoute(it)) },
-                                )
-                            }
-                            VerticalDivider()
-                            Box(Modifier.weight(0.58f).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                                val id = paneMemo
-                                if (id == null) {
-                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Text(stringResource(R.string.pane_placeholder), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                } else {
-                                    MemoDetailScreen(
-                                        localId = id,
-                                        onBack = { paneMemo = null },
-                                        onEdit = { navController.navigate(EditorRoute(id)) },
-                                        onOpenMemo = { paneMemo = it },
-                                        showBack = false,
-                                    )
-                                }
-                            }
-                        }
-                        return@composable
+                    topLevelPanes {
+                        TimelineScreen(
+                            onOpenMemo = openMemo,
+                            onNewMemo = { navController.navigate(EditorRoute()) },
+                            onEditMemo = { navController.navigate(EditorRoute(it)) },
+                            onSettings = { navController.navigate(SettingsRoute) },
+                            onManageShortcuts = { navController.navigate(ShortcutsRoute) },
+                            onNotifications = { navController.navigate(NotificationsRoute) },
+                            onReview = { go(ReviewRoute) },
+                            onTagSettings = { navController.navigate(TagsRoute(it)) },
+                        )
                     }
-                    TimelineScreen(
-                        onOpenMemo = { navController.navigate(MemoDetailRoute(it)) },
-                        onNewMemo = { navController.navigate(EditorRoute()) },
-                        onEditMemo = { navController.navigate(EditorRoute(it)) },
-                        onSettings = { navController.navigate(SettingsRoute) },
-                        onManageShortcuts = { navController.navigate(ShortcutsRoute) },
-                        onNotifications = { navController.navigate(NotificationsRoute) },
-                        onReview = { go(ReviewRoute) },
-                        onTagSettings = { navController.navigate(TagsRoute(it)) },
-                    )
                 }
                 composable<MemoDetailRoute> { entry ->
                     val route = entry.toRoute<MemoDetailRoute>()
@@ -229,20 +264,49 @@ fun MyMemosNavHost(twoPane: Boolean = false) {
                     AdminUsersScreen(serverUrl = (session as SessionState.SignedIn).account.serverUrl, onBack = { navController.popBackStack() })
                 }
                 composable<ReviewRoute> {
-                    ReviewScreen(
-                        onBack = { navController.popBackStack() },
-                        onOpenMemo = { navController.navigate(MemoDetailRoute(it)) },
-                        onEditMemo = { navController.navigate(EditorRoute(it)) },
-                    )
+                    topLevelPanes {
+                        ReviewScreen(
+                            onBack = { navController.popBackStack() },
+                            onOpenMemo = openMemo,
+                            onEditMemo = { navController.navigate(EditorRoute(it)) },
+                        )
+                    }
                 }
                 composable<TemplatesRoute> { TemplatesScreen(onBack = { navController.popBackStack() }) }
                 composable<DataRoute> { DataScreen(onBack = { navController.popBackStack() }) }
                 composable<AdminInstanceRoute> { AdminInstanceScreen(onBack = { navController.popBackStack() }) }
-                composable<TasksRoute> { TasksScreen(onOpenMemo = { navController.navigate(MemoDetailRoute(it)) }) }
+                composable<TasksRoute> { topLevelPanes { TasksScreen(onOpenMemo = openMemo) } }
                 composable<TagsRoute> { entry -> TagsScreen(onBack = { navController.popBackStack() }, initialTag = entry.toRoute<TagsRoute>().tag) }
             }
             }
             }
         }
+    }
+}
+
+private fun NavDestination?.isTopLevel(): Boolean =
+    this != null && (hasRoute(TimelineRoute::class) || hasRoute(TasksRoute::class) || hasRoute(ReviewRoute::class))
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.betweenTopLevel(): Boolean =
+    initialState.destination.isTopLevel() && targetState.destination.isTopLevel()
+
+/** A top-level screen with the navigation bar beneath it on the left, the open memo on the right. */
+@Composable
+private fun ListDetailPanes(
+    listWeight: Float,
+    hinge: Rect?,
+    navBar: @Composable () -> Unit,
+    list: @Composable () -> Unit,
+    detail: @Composable () -> Unit,
+) {
+    val density = LocalDensity.current
+    Row(Modifier.fillMaxSize()) {
+        val listModifier = if (hinge != null) Modifier.width(with(density) { hinge.left.toDp() }) else Modifier.weight(listWeight)
+        Scaffold(modifier = listModifier, bottomBar = navBar) { padding ->
+            Box(Modifier.padding(bottom = padding.calculateBottomPadding())) { list() }
+        }
+        // A hinge with width hides what is under it; a seamless fold reports none and gets the line.
+        if (hinge != null && hinge.width() > 0) Spacer(Modifier.width(with(density) { hinge.width().toDp() })) else VerticalDivider()
+        Box(Modifier.weight(1f).fillMaxSize().background(MaterialTheme.colorScheme.background)) { detail() }
     }
 }

@@ -47,7 +47,9 @@ nothing is collected along the way. Thank you.
   maps app.
 - Comments, reactions, references with backlinks, and public share links with revoke.
 - Offline full-text search, tag filters, saved server-side shortcuts (CEL filters), an
-  archive view, and a two-pane layout on tablets and landscape phones.
+  archive view, and a two-pane layout on tablets, landscape phones and unfolded foldables:
+  the list and the navigation bar on the left, the open memo on the right. Fold the phone
+  and the memo you had open stays in front.
 - The timeline folds as it goes back: days for the current week, a week header for earlier
   weeks of this month, a month header before that. Every header collapses, and what you
   folded away is still folded next time you open the app.

@@ -95,6 +95,7 @@ dependencies {
     ksp(libs.hilt.androidx.compiler)
     implementation(libs.splashscreen)
     implementation(libs.material3.window.size)
+    implementation(libs.androidx.window)
     implementation(libs.commonmark)
     implementation(libs.commonmark.tables)
     implementation(libs.commonmark.strikethrough)
