@@ -12,6 +12,9 @@ struct MarkdownView: View {
     /// Set by a list card: row sizes, tighter spacing, a few lines per block at most, and no
     /// text selection, which would otherwise swallow the click that selects the row.
     var card = false
+    /// Leaves out lines that are only tags, for a view that already shows them as chips.
+    /// A card always does.
+    var hidesTagLines = false
     /// Called with the source line and the new state when a task's box is tapped. Nil leaves
     /// the boxes as pictures, which is what a preview wants.
     var onToggleTask: ((Int, Bool) -> Void)? = nil
@@ -34,8 +37,8 @@ struct MarkdownView: View {
 
     private var bodyFont: Font { card ? Type.rowBody : Type.body }
 
-    // A card draws its tags as chips underneath, so a line of nothing but tags would say it twice.
-    private var blocks: [Block] { Block.parse(text, limit: lineLimit, skippingTagLines: card) }
+    // Where the tags are drawn as chips, a line of nothing but tags would say it twice.
+    private var blocks: [Block] { Block.parse(text, limit: lineLimit, skippingTagLines: card || hidesTagLines) }
 
     @ViewBuilder
     private func view(for block: Block) -> some View {

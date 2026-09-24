@@ -32,7 +32,7 @@ struct MemoDetailView: View {
                 } else if memo.locked {
                     lockedNotice
                 } else {
-                    MarkdownView(text: detail.bodyBelowTitle) { line, checked in
+                    MarkdownView(text: detail.bodyBelowTitle, hidesTagLines: true) { line, checked in
                         Task { await model.toggleTask(memo.localId, line: line + Int(detail.bodyLineOffset), checked: checked) }
                     }
                     .frame(maxWidth: Theme.readingWidth, alignment: .leading)
