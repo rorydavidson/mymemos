@@ -1430,6 +1430,7 @@ class MemosSession {
         localId = localId,
         title = MemoTitle.of(displayContent) ?: firstLine(),
         body = if (isLocked) "" else displayContent,
+        bodyBelowTitle = if (isLocked) "" else MemoTitle.withoutTitleLine(displayContent),
         tags = tags,
         pinned = pinned,
         locked = isLocked,
@@ -1588,6 +1589,8 @@ data class MemoRow(
     val localId: String,
     val title: String,
     val body: String,
+    /** [body] without the line [title] came from, which is what a card shows under it. */
+    val bodyBelowTitle: String,
     val tags: List<String>,
     val pinned: Boolean,
     val locked: Boolean,
