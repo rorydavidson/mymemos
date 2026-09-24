@@ -68,7 +68,8 @@ struct MemoDetailView: View {
             .frame(maxWidth: Theme.readingWidth + 80, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .background(Theme.canvas)
+        // A tinted memo reads on its own colour here as it does on its card in the list.
+        .background(Color.memoTint(memo.colourHex, isDark: scheme == .dark) ?? Theme.canvas)
         .task(id: detail.row.localId) {
             attachments = await model.attachments(detail.row.localId)
             if detail.onServer { await model.loadSocial(detail.row.localId) }
@@ -99,10 +100,6 @@ struct MemoDetailView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                if let tint = Color.memoTint(memo.colourHex, isDark: scheme == .dark) {
-                    Circle().fill(tint).frame(width: 10, height: 10)
-                        .overlay(Circle().strokeBorder(Theme.hairline))
-                }
                 Text(memo.locked ? "Locked memo" : memo.title)
                     .font(Type.title)
                     .foregroundStyle(Theme.ink)

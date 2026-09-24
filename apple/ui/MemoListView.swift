@@ -209,12 +209,6 @@ struct CompactMemoRowView: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            // The colour a card shows as a whole tint has to survive here as something, so it
-            // becomes the bar down the side. Without it a coloured memo is indistinguishable.
-            Rectangle()
-                .fill(Color.memoTint(memo.colourHex, isDark: scheme == .dark)?.opacity(0.9) ?? .clear)
-                .frame(width: 3)
-
             if memo.pinned {
                 Image(systemName: "pin.fill")
                     .font(.system(size: 10))
@@ -250,12 +244,19 @@ struct CompactMemoRowView: View {
                 .monospacedDigit()
                 .foregroundStyle(Theme.inkSoft.opacity(0.8))
         }
-        .padding(.trailing, 12)
+        .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .frame(height: 28)
+        // The memo's colour fills the row as it fills a card, so a tinted memo stays tinted
+        // whichever way the list is drawn. Selection and hover sit on top of it.
         .background(
             RoundedRectangle(cornerRadius: 6)
+                .fill(Color.memoTint(memo.colourHex, isDark: scheme == .dark) ?? .clear)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
                 .fill(selected ? Theme.accent.opacity(0.16) : (hovering ? Theme.ink.opacity(0.04) : .clear))
+                .allowsHitTesting(false)
         )
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .contentShape(Rectangle())
