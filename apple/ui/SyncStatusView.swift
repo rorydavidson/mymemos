@@ -120,7 +120,7 @@ struct SyncStatusView: View {
                 .font(Type.rowMeta).foregroundStyle(Theme.inkSoft).fixedSize(horizontal: false, vertical: true)
             ForEach(model.conflicts, id: \.localId) { memo in
                 HStack {
-                    Text(memo.locked ? "Locked memo" : memo.title).font(Type.rowTitle).lineLimit(1)
+                    Text(memo.title).font(Type.rowTitle).lineLimit(1)
                     Spacer()
                     Button("Open") { model.open(memo.localId); dismiss() }.linkButton().font(Type.rowMeta)
                     Button("Keep") { Task { await model.keepConflictCopy(memo.localId) } }.linkButton().font(Type.rowMeta)

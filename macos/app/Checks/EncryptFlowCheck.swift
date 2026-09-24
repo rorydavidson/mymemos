@@ -15,17 +15,22 @@ struct EncryptFlowCheck {
         print("no password held: \(!session.hasPassword)")
 
         // Step one: the user picks Encrypt. This is what used to return false and stop.
-        let firstTry = try await session.lock(localId: id)
+        let firstTry = try await session.lock(localId: id, title: "Check title")
         print("encrypt without a password refuses: \(firstTry == false)")
 
         // Step two: the sheet supplies one, and the app must now finish the job.
         session.usePassword(password: "a good password", remember: false)
-        let retry = try await session.lock(localId: id)
+        let retry = try await session.lock(localId: id, title: "Check title")
         print("encrypt after the password arrives: \(retry == true)")
 
         let after = try await session.memo(localId: id)
         print("memo is now locked: \(after?.row.locked ?? false)")
         print("stored body is empty: \((after?.row.body ?? "x").isEmpty)")
+        print("readable title kept: \(after?.row.title == "Check title")")
+
+        try await session.setLockedTitle(localId: id, title: "Renamed")
+        let renamed = try await session.memo(localId: id)
+        print("renamed without the password: \(renamed?.row.title == "Renamed" && renamed?.row.locked == true)")
 
         let shown = try await session.reveal(localId: id)
         print("reveals back to the original: \(shown.text == text)")

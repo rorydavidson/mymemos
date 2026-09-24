@@ -24,7 +24,7 @@ extension SessionModel {
     // MARK: archive, colour and undo
 
     func setArchived(_ localId: String, _ archived: Bool) async {
-        let title = memo(localId).map { $0.locked ? "Locked memo" : $0.title } ?? "Memo"
+        let title = memo(localId).map { $0.title } ?? "Memo"
         try? await session.setArchived(localId: localId, archived: archived)
         if archived {
             if selection == localId { selection = nil }
@@ -379,7 +379,7 @@ extension SessionModel {
     func writeWidgetSnapshot() async {
         #if os(iOS)
         let recent = sections.flatMap(\.memos).prefix(10).map {
-            AppGroup.Snapshot.Memo(localId: $0.localId, title: $0.locked ? "Locked memo" : $0.title, time: $0.timeLabel, pinned: $0.pinned)
+            AppGroup.Snapshot.Memo(localId: $0.localId, title: $0.title, time: $0.timeLabel, pinned: $0.pinned)
         }
         let groups = (try? await session.openTasks()) ?? []
         let tasks = groups.flatMap { group in

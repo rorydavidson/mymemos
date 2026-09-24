@@ -99,7 +99,7 @@ struct ReviewView: View {
                                 .frame(width: 18, height: 18)
                                 .background(Circle().fill(Theme.accent))
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(stop.row.locked ? "Locked memo" : stop.row.title)
+                                Text(stop.row.title)
                                     .font(Type.rowTitle).foregroundStyle(Theme.ink).lineLimit(1)
                                 Text(stop.placeName.isEmpty ? "Somewhere unnamed" : stop.placeName)
                                     .font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
@@ -168,7 +168,7 @@ struct ReviewView: View {
                                 Text(throwback.row.dateLabel)
                                     .font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
                             }
-                            Text(throwback.row.locked ? "Locked memo" : throwback.row.title)
+                            Text(throwback.row.title)
                                 .font(Type.rowTitle).foregroundStyle(Theme.ink).lineLimit(1)
                             if !throwback.row.locked, !throwback.row.body.isEmpty {
                                 Text(throwback.row.body)
@@ -230,7 +230,7 @@ struct DayReview: View {
                 HStack(alignment: .top, spacing: 10) {
                     Button { openMemo(memo.localId) } label: {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(memo.locked ? "Locked memo" : memo.title).font(Type.rowTitle).foregroundStyle(Theme.ink).lineLimit(1)
+                            Text(memo.title).font(Type.rowTitle).foregroundStyle(Theme.ink).lineLimit(1)
                             if !memo.locked, !memo.body.isEmpty {
                                 Text(memo.body).font(Type.rowBody).foregroundStyle(Theme.inkSoft).lineLimit(2)
                             }
@@ -291,7 +291,7 @@ struct NearbySection: View {
                 Button { openMemo(near.row.localId) } label: {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(near.row.locked ? "Locked memo" : near.row.title).font(Type.rowTitle).foregroundStyle(Theme.ink).lineLimit(1)
+                            Text(near.row.title).font(Type.rowTitle).foregroundStyle(Theme.ink).lineLimit(1)
                             Text(near.placeName.isEmpty ? "Somewhere unnamed" : near.placeName).font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
                         }
                         Spacer()

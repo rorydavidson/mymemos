@@ -9,78 +9,95 @@ import SwiftUI
 struct MarkdownView: View {
     let text: String
     var lineLimit: Int?
+    /// Set by a list card: row sizes, tighter spacing, a few lines per block at most, and no
+    /// text selection, which would otherwise swallow the click that selects the row.
+    var card = false
+    /// Leaves out lines that are only tags, for a view that already shows them as chips.
+    /// A card always does.
+    var hidesTagLines = false
     /// Called with the source line and the new state when a task's box is tapped. Nil leaves
     /// the boxes as pictures, which is what a preview wants.
     var onToggleTask: ((Int, Bool) -> Void)? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let stack = VStack(alignment: .leading, spacing: card ? 4 : 12) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 view(for: block)
+                    .lineLimit(card ? 3 : nil)
             }
         }
-        .textSelection(.enabled)
-        .lineSpacing(Theme.readingLeading)
+        .lineSpacing(card ? 2.5 : Theme.readingLeading)
+
+        if card {
+            stack.textSelection(.disabled)
+        } else {
+            stack.textSelection(.enabled)
+        }
     }
 
-    private var blocks: [Block] { Block.parse(text, limit: lineLimit) }
+    private var bodyFont: Font { card ? Type.rowBody : Type.body }
+
+    // Where the tags are drawn as chips, a line of nothing but tags would say it twice.
+    private var blocks: [Block] { Block.parse(text, limit: lineLimit, skippingTagLines: card || hidesTagLines) }
 
     @ViewBuilder
     private func view(for block: Block) -> some View {
         switch block {
         case let .heading(level, content):
             Text(inline(content))
-                .font(headingFont(level))
-                .padding(.top, level <= 2 ? 8 : 4)
+                .font(card ? Type.rowTitle : headingFont(level))
+                .padding(.top, card ? 0 : (level <= 2 ? 8 : 4))
 
         case let .paragraph(content):
-            Text(inline(content)).font(Type.body)
+            Text(inline(content)).font(bodyFont)
 
         case let .quote(content):
             HStack(alignment: .top, spacing: 10) {
                 RoundedRectangle(cornerRadius: 1.5)
                     .fill(Theme.accent.opacity(0.45)).frame(width: 3)
-                Text(inline(content)).font(Type.quote).italic().foregroundStyle(Theme.inkSoft)
+                Text(inline(content)).font(card ? Type.rowBody : Type.quote).italic().foregroundStyle(Theme.inkSoft)
             }
             .fixedSize(horizontal: false, vertical: true)
 
         case let .bullet(depth, content):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("•").font(Type.body).foregroundStyle(Theme.inkSoft)
-                Text(inline(content)).font(Type.body)
+                Text("•").font(bodyFont).foregroundStyle(Theme.inkSoft)
+                Text(inline(content)).font(bodyFont)
             }
-            .padding(.leading, CGFloat(depth) * 18)
+            .padding(.leading, CGFloat(depth) * indent)
 
         case let .numbered(depth, marker, content):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(marker).font(Type.body).foregroundStyle(Theme.inkSoft).monospacedDigit()
-                Text(inline(content)).font(Type.body)
+                Text(marker).font(bodyFont).foregroundStyle(Theme.inkSoft).monospacedDigit()
+                Text(inline(content)).font(bodyFont)
             }
-            .padding(.leading, CGFloat(depth) * 18)
+            .padding(.leading, CGFloat(depth) * indent)
 
         case let .task(depth, done, content, line):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Button {
-                    onToggleTask?(line, !done)
-                } label: {
-                    Image(systemName: done ? "checkmark.square.fill" : "square")
-                        .font(.system(size: onToggleTask == nil ? 14 : 18))
-                        .foregroundStyle(done ? Theme.accent : Theme.inkSoft.opacity(0.75))
+                let box = Image(systemName: done ? "checkmark.square.fill" : "square")
+                    .font(.system(size: card ? 11 : (onToggleTask == nil ? 14 : 18)))
+                    .foregroundStyle(done ? Theme.accent : Theme.inkSoft.opacity(0.75))
+                // Without a handler the box is only a picture, and a disabled button would still
+                // take the click that a list card needs for selecting itself.
+                if let onToggleTask {
+                    Button { onToggleTask(line, !done) } label: { box }
+                        .buttonStyle(.plain)
+                } else {
+                    box
                 }
-                .buttonStyle(.plain)
-                .disabled(onToggleTask == nil)
                 Text(inline(content))
-                    .font(Type.body)
+                    .font(bodyFont)
                     .strikethrough(done, color: Theme.inkSoft)
                     .foregroundStyle(done ? Theme.inkSoft : Theme.ink)
             }
-            .padding(.leading, CGFloat(depth) * 18)
+            .padding(.leading, CGFloat(depth) * indent)
 
         case let .code(content):
             Text(content)
-                .font(Type.code)
+                .font(card ? .system(size: 11.5, design: .monospaced) : Type.code)
                 .lineSpacing(3)
-                .padding(12)
+                .padding(card ? 8 : 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Theme.raised.opacity(0.6), in: RoundedRectangle(cornerRadius: 8))
                 .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.hairline, lineWidth: 0.5))
@@ -89,6 +106,8 @@ struct MarkdownView: View {
             Divider()
         }
     }
+
+    private var indent: CGFloat { card ? 14 : 18 }
 
     private func headingFont(_ level: Int) -> Font {
         switch level {
@@ -123,7 +142,7 @@ enum Block {
     case code(String)
     case rule
 
-    static func parse(_ text: String, limit: Int?) -> [Block] {
+    static func parse(_ text: String, limit: Int?, skippingTagLines: Bool = false) -> [Block] {
         var blocks: [Block] = []
         var lines = text.components(separatedBy: "\n")
         if let limit, lines.count > limit { lines = Array(lines.prefix(limit)) }
@@ -183,10 +202,27 @@ enum Block {
                 index += 1
                 continue
             }
+            if skippingTagLines, isTagLine(trimmed) {
+                index += 1
+                continue
+            }
             blocks.append(.paragraph(trimmed))
             index += 1
         }
         return blocks
+    }
+
+    /// The same tag pattern the shared code extracts tags with, so what is hidden here is
+    /// exactly what shows as a chip.
+    private static let tag = try! NSRegularExpression(pattern: "(?<![\\w/])#[\\p{L}\\p{N}_/\\-]+")
+
+    /// True for a line that is only tags, such as `#work #ideas`. A sentence that mentions a
+    /// tag keeps it, because taking the word out would change what the sentence says.
+    private static func isTagLine(_ line: String) -> Bool {
+        let range = NSRange(location: 0, length: (line as NSString).length)
+        guard tag.firstMatch(in: line, range: range) != nil else { return false }
+        return tag.stringByReplacingMatches(in: line, range: range, withTemplate: "")
+            .trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     private static func indentDepth(_ line: String) -> Int {

@@ -99,7 +99,7 @@ class MemoDetailViewModel @AssistedInject constructor(
         try {
             when (purpose) {
                 PasswordPurpose.UNLOCK_VIEW -> unlockedText.value = memoRepository.decrypt(memo, password)
-                PasswordPurpose.LOCK -> memoRepository.lock(memo.localId, password)
+                PasswordPurpose.LOCK -> memoRepository.lock(memo.localId, password, pendingTitle)
                 PasswordPurpose.REMOVE_LOCK -> { memoRepository.unlock(memo.localId, password); unlockedText.value = null }
             }
             passwordSession.set(password, remember)
@@ -112,13 +112,36 @@ class MemoDetailViewModel @AssistedInject constructor(
 
     fun requestLock() { askPassword.value = PasswordPurpose.LOCK }
     fun requestRemoveLock() { askPassword.value = PasswordPurpose.REMOVE_LOCK }
-    fun dismissPassword() { askPassword.value = null; passwordError.value = null }
+    fun dismissPassword() { askPassword.value = null; passwordError.value = null; pendingTitle = null }
 
     /** Lock using the remembered password without asking, when there is one. */
     fun lockNow() = viewModelScope.launch {
         val memo = state.value.memo ?: return@launch
         val pw = passwordSession.current() ?: run { requestLock(); return@launch }
-        memoRepository.lock(memo.localId, pw)
+        memoRepository.lock(memo.localId, pw, pendingTitle)
+    }
+
+    /** Locking asks first what, if anything, the memo should still be called; renaming asks again. */
+    enum class TitlePurpose { LOCK, RENAME }
+
+    val askTitle = MutableStateFlow<TitlePurpose?>(null)
+
+    /** The title chosen for a lock that is still waiting on its password. */
+    private var pendingTitle: String? = null
+
+    fun requestLockTitle() { askTitle.value = TitlePurpose.LOCK }
+    fun requestRename() { askTitle.value = TitlePurpose.RENAME }
+    fun dismissTitle() { askTitle.value = null }
+
+    fun submitTitle(title: String) {
+        val memo = state.value.memo ?: return
+        val purpose = askTitle.value ?: return
+        askTitle.value = null
+        val chosen = title.trim().takeIf { it.isNotEmpty() }
+        when (purpose) {
+            TitlePurpose.RENAME -> viewModelScope.launch { memoRepository.setLockedTitle(memo.localId, chosen) }
+            TitlePurpose.LOCK -> { pendingTitle = chosen; lockNow() }
+        }
     }
     @AssistedFactory
     interface Factory {

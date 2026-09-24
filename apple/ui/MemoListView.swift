@@ -75,9 +75,10 @@ struct RowMenu: View {
         }
         if memo.locked {
             Button("Show", systemImage: "eye") { Task { await model.reveal(memo.localId) } }
+            Button("Rename…", systemImage: "character.cursor.ibeam") { model.askToRename(memo.localId) }
             Button("Remove encryption", systemImage: "lock.open") { Task { await model.unlockForGood(memo.localId) } }
         } else {
-            Button("Encrypt", systemImage: "lock") { Task { await model.lock(memo.localId) } }
+            Button("Encrypt…", systemImage: "lock") { model.askToLock(memo.localId) }
         }
         Button(model.showArchived ? "Unarchive" : "Archive", systemImage: model.showArchived ? "tray.and.arrow.up" : "archivebox") {
             Task { await model.setArchived(memo.localId, !model.showArchived) }
@@ -137,7 +138,7 @@ struct MemoRowView: View {
             }
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(memo.locked ? "Locked memo" : memo.title)
+                    Text(memo.title)
                         .font(Type.rowTitle)
                         .foregroundStyle(Theme.ink)
                         .lineLimit(1)
@@ -148,13 +149,11 @@ struct MemoRowView: View {
                         .foregroundStyle(Theme.inkSoft.opacity(0.8))
                 }
 
-                if !memo.locked, !bodyPreview.isEmpty {
-                    Text(bodyPreview)
-                        .font(Type.rowBody)
+                if !memo.locked, !memo.bodyBelowTitle.isEmpty {
+                    // The memo as it reads, headings and lists and tasks, cut short. The title
+                    // line is already above, so it is left out rather than printed twice.
+                    MarkdownView(text: memo.bodyBelowTitle, lineLimit: 10, card: true)
                         .foregroundStyle(Theme.inkSoft)
-                        .lineSpacing(2.5)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -166,7 +165,7 @@ struct MemoRowView: View {
                                 .font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
                         }
                         Spacer(minLength: 0)
-                        MemoBadges(memo: memo)
+                        MemoBadges(memo: memo).layoutPriority(1)
                     }
                 }
             }
@@ -197,31 +196,6 @@ struct MemoRowView: View {
     private var hasBadges: Bool {
         memo.pinned || memo.locked || memo.hasTasks || memo.attachmentCount > 0
     }
-
-        /// The body without the line already used as the title, so the preview is not a repeat,
-    /// and without the Markdown markers, so a task list reads as its tasks rather than as
-    /// brackets. A preview is a taste of the text, not the text.
-    private var bodyPreview: String {
-        let lines = memo.body.components(separatedBy: "\n")
-        let remainder = lines.drop { $0.trimmingCharacters(in: .whitespaces).isEmpty }.dropFirst()
-        return remainder
-            .map(Self.plain)
-            .filter { !$0.isEmpty }
-            .joined(separator: " · ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private static let marker = try! NSRegularExpression(
-        pattern: "^\\s*(?:[-*+]\\s+(?:\\[[ xX]\\]\\s+)?|\\d+[.)]\\s+|>\\s+|#{1,6}\\s+)"
-    )
-    private static let emphasis = try! NSRegularExpression(pattern: "[*_`~]{1,3}")
-
-    private static func plain(_ line: String) -> String {
-        let all = { (s: String) in NSRange(location: 0, length: (s as NSString).length) }
-        var text = marker.stringByReplacingMatches(in: line, range: all(line), withTemplate: "")
-        text = emphasis.stringByReplacingMatches(in: text, range: all(text), withTemplate: "")
-        return text.replacingOccurrences(of: "#", with: "").trimmingCharacters(in: .whitespaces)
-    }
 }
 
 /// One memo as a single line: its title, the time it was written, and the badges that say
@@ -236,12 +210,6 @@ struct CompactMemoRowView: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            // The colour a card shows as a whole tint has to survive here as something, so it
-            // becomes the bar down the side. Without it a coloured memo is indistinguishable.
-            Rectangle()
-                .fill(Color.memoTint(memo.colourHex, isDark: scheme == .dark)?.opacity(0.9) ?? .clear)
-                .frame(width: 3)
-
             if memo.pinned {
                 Image(systemName: "pin.fill")
                     .font(.system(size: 10))
@@ -277,21 +245,28 @@ struct CompactMemoRowView: View {
                 .monospacedDigit()
                 .foregroundStyle(Theme.inkSoft.opacity(0.8))
         }
-        .padding(.trailing, 12)
+        .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .frame(height: 28)
+        // The memo's colour fills the row as it fills a card, so a tinted memo stays tinted
+        // whichever way the list is drawn. Selection and hover sit on top of it.
         .background(
             RoundedRectangle(cornerRadius: 6)
+                .fill(Color.memoTint(memo.colourHex, isDark: scheme == .dark) ?? .clear)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
                 .fill(selected ? Theme.accent.opacity(0.16) : (hovering ? Theme.ink.opacity(0.04) : .clear))
+                .allowsHitTesting(false)
         )
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
     }
 
-    /// A locked memo's body is ciphertext, so there is no title to be had from it.
+    /// A locked memo's title comes from the plain line beside its ciphertext, or is
+    /// “Locked memo” when it has none, so only a plain memo can be untitled.
     private var title: String {
-        if memo.locked { return "Locked memo" }
-        return memo.title.isEmpty ? "Untitled" : memo.title
+        memo.title.isEmpty ? "Untitled" : memo.title
     }
 }

@@ -32,8 +32,8 @@ private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:m
  */
 @Composable
 fun CompactMemoRow(memo: Memo, byModified: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    // A locked memo's body is ciphertext, so there is no title to pull out of it.
-    val title = if (memo.isLocked) null else MemoTitle.of(memo.displayContent)
+    // A locked memo's body is ciphertext; all it has is the title it was given in the clear.
+    val title = if (memo.isLocked) memo.lockedTitle else MemoTitle.of(memo.displayContent)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),

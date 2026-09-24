@@ -155,7 +155,7 @@ fun MemoEntity.toModel(attachments: List<Attachment> = emptyList()) = Memo(
     visibility = runCatching { Visibility.valueOf(visibility) }.getOrDefault(Visibility.PRIVATE),
     state = runCatching { MemoState.valueOf(state) }.getOrDefault(MemoState.NORMAL),
     pinned = pinned,
-    tags = if (tagsJoined.isEmpty()) emptyList() else tagsJoined.split(MemoEntity.TAG_SEPARATOR).filter { !ColourTag.isColourTag(it) },
+    tags = if (tagsJoined.isEmpty()) emptyList() else ColourTag.visible(tagsJoined.split(MemoEntity.TAG_SEPARATOR)),
     createTime = Instant.fromEpochMilliseconds(createTimeEpochMs),
     updateTime = Instant.fromEpochMilliseconds(updateTimeEpochMs),
     snippet = snippet,

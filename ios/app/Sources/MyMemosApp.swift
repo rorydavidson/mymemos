@@ -65,6 +65,10 @@ struct RootView: View {
             PasswordSheet(model: model, request: request)
                 .presentationDetents([.medium])
         }
+        .sheet(item: $model.titling) { request in
+            LockTitleSheet(model: model, request: request)
+                .presentationDetents([.medium])
+        }
         .sheet(item: Binding(
             get: { model.settingReminderFor.map(ReminderTarget.init) },
             set: { if $0 == nil { model.settingReminderFor = nil } }

@@ -75,14 +75,19 @@ struct AppCommands: Commands {
                 }
                 .keyboardShortcut("u", modifiers: [.command, .shift])
 
+                Button("Rename Locked Memo…") {
+                    guard let memo = model.selectedMemo else { return }
+                    model.askToRename(memo.localId)
+                }
+
                 Button("Remove Encryption") {
                     guard let memo = model.selectedMemo else { return }
                     Task { await model.unlockForGood(memo.localId) }
                 }
             } else {
-                Button("Encrypt") {
+                Button("Encrypt…") {
                     guard let memo = model.selectedMemo else { return }
-                    Task { await model.lock(memo.localId) }
+                    model.askToLock(memo.localId)
                 }
                 .keyboardShortcut("l", modifiers: [.command, .shift])
                 .disabled(model.selectedMemo == nil)

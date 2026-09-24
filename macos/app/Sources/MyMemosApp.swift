@@ -28,6 +28,9 @@ struct RootView: View {
         .sheet(item: $model.passwordRequest) { request in
             PasswordSheet(model: model, request: request)
         }
+        .sheet(item: $model.titling) { request in
+            LockTitleSheet(model: model, request: request)
+        }
         .sheet(item: Binding(
             get: { model.settingReminderFor.map(ReminderTarget.init) },
             set: { if $0 == nil { model.settingReminderFor = nil } }

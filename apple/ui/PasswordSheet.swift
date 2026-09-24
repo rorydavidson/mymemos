@@ -123,3 +123,97 @@ struct PasswordSheet: View {
         }
     }
 }
+
+/// Names a locked memo. The title is the one part of a locked memo left readable, on this
+/// device, on the server and in notifications, so the sheet says so and starts empty: nothing
+/// is shown in the clear unless it is typed here.
+///
+/// When encrypting with no password held yet, it asks for that too. Handing on to the
+/// password sheet instead would mean presenting one sheet as another is dismissed, which
+/// SwiftUI does not reliably do.
+struct LockTitleSheet: View {
+    @ObservedObject var model: SessionModel
+    let request: LockTitleRequest
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var title = ""
+    @State private var needsPassword = false
+    @State private var password = ""
+    @State private var remember = false
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 11) {
+                Image(systemName: request.renaming ? "character.cursor.ibeam" : "lock")
+                    .font(.system(size: 17))
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 36, height: 36)
+                    .background(Theme.accentSoft, in: RoundedRectangle(cornerRadius: 9))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(request.renaming ? "Rename locked memo" : "Encrypt this memo")
+                        .font(Type.heading3).foregroundStyle(Theme.ink)
+                    Text("A title is optional. Without one it shows as \u{201C}Locked memo\u{201D}.")
+                        .font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            TextField("Title (optional)", text: $title)
+                .textFieldStyle(.roundedBorder)
+                .font(Type.body)
+                .focused($focused)
+                .onSubmit { submit() }
+
+            if needsPassword {
+                SecureField("Memo password", text: $password)
+                    .textFieldStyle(.roundedBorder)
+                    .font(Type.body)
+                    .onSubmit { submit() }
+                Toggle("Remember on this device", isOn: $remember)
+                    .font(Type.rowBody)
+                    .help("Kept in the Keychain, so locked memos open without asking again.")
+            }
+
+            Label("The title is not encrypted. The server, search and notifications can all show it.",
+                  systemImage: "eye")
+                .font(Type.rowMeta)
+                .foregroundStyle(Theme.inkSoft)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(request.renaming ? "Save" : "Encrypt", action: submit)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(needsPassword && password.isEmpty)
+            }
+        }
+        .padding(22)
+        .sheetWidth(400)
+        .background(Theme.card)
+        .task {
+            title = request.current
+            needsPassword = !request.renaming && !model.hasPassword
+            focused = true
+        }
+    }
+
+    private func submit() {
+        guard !(needsPassword && password.isEmpty) else { return }
+        let chosen = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let request = request
+        let entered = needsPassword ? password : nil
+        let remember = remember
+        password = ""
+        dismiss()
+        Task {
+            if let entered { await model.usePassword(entered, remember: remember) }
+            if request.renaming {
+                await model.setLockedTitle(request.localId, chosen.isEmpty ? nil : chosen)
+            } else {
+                await model.lock(request.localId, title: chosen.isEmpty ? nil : chosen)
+            }
+        }
+    }
+}
