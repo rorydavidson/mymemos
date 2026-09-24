@@ -34,7 +34,8 @@ struct MarkdownView: View {
 
     private var bodyFont: Font { card ? Type.rowBody : Type.body }
 
-    private var blocks: [Block] { Block.parse(text, limit: lineLimit) }
+    // A card draws its tags as chips underneath, so a line of nothing but tags would say it twice.
+    private var blocks: [Block] { Block.parse(text, limit: lineLimit, skippingTagLines: card) }
 
     @ViewBuilder
     private func view(for block: Block) -> some View {
@@ -138,7 +139,7 @@ enum Block {
     case code(String)
     case rule
 
-    static func parse(_ text: String, limit: Int?) -> [Block] {
+    static func parse(_ text: String, limit: Int?, skippingTagLines: Bool = false) -> [Block] {
         var blocks: [Block] = []
         var lines = text.components(separatedBy: "\n")
         if let limit, lines.count > limit { lines = Array(lines.prefix(limit)) }
@@ -198,10 +199,27 @@ enum Block {
                 index += 1
                 continue
             }
+            if skippingTagLines, isTagLine(trimmed) {
+                index += 1
+                continue
+            }
             blocks.append(.paragraph(trimmed))
             index += 1
         }
         return blocks
+    }
+
+    /// The same tag pattern the shared code extracts tags with, so what is hidden here is
+    /// exactly what shows as a chip.
+    private static let tag = try! NSRegularExpression(pattern: "(?<![\\w/])#[\\p{L}\\p{N}_/\\-]+")
+
+    /// True for a line that is only tags, such as `#work #ideas`. A sentence that mentions a
+    /// tag keeps it, because taking the word out would change what the sentence says.
+    private static func isTagLine(_ line: String) -> Bool {
+        let range = NSRange(location: 0, length: (line as NSString).length)
+        guard tag.firstMatch(in: line, range: range) != nil else { return false }
+        return tag.stringByReplacingMatches(in: line, range: range, withTemplate: "")
+            .trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     private static func indentDepth(_ line: String) -> Int {
