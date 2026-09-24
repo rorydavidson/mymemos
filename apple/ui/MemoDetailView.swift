@@ -100,7 +100,7 @@ struct MemoDetailView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                Text(memo.locked ? "Locked memo" : memo.title)
+                Text(memo.title)
                     .font(Type.title)
                     .foregroundStyle(Theme.ink)
                     .textSelection(.enabled)
@@ -116,12 +116,15 @@ struct MemoDetailView: View {
                         Button("Show", systemImage: "eye") {
                             Task { await model.reveal(memo.localId) }
                         }
+                        Button("Rename…", systemImage: "character.cursor.ibeam") {
+                            model.askToRename(memo.localId)
+                        }
                         Button("Remove encryption", systemImage: "lock.open") {
                             Task { await model.unlockForGood(memo.localId) }
                         }
                     } else {
-                        Button("Encrypt", systemImage: "lock") {
-                            Task { await model.lock(memo.localId) }
+                        Button("Encrypt…", systemImage: "lock") {
+                            model.askToLock(memo.localId)
                         }
                     }
                     Divider()
@@ -237,7 +240,7 @@ struct MemoDetailView: View {
                         Button { model.open(back.localId) } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "arrow.turn.up.left").font(.system(size: 11)).foregroundStyle(Theme.inkSoft)
-                                Text(back.locked ? "Locked memo" : back.title)
+                                Text(back.title)
                                     .font(Type.rowBody).foregroundStyle(Theme.accent).lineLimit(1)
                             }
                         }
@@ -540,7 +543,7 @@ struct ReferencePicker: View {
                             }
                         } label: {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(row.locked ? "Locked memo" : row.title).font(Type.rowTitle).foregroundStyle(Theme.ink).lineLimit(1)
+                                Text(row.title).font(Type.rowTitle).foregroundStyle(Theme.ink).lineLimit(1)
                                 Text(row.dateLabel).font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
                             }
                             .padding(10)

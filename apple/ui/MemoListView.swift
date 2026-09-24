@@ -75,9 +75,10 @@ struct RowMenu: View {
         }
         if memo.locked {
             Button("Show", systemImage: "eye") { Task { await model.reveal(memo.localId) } }
+            Button("Rename…", systemImage: "character.cursor.ibeam") { model.askToRename(memo.localId) }
             Button("Remove encryption", systemImage: "lock.open") { Task { await model.unlockForGood(memo.localId) } }
         } else {
-            Button("Encrypt", systemImage: "lock") { Task { await model.lock(memo.localId) } }
+            Button("Encrypt…", systemImage: "lock") { model.askToLock(memo.localId) }
         }
         Button(model.showArchived ? "Unarchive" : "Archive", systemImage: model.showArchived ? "tray.and.arrow.up" : "archivebox") {
             Task { await model.setArchived(memo.localId, !model.showArchived) }
@@ -137,7 +138,7 @@ struct MemoRowView: View {
             }
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(memo.locked ? "Locked memo" : memo.title)
+                    Text(memo.title)
                         .font(Type.rowTitle)
                         .foregroundStyle(Theme.ink)
                         .lineLimit(1)
@@ -263,9 +264,9 @@ struct CompactMemoRowView: View {
         .onHover { hovering = $0 }
     }
 
-    /// A locked memo's body is ciphertext, so there is no title to be had from it.
+    /// A locked memo's title comes from the plain line beside its ciphertext, or is
+    /// “Locked memo” when it has none, so only a plain memo can be untitled.
     private var title: String {
-        if memo.locked { return "Locked memo" }
-        return memo.title.isEmpty ? "Untitled" : memo.title
+        memo.title.isEmpty ? "Untitled" : memo.title
     }
 }

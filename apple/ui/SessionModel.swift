@@ -36,6 +36,7 @@ final class SessionModel: ObservableObject {
     /// just being remembered. Without this, asking and acting were two unconnected steps and
     /// anything that was not a reveal quietly did nothing.
     @Published var passwordRequest: PasswordRequest?
+    @Published var titling: LockTitleRequest?
     @Published var wrongPassword = false
     /// Revealed text for locked memos, by localId. Display only: nothing stored changes.
     @Published var revealed: [String: String] = [:]
@@ -269,6 +270,7 @@ final class SessionModel: ObservableObject {
     // MARK: locked memos
 
     var passwordRemembered: Bool { session.passwordRemembered }
+    var hasPassword: Bool { session.hasPassword }
 
     /// Takes the password, then carries out whatever was waiting on it.
     func usePassword(_ password: String, remember: Bool) async {
@@ -277,7 +279,7 @@ final class SessionModel: ObservableObject {
         let pending = passwordRequest
         passwordRequest = nil
         switch pending?.purpose {
-        case .encrypt: await lock(pending!.localId, asking: false)
+        case .encrypt: await lock(pending!.localId, title: pending!.title, asking: false)
         case .removeEncryption: await unlockForGood(pending!.localId, asking: false)
         case .reveal, .none: await revealAll()
         }
@@ -324,13 +326,28 @@ final class SessionModel: ObservableObject {
         await sync()
     }
 
-    func lock(_ localId: String, asking: Bool = true) async {
-        guard (try? await session.lock(localId: localId)) == true else {
+    /// Encrypting starts by asking what, if anything, the memo should still be called.
+    func askToLock(_ localId: String) {
+        titling = LockTitleRequest(localId: localId, renaming: false, current: "")
+    }
+
+    func askToRename(_ localId: String) {
+        titling = LockTitleRequest(localId: localId, renaming: true, current: memo(localId)?.lockedTitle ?? "")
+    }
+
+    func lock(_ localId: String, title: String? = nil, asking: Bool = true) async {
+        guard (try? await session.lock(localId: localId, title: title)) == true else {
             wrongPassword = !asking
-            passwordRequest = PasswordRequest(localId: localId, purpose: .encrypt)
+            passwordRequest = PasswordRequest(localId: localId, purpose: .encrypt, title: title)
             return
         }
         revealed.removeValue(forKey: localId)
+        await reload()
+        await sync()
+    }
+
+    func setLockedTitle(_ localId: String, _ title: String?) async {
+        try? await session.setLockedTitle(localId: localId, title: title)
         await reload()
         await sync()
     }
@@ -375,7 +392,7 @@ final class SessionModel: ObservableObject {
     /// Deletes, and offers Undo for a memo the server had, since that one waits a few seconds
     /// before it is sent. One that never synced is gone at once and Undo is not offered.
     func delete(_ localId: String) async {
-        let title = memo(localId).map { $0.locked ? "Locked memo" : $0.title } ?? "Memo"
+        let title = memo(localId).map { $0.title } ?? "Memo"
         let canUndo = ((try? await session.delete(localId: localId)) as? Bool) ?? false
         if selection == localId { selection = nil }
         undoable = canUndo ? Undoable(localId: localId, kind: .deleted, title: title) : nil

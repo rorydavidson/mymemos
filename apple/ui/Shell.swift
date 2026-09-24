@@ -16,8 +16,19 @@ struct PasswordRequest: Identifiable {
 
     let localId: String
     let purpose: Purpose
+    /// For encrypting: the title to leave readable once the password arrives.
+    var title: String? = nil
 
     var id: String { "\(localId)-\(purpose)" }
+}
+
+/// A locked memo's readable title being chosen, as it is encrypted or afterwards.
+struct LockTitleRequest: Identifiable {
+    let localId: String
+    let renaming: Bool
+    let current: String
+
+    var id: String { "\(localId)-title" }
 }
 
 /// A memo the menu bar asked to set a reminder on.

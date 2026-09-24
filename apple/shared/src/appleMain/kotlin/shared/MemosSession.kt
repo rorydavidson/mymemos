@@ -489,12 +489,21 @@ class MemosSession {
         }
     }
 
-    /** Locks a memo that is currently in the clear. */
+    /**
+     * Locks a memo that is currently in the clear. [title] stays readable beside the
+     * encrypted text; null or blank leaves nothing readable.
+     */
     @Throws(Throwable::class)
-    suspend fun lock(localId: String): Boolean {
+    suspend fun lock(localId: String, title: String?): Boolean {
         val password = passwords.current() ?: return false
-        memos.lock(localId, password)
+        memos.lock(localId, password, title)
         return true
+    }
+
+    /** Renames a locked memo. Its title is plain text, so this needs no password. */
+    @Throws(Throwable::class)
+    suspend fun setLockedTitle(localId: String, title: String?) {
+        memos.setLockedTitle(localId, title)
     }
 
     // MARK: writing
@@ -602,9 +611,7 @@ class MemosSession {
                     id = reminder.id,
                     memoRemoteName = reminder.memoRemoteName,
                     memoLocalId = memo?.localId.orEmpty(),
-                    memoTitle = memo?.let { m ->
-                        if (m.isLocked) "Locked memo" else MemoTitle.of(m.displayContent) ?: m.firstLine()
-                    }.orEmpty(),
+                    memoTitle = memo?.listTitle().orEmpty(),
                     note = reminder.note,
                     atEpochMs = reminder.atEpochMs,
                     whenLabel = Instant.fromEpochMilliseconds(reminder.atEpochMs).friendlyWithTime(zone),
@@ -1016,7 +1023,7 @@ class MemosSession {
             FailedOpRow(
                 id = op.id,
                 memoLocalId = op.memoLocalId,
-                memoTitle = memo?.let { m -> if (m.isLocked) "Locked memo" else MemoTitle.of(m.displayContent) ?: m.firstLine() }.orEmpty(),
+                memoTitle = memo?.listTitle().orEmpty(),
                 type = op.type.lowercase().replace('_', ' '),
                 error = op.error.orEmpty(),
                 attempts = op.attempts,
@@ -1428,7 +1435,8 @@ class MemosSession {
 
     private fun Memo.toRow(): MemoRow = MemoRow(
         localId = localId,
-        title = MemoTitle.of(displayContent) ?: firstLine(),
+        title = listTitle(),
+        lockedTitle = lockedTitle,
         body = if (isLocked) "" else displayContent,
         bodyBelowTitle = if (isLocked) "" else MemoTitle.withoutTitleLine(displayContent),
         tags = tags,
@@ -1441,6 +1449,10 @@ class MemosSession {
         timeLabel = createTime.timeOfDay(),
         dateLabel = createTime.friendly(),
     )
+
+    /** What a list calls this memo. A locked one shows only the title it was given in the clear. */
+    private fun Memo.listTitle(): String =
+        if (isLocked) lockedTitle ?: "Locked memo" else MemoTitle.of(displayContent) ?: firstLine()
 
     /** A memo with no heading still needs something to show in a list. */
     private fun Memo.firstLine(): String =
@@ -1587,7 +1599,10 @@ data class Reveal(val text: String?, val needsPassword: Boolean, val wrongPasswo
 /** One row on screen. A plain class so Swift sees plain properties. */
 data class MemoRow(
     val localId: String,
+    /** For a locked memo, its plain-text title, or "Locked memo" if it has none. */
     val title: String,
+    /** The title a locked memo carries in the clear, null if none or not locked. */
+    val lockedTitle: String?,
     val body: String,
     /** [body] without the line [title] came from, which is what a card shows under it. */
     val bodyBelowTitle: String,
