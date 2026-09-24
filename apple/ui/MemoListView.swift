@@ -164,7 +164,7 @@ struct MemoRowView: View {
                                 .font(Type.rowMeta).foregroundStyle(Theme.inkSoft)
                         }
                         Spacer(minLength: 0)
-                        MemoBadges(memo: memo)
+                        MemoBadges(memo: memo).layoutPriority(1)
                     }
                 }
             }

@@ -15,6 +15,10 @@ struct TagChip: View {
             if let emoji = style?.emoji, !emoji.isEmpty { Text(emoji) }
             Text("#\(tag)")
         }
+        // A tag is one word, so it never breaks across lines; if there is truly no room it
+        // loses its middle rather than its ending, which is usually what tells tags apart.
+        .lineLimit(1)
+        .truncationMode(.middle)
         .font(Type.rowMeta)
         .foregroundStyle(selected ? Theme.card : Theme.onAccentSoft)
         .padding(.horizontal, 8)

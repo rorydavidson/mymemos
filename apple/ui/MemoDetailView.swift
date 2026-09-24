@@ -423,16 +423,72 @@ struct MemoDetailView: View {
     }
 }
 
-/// Tags wrap rather than scroll, because a memo can carry a lot of them.
+/// Tags run on to the next line rather than scroll, because a memo can carry a lot of them.
+/// Each chip keeps its own width: a fixed grid cut long tags down until they wrapped.
 struct FlowTags: View {
     let tags: [String]
     var styles: [String: TagStyleRow] = [:]
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 60, maximum: 200), spacing: 6, alignment: .leading)],
-                  alignment: .leading, spacing: 6) {
+        FlowLayout(spacing: 6) {
             ForEach(tags, id: \.self) { TagChip(tag: $0, style: styles[$0]) }
         }
+    }
+}
+
+/// Lays its children out left to right at their natural width, starting a new line when the
+/// next one would not fit. A child wider than the whole line is given the line and truncates.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = arrange(subviews, width: proposal.width ?? .infinity)
+        let height = rows.last.map { $0.y + $0.height } ?? 0
+        let width = rows.flatMap(\.frames).map(\.maxX).max() ?? 0
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for row in arrange(subviews, width: bounds.width) {
+            for (index, frame) in zip(row.indices, row.frames) {
+                subviews[index].place(
+                    at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
+                    proposal: ProposedViewSize(frame.size)
+                )
+            }
+        }
+    }
+
+    private struct Row {
+        var indices: [Int] = []
+        var frames: [CGRect] = []
+        var y: CGFloat = 0
+        var height: CGFloat = 0
+    }
+
+    private func arrange(_ subviews: Subviews, width: CGFloat) -> [Row] {
+        var rows: [Row] = []
+        var current = Row()
+        var x: CGFloat = 0
+
+        for index in subviews.indices {
+            var size = subviews[index].sizeThatFits(.unspecified)
+            if size.width > width {
+                size = subviews[index].sizeThatFits(ProposedViewSize(width: width, height: nil))
+            }
+            if !current.indices.isEmpty, x + size.width > width {
+                let next = current.y + current.height + spacing
+                rows.append(current)
+                current = Row(y: next)
+                x = 0
+            }
+            current.indices.append(index)
+            current.frames.append(CGRect(x: x, y: current.y, width: size.width, height: size.height))
+            current.height = max(current.height, size.height)
+            x += size.width + spacing
+        }
+        if !current.indices.isEmpty { rows.append(current) }
+        return rows
     }
 }
 
