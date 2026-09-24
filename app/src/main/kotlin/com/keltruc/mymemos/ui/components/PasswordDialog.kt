@@ -65,3 +65,37 @@ fun MemoPasswordDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
+
+/**
+ * Names a locked memo, as it is locked or afterwards. Starts empty when locking so nothing is
+ * left readable unless it is typed, and says plainly that the title is not encrypted.
+ */
+@Composable
+fun LockTitleDialog(
+    renaming: Boolean,
+    initial: String,
+    onConfirm: (title: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var title by remember { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(if (renaming) R.string.rename_locked else R.string.lock)) },
+        text = {
+            Column {
+                Text(stringResource(R.string.lock_title_hint), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 12.dp))
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text(stringResource(R.string.lock_title_label)) },
+                    singleLine = true,
+                    supportingText = { Text(stringResource(R.string.lock_title_warning)) },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { onConfirm(title) }) { Text(stringResource(if (renaming) R.string.save else R.string.lock)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
+}

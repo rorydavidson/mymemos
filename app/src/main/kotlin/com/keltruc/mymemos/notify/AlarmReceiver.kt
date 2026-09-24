@@ -61,7 +61,7 @@ class AlarmReceiver : BroadcastReceiver() {
         val localId = entry.memos().ensureLocal(account, reminder.memoRemoteName)
         val memo = localId?.let { entry.memos().observeMemoOnce(it) }
         val text = reminder.note.ifEmpty {
-            memo?.let { m -> if (m.isLocked) context.getString(R.string.locked_memo) else m.displayContent.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty() }.orEmpty()
+            memo?.let { m -> if (m.isLocked) m.lockedTitle ?: context.getString(R.string.locked_memo) else m.displayContent.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty() }.orEmpty()
         }
         entry.notifier().post(Notifier.Channel.REMINDERS, id.hashCode(), context.getString(R.string.reminder_notification_title), text, localId)
         // One-off: drop it from the config so other devices stop showing it too.

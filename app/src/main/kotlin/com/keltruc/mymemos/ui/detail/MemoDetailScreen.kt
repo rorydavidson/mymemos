@@ -88,6 +88,7 @@ import com.keltruc.mymemos.ui.components.DateTimePickerDialog
 import com.keltruc.mymemos.ui.components.tint
 import com.keltruc.mymemos.ui.components.MapPreview
 import com.keltruc.mymemos.ui.components.MemoContent
+import com.keltruc.mymemos.ui.components.LockTitleDialog
 import com.keltruc.mymemos.ui.components.MemoPasswordDialog
 import com.keltruc.mymemos.ui.format.atZone
 import java.time.ZoneId
@@ -111,6 +112,7 @@ fun MemoDetailScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val unlockedText by viewModel.unlockedText.collectAsStateWithLifecycle()
     val askPassword by viewModel.askPassword.collectAsStateWithLifecycle()
+    val askTitle by viewModel.askTitle.collectAsStateWithLifecycle()
     val passwordError by viewModel.passwordError.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -193,8 +195,15 @@ fun MemoDetailScreen(
                         DropdownMenuItem(
                             text = { Text(stringResource(if (m.isLocked) R.string.unlock else R.string.lock)) },
                             leadingIcon = { Icon(if (m.isLocked) Icons.Default.LockOpen else Icons.Default.Lock, null) },
-                            onClick = { overflow = false; if (m.isLocked) viewModel.requestRemoveLock() else viewModel.lockNow() },
+                            onClick = { overflow = false; if (m.isLocked) viewModel.requestRemoveLock() else viewModel.requestLockTitle() },
                         )
+                        if (m.isLocked) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.rename_locked)) },
+                                leadingIcon = { Icon(Icons.Default.Edit, null) },
+                                onClick = { overflow = false; viewModel.requestRename() },
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.colour)) },
                             leadingIcon = { Icon(Icons.Default.Palette, null) },
@@ -247,7 +256,7 @@ fun MemoDetailScreen(
                     Column(Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Icon(Icons.Default.Lock, null, tint = MaterialTheme.colorScheme.primary)
-                            Text(stringResource(R.string.locked_memo), style = MaterialTheme.typography.titleMedium)
+                            Text(m.lockedTitle ?: stringResource(R.string.locked_memo), style = MaterialTheme.typography.titleMedium)
                         }
                         Text(stringResource(R.string.locked_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
                         TextButton(onClick = { viewModel.askPassword.value = MemoDetailViewModel.PasswordPurpose.UNLOCK_VIEW }) { Text(stringResource(R.string.unlock_button)) }
@@ -408,6 +417,15 @@ fun MemoDetailScreen(
             initialRemember = viewModel.passwordRemembered,
             onConfirm = viewModel::submitPassword,
             onDismiss = viewModel::dismissPassword,
+        )
+    }
+
+    askTitle?.let { purpose ->
+        LockTitleDialog(
+            renaming = purpose == MemoDetailViewModel.TitlePurpose.RENAME,
+            initial = if (purpose == MemoDetailViewModel.TitlePurpose.RENAME) state.memo?.lockedTitle.orEmpty() else "",
+            onConfirm = viewModel::submitTitle,
+            onDismiss = viewModel::dismissTitle,
         )
     }
 

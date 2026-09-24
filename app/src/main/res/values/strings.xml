@@ -208,6 +208,10 @@
     <string name="lock">Lock with password</string>
     <string name="unlock">Remove lock</string>
     <string name="locked_memo">Locked memo</string>
+    <string name="rename_locked">Rename</string>
+    <string name="lock_title_label">Title (optional)</string>
+    <string name="lock_title_hint">Without a title it shows as “Locked memo”.</string>
+    <string name="lock_title_warning">Not encrypted. The server, search and notifications can show it.</string>
     <string name="locked_hint">Encrypted on this device. The server only stores the scrambled text.</string>
     <string name="memo_password">Memo password</string>
     <string name="memo_password_hint">One password unlocks all your locked memos. It is never sent to the server and cannot be recovered.</string>

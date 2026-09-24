@@ -76,7 +76,7 @@ class RecentWidget : GlanceAppWidget() {
                                     ),
                                 ) {
                                     Text(
-                                        (if (memo.pinned) "📌 " else "") + if (memo.isLocked) context.getString(R.string.locked_memo) else memo.displayContent.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty(),
+                                        (if (memo.pinned) "📌 " else "") + if (memo.isLocked) memo.lockedTitle ?: context.getString(R.string.locked_memo) else memo.displayContent.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty(),
                                         maxLines = 2,
                                         style = TextStyle(fontSize = 14.sp, color = GlanceTheme.colors.onSurface),
                                     )

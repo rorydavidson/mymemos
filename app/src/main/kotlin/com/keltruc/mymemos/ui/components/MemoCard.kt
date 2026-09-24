@@ -88,7 +88,7 @@ fun MemoCard(
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Column {
-                            Text(stringResource(R.string.locked_memo), style = MaterialTheme.typography.titleSmall)
+                            Text(memo.lockedTitle ?: stringResource(R.string.locked_memo), style = MaterialTheme.typography.titleSmall)
                             Text(stringResource(R.string.locked_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
