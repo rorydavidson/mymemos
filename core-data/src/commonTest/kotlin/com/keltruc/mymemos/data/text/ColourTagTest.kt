@@ -33,4 +33,14 @@ class ColourTagTest {
         assertNull(ColourTag.extract(text))
         assertEquals(text, ColourTag.strip(text))
     }
+
+    @Test
+    fun `the parent tag the server adds goes with the colour`() {
+        assertEquals(listOf("session"), ColourTag.visible(listOf("session", "colour", "colour/lime")))
+    }
+
+    @Test
+    fun `a bare colour tag with no tint beside it stays`() {
+        assertEquals(listOf("colour", "paint"), ColourTag.visible(listOf("colour", "paint")))
+    }
 }

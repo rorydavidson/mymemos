@@ -91,7 +91,7 @@ class MemoRepository constructor(
 
     fun observeTags(accountId: Long): Flow<List<String>> =
         memoDao.observeTagStrings(accountId).map { joined ->
-            joined.flatMap { it.split(MemoEntity.TAG_SEPARATOR) }.filter { it.isNotEmpty() && !ColourTag.isColourTag(it) }
+            joined.flatMap { ColourTag.visible(it.split(MemoEntity.TAG_SEPARATOR)) }.filter { it.isNotEmpty() }
                 .groupingBy { it }.eachCount()
                 .entries.sortedByDescending { it.value }.map { it.key }
         }

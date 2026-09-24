@@ -22,4 +22,14 @@ object ColourTag {
     }
 
     fun isColourTag(tag: String): Boolean = tag.startsWith(PREFIX)
+
+    /**
+     * One memo's tags without the colour. The server reports a nested tag's parents too, so
+     * `#colour/yellow` arrives as both `colour/yellow` and `colour`. The bare `colour` only
+     * goes when a `colour/x` sits beside it, so a memo genuinely tagged `#colour` keeps it.
+     */
+    fun visible(tags: List<String>): List<String> {
+        val tinted = tags.any(::isColourTag)
+        return tags.filter { !isColourTag(it) && !(tinted && it == PREFIX.trimEnd('/')) }
+    }
 }

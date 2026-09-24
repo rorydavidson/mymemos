@@ -1100,8 +1100,8 @@ class MemosSession {
     suspend fun tagCounts(): List<TagCount> {
         val account = db.accountDao().getActive() ?: return emptyList()
         return db.memoDao().observeTagStrings(account.id).first()
-            .flatMap { it.split(com.keltruc.mymemos.database.entity.MemoEntity.TAG_SEPARATOR) }
-            .filter { it.isNotEmpty() && !com.keltruc.mymemos.data.text.ColourTag.isColourTag(it) }
+            .flatMap { com.keltruc.mymemos.data.text.ColourTag.visible(it.split(com.keltruc.mymemos.database.entity.MemoEntity.TAG_SEPARATOR)) }
+            .filter { it.isNotEmpty() }
             .groupingBy { it }.eachCount()
             .entries.sortedByDescending { it.value }
             .map { TagCount(it.key, it.value) }
