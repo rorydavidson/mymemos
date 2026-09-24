@@ -481,11 +481,21 @@ class MemoRepository constructor(
 
     // ---- end-to-end encryption ---------------------------------------------------------
 
-    /** Replaces the memo text with its encrypted form. The server only ever sees the blob. */
-    suspend fun lock(localId: String, password: CharArray) {
+    /**
+     * Replaces the memo text with its encrypted form. The server sees the blob and, if one is
+     * given, [title] in the clear; a blank title leaves nothing readable.
+     */
+    suspend fun lock(localId: String, password: CharArray, title: String? = null) {
         val memo = memoDao.getByLocalId(localId) ?: return
         if (MemoCipher.isEncrypted(memo.content)) return
-        updateContent(localId, MemoCipher.encrypt(memo.content, password))
+        updateContent(localId, MemoCipher.withTitle(MemoCipher.encrypt(memo.content, password), title))
+    }
+
+    /** Renames a locked memo. The title is plain text, so no password is needed. */
+    suspend fun setLockedTitle(localId: String, title: String?) {
+        val memo = memoDao.getByLocalId(localId) ?: return
+        if (!MemoCipher.isEncrypted(memo.content)) return
+        updateContent(localId, MemoCipher.withTitle(memo.content, title))
     }
 
     /** Stores the plain text again. Throws [MemoCipher.WrongPassword] if the password is wrong. */
@@ -496,15 +506,17 @@ class MemoRepository constructor(
     }
 
     /** Edits a locked memo: the new plain text is encrypted before it is stored. */
-    suspend fun updateLockedContent(localId: String, plain: String, password: CharArray) =
-        updateContent(localId, MemoCipher.encrypt(plain, password))
+    suspend fun updateLockedContent(localId: String, plain: String, password: CharArray) {
+        val title = memoDao.getByLocalId(localId)?.content?.let(Memo::lockedTitleOf)
+        updateContent(localId, MemoCipher.withTitle(MemoCipher.encrypt(plain, password), title))
+    }
 
     fun decrypt(memo: Memo, password: CharArray): String = MemoCipher.decrypt(memo.content, password)
 
     /**
      * Sets the tint. For plain memos it rides along as a `#colour/x` tag line so other
-     * devices pick it up; locked memos keep it on this device only, since nothing readable
-     * can sit next to the ciphertext.
+     * devices pick it up; locked memos keep it on this device only, since the only thing
+     * allowed in the clear beside the ciphertext is a title the user chose to show.
      */
     suspend fun setColour(localId: String, colour: NoteColour?) {
         val memo = memoDao.getByLocalId(localId) ?: return

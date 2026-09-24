@@ -27,6 +27,17 @@ object MemoCipher {
         return PREFIX + Base64.Default.encode(salt + nonce + body)
     }
 
+    /**
+     * The locked text with [title] beside it in the clear, or with no title if it is blank.
+     * Whatever followed the blob before is replaced. See [com.keltruc.mymemos.model.Memo.lockedTitleOf].
+     */
+    fun withTitle(content: String, title: String?): String {
+        val blob = content.trim().lineSequence().first()
+        // One line, and no leading hashes, so it reads back as exactly one heading.
+        val clean = title?.lineSequence()?.joinToString(" ") { it.trim() }?.trimStart('#')?.trim().orEmpty()
+        return if (clean.isEmpty()) blob else "$blob\n\n# $clean"
+    }
+
     fun decrypt(content: String, password: CharArray): String {
         val blob = runCatching {
             Base64.Default.decode(content.trim().lineSequence().first().removePrefix(PREFIX))
