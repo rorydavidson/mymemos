@@ -1,0 +1,25 @@
+{
+  "name": "mymemos-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "core": "cd ../.. && ./gradlew :web-core:jsBrowserProductionLibraryDistribution -q",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@js-joda/core": "3.2.0",
+    "@js-joda/timezone": "2.22.0",
+    "commonmark": "0.31.2",
+    "mymemos-web-core": "file:../core/build/dist/js/productionLibrary",
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@types/commonmark": "0.27.10",
+    "typescript": "5.9.3",
+    "vite": "7.3.6"
+  }
+}

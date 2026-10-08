@@ -20,3 +20,7 @@ ios/app/Info.plist
 ios/share/Info.plist
 ios/widget/Info.plist
 ios/app/MyMemos.entitlements
+
+# Web client
+web/app/node_modules/
+web/app/dist/
