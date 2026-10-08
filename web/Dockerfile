@@ -20,7 +20,7 @@ RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew --no-daemon -PwebOnly :web-core:jsBrowserProductionLibraryDistribution
 
 # ---- 2. The UI ---------------------------------------------------------------------------
-FROM node:22-alpine AS app
+FROM node:26-alpine AS app
 WORKDIR /src/web/app
 COPY --from=core /src/web/core/build/dist/js/productionLibrary /src/web/core/build/dist/js/productionLibrary
 COPY web/app/package.json web/app/package-lock.json ./
