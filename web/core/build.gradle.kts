@@ -51,8 +51,10 @@ val sharedTests = listOf(
 kotlin {
     js {
         browser { testTask { enabled = false } }
-        // Tests run under Node, which has WebCrypto and fetch but no IndexedDB.
-        nodejs()
+        // Tests run under Node, which has WebCrypto and fetch but no IndexedDB. Mocha's 2s
+        // default is too short on a cold CI runner for the first test that touches a time
+        // zone, since that loads the whole js-joda zone database.
+        nodejs { testTask { useMocha { timeout = "30s" } } }
         binaries.library()
         generateTypeScriptDefinitions()
         useEsModules()
