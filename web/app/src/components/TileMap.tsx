@@ -12,7 +12,8 @@ export interface MapPoint {
  * A map drawn from OpenStreetMap tiles with nothing but image tags: fit to the points, one
  * zoom level, no panning. Enough for "where was this written" and a day's route, and no
  * map library to ship. Only rendered when the reader has turned map tiles on, since the
- * tiles reveal roughly where a memo was written to tile.openstreetmap.org.
+ * tiles reveal roughly where a memo was written, and this app's address, to
+ * tile.openstreetmap.org.
  */
 export function TileMap(props: { points: MapPoint[]; height?: number; route?: boolean; onOpen?: () => void }) {
   const box = useRef<HTMLDivElement>(null)
@@ -55,7 +56,9 @@ export function TileMap(props: { points: MapPoint[]; height?: number; route?: bo
             class="tile"
             alt=""
             loading="lazy"
-            referrerpolicy="no-referrer"
+            // OSM's tile policy refuses browser requests with no Referer. The origin alone is
+            // enough for them and says nothing about which memo is open.
+            referrerpolicy="origin"
             src={`https://tile.openstreetmap.org/${zoom}/${((t.x % n) + n) % n}/${t.y}.png`}
             style={{ left: t.x * 256 - left, top: t.y * 256 - top }}
           />
