@@ -75,9 +75,9 @@ this file needs on top:
   builds without an Android SDK.
 - **Verified** against `neosmemo/memos:0.30.0` in Docker, through the dev server and through
   the built container under its CSP: sign-in mints and names a token, create, tick, lock,
-  unlock, export, backup and restore, and a three-way merge with a concurrent server edit.
+  unlock, export, backup and restore, an attachment, and a three-way merge with a concurrent server edit.
   Not verified: a real iPhone home-screen install, the service worker (it only registers on
-  HTTPS), Web Notifications, and attachments.
+  HTTPS) and Web Notifications. Attachments upload, attach to the memo and read back.
 
 ## The iOS client
 
