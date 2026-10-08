@@ -24,3 +24,4 @@ ios/app/MyMemos.entitlements
 # Web client
 web/app/node_modules/
 web/app/dist/
+web/docker-compose.yml
