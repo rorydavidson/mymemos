@@ -71,8 +71,16 @@ function Accounts() {
       true,
     )
     if (!ok) return
-    const done = await attempt(() => session.signOut(), 'Could not sign out')
-    if (done === undefined) return
+    const revoked = await attempt(() => session.signOut(), 'Could not sign out')
+    if (revoked === undefined) return
+    if (!revoked) {
+      // Said in a dialog rather than a toast: the page may reload straight after.
+      await confirmDialog(
+        'Token still active',
+        'The server could not be reached, so the access token this browser made is still valid. Revoke it in Memos under Settings, Access tokens. It is named after this browser.',
+        'OK',
+      )
+    }
     refresh()
     if (session.accounts().length === 0) location.reload()
     else go('memos')

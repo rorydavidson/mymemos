@@ -1,6 +1,6 @@
 import { Parser, type Node } from 'commonmark'
 import type { ComponentChildren, JSX } from 'preact'
-import { useMemo } from 'preact/hooks'
+import { useMemo, useState } from 'preact/hooks'
 
 /**
  * CommonMark as the apps render it. commonmark.js is the reference parser for the spec the
@@ -95,7 +95,7 @@ function render(node: Node, ctx: Ctx, key: number): ComponentChildren {
       const dest = node.destination ?? ''
       const alt = textOf(node)
       if (!/^https?:/i.test(dest)) return <>{alt}</>
-      return <img key={key} src={dest} alt={alt} loading="lazy" referrerpolicy="no-referrer" />
+      return <RemoteImage key={key} src={dest} alt={alt} />
     }
     case 'list': {
       const items = children(node, ctx)
@@ -260,4 +260,51 @@ function textOf(node: Node): string {
   const w = node.walker()
   for (let e = w.next(); e; e = w.next()) if (e.entering && e.node.literal) s += e.node.literal
   return s
+}
+
+const REMOTE_IMAGES_KEY = 'mymemos.remoteImages'
+
+/** Whether images linked from memo text load by themselves. Off unless the reader says so. */
+export function remoteImagesAllowed(): boolean {
+  try {
+    return localStorage.getItem(REMOTE_IMAGES_KEY) === 'always'
+  } catch {
+    return false
+  }
+}
+
+export function setRemoteImagesAllowed(allowed: boolean): void {
+  try {
+    if (allowed) localStorage.setItem(REMOTE_IMAGES_KEY, 'always')
+    else localStorage.removeItem(REMOTE_IMAGES_KEY)
+  } catch {
+    // Storage refused: images stay click-to-load, the safe side.
+  }
+}
+
+/**
+ * An image from another site, which by default waits for a click: loading it tells that site
+ * your address and when you read the memo, and memos can come from other people.
+ */
+function RemoteImage(props: { src: string; alt: string }) {
+  const [shown, setShown] = useState(remoteImagesAllowed())
+  if (shown) return <img src={props.src} alt={props.alt} loading="lazy" referrerpolicy="no-referrer" />
+  let host = props.src
+  try {
+    host = new URL(props.src).host
+  } catch {
+    // Unparseable: show the whole address.
+  }
+  return (
+    <button
+      class="chip"
+      title={props.src}
+      onClick={(e) => {
+        e.stopPropagation()
+        setShown(true)
+      }}
+    >
+      Show image{props.alt ? ` “${props.alt}”` : ''} from {host}
+    </button>
+  )
 }

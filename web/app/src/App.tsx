@@ -87,7 +87,8 @@ function Shell() {
     return () => removeEventListener('keydown', key)
   }, [route.view, composing])
 
-  const ViewComponent = views[route.view] ?? MemosView
+  // Own properties only: `#/constructor` must not resolve to something on Object's prototype.
+  const ViewComponent = Object.hasOwn(views, route.view) ? views[route.view] : MemosView
   const hasDetail = !!route.memo
   const layout = hasDetail ? 'has-detail' : 'no-detail'
 
