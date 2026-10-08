@@ -9,6 +9,8 @@ kotlin {
     macosArm64()
     iosArm64()
     iosSimulatorArm64()
+    // For the web client in web/core.
+    js { browser(); nodejs() }
 
     sourceSets {
         commonMain.dependencies {

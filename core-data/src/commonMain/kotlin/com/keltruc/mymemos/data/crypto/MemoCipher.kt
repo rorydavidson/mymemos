@@ -13,7 +13,8 @@ import kotlin.io.encoding.Base64
  */
 object MemoCipher {
     const val PREFIX = "mymemos-enc:v1:"
-    private const val ITERATIONS = 120_000
+    // Internal rather than private so the web client's WebCrypto path derives the same key.
+    internal const val ITERATIONS = 120_000
 
     class WrongPassword : Exception("Wrong password")
 
