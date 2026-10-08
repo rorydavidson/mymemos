@@ -1,6 +1,9 @@
 # Memos and the MyMemos web client side by side. Copy to docker-compose.yml, then:
 #
-#   docker compose up -d --build
+#   docker compose pull && docker compose up -d
+#
+# The web client is the image CI publishes on every merge to main. To run unreleased changes
+# instead, swap its `image:` line for the commented `build:` block and add --build.
 #
 # Memos' own UI is on :5230 and MyMemos on :8080. Put both behind your HTTPS reverse proxy:
 # the web client's locking uses WebCrypto and its offline cache uses a service worker, and
@@ -16,9 +19,10 @@ services:
       - "5230:5230"
 
   mymemos-web:
-    build:
-      context: ..
-      dockerfile: web/Dockerfile
+    image: ghcr.io/rorydavidson/mymemos-web:latest
+    # build:
+    #   context: ..
+    #   dockerfile: web/Dockerfile
     restart: unless-stopped
     depends_on:
       - memos

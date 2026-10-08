@@ -10,8 +10,12 @@ changes when the server can be reached.
 Copy `docker-compose.example.yml` to `docker-compose.yml`, adjust it, then from this folder:
 
 ```bash
-docker compose up -d --build
+docker compose pull && docker compose up -d
 ```
+
+That uses `ghcr.io/rorydavidson/mymemos-web:latest`, which CI publishes on every merge to
+`main` (with a tag per commit too). To run local changes, use the compose file's commented
+`build:` block instead.
 
 Memos is on `:5230` and MyMemos on `:8080`. The image is also buildable on its own from the
 repository root:
@@ -19,10 +23,6 @@ repository root:
 ```bash
 docker build -f web/Dockerfile -t mymemos-web .
 ```
-
-Every merge to `main` on GitHub also publishes the image as
-`ghcr.io/rorydavidson/mymemos-web:latest` (and a tag per commit), so a server can pull it
-instead of building: swap the compose file's `build:` block for `image:` with that name.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
