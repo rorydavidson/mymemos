@@ -1,19 +1,41 @@
-# Base images and actions are pinned, so something has to say when they move. Weekly PRs for
-# security and version updates; nothing merges without a person.
+# Base images and actions are pinned, so something has to say when they move. Updates are
+# grouped into one weekly PR per ecosystem, and major versions are left for a person to do on
+# purpose: they need code changes, a different JDK or Node line, or a matching Kotlin release.
+# Security updates still arrive regardless of these rules.
 version: 2
 updates:
   - package-ecosystem: docker
     directory: /web
     schedule:
       interval: weekly
+    groups:
+      base-images:
+        patterns: ["*"]
+    ignore:
+      # The Gradle build targets JDK 17 and the UI build Node's LTS line.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
   - package-ecosystem: npm
     directory: /web/app
     schedule:
       interval: weekly
-    # The Kotlin library is a local file: dependency, not something npm can update.
+    groups:
+      web-app:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
     ignore:
+      # The Kotlin library is a local file: dependency, not something npm can update.
       - dependency-name: mymemos-web-core
+      # kotlinx-datetime chooses these versions; they move when it does, in Gradle.
+      - dependency-name: "@js-joda/*"
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
