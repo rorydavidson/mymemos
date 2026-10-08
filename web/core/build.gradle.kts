@@ -17,6 +17,7 @@ plugins {
 val coreData = rootProject.file("core-data/src")
 
 val sharedLogic = listOf(
+    "com/keltruc/mymemos/data/account/AvatarSource.kt",
     "com/keltruc/mymemos/data/config/ConfigCodec.kt",
     "com/keltruc/mymemos/data/crypto/AesGcm.kt",
     "com/keltruc/mymemos/data/crypto/MemoCipher.kt",
@@ -38,6 +39,7 @@ val sharedLogic = listOf(
 // Their tests come too, so the rules are checked on the JS compiler as well as the JVM and
 // Kotlin/Native ones. Tests that reach a repository stay behind.
 val sharedTests = listOf(
+    "com/keltruc/mymemos/data/account/**",
     "com/keltruc/mymemos/data/config/**",
     "com/keltruc/mymemos/data/crypto/**",
     "com/keltruc/mymemos/data/notify/**",
