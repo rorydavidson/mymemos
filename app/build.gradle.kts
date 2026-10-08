@@ -14,7 +14,9 @@ val keystoreProps = Properties().apply {
     val f = rootProject.file("keystore.properties")
     if (f.exists()) f.inputStream().use { load(it) }
 }
-fun signingValue(key: String): String? = keystoreProps.getProperty(key) ?: System.getenv(key.uppercase().replace('.', '_'))
+// Blank counts as unset: GitHub Actions passes a secret the repository does not have as "".
+fun signingValue(key: String): String? =
+    (keystoreProps.getProperty(key) ?: System.getenv(key.uppercase().replace('.', '_')))?.takeIf { it.isNotBlank() }
 
 android {
     namespace = "com.keltruc.mymemos"
