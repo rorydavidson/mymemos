@@ -5,7 +5,7 @@
 #   docker build -f web/Dockerfile -t mymemos-web .
 
 # ---- 1. Kotlin/JS: the shared rules, network client, store and WebSession ----------------
-FROM eclipse-temurin:17-jdk AS core
+FROM eclipse-temurin:25-jdk AS core
 WORKDIR /src
 COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY gradle gradle
