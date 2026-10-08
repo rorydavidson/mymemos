@@ -29,7 +29,7 @@ COPY web/app ./
 RUN npm run build
 
 # ---- 3. Serve ----------------------------------------------------------------------------
-FROM nginxinc/nginx-unprivileged:alpine
+FROM nginxinc/nginx-unprivileged:1.31-alpine
 # The image's entrypoint fills ${...} in templates from the environment at start-up.
 COPY web/docker/default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=app /src/web/app/dist /usr/share/nginx/html

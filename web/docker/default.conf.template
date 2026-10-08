@@ -1,10 +1,16 @@
 # MyMemos web. The page and the Memos API share this origin: /api and /file go to Memos,
-# everything else is the app. Nothing is logged beyond nginx's defaults.
+# everything else is the app.
+
+# Requests are logged without their query strings: text shared to the app arrives as one
+# (`/?text=…`), and memo content has no business in a log.
+log_format mymemos '$remote_addr [$time_local] "$request_method $uri $server_protocol" $status $body_bytes_sent';
 
 server {
     listen 8080;
     server_name _;
     root /usr/share/nginx/html;
+    server_tokens off;
+    access_log /dev/stdout mymemos;
 
     # Attachments travel as base64 JSON, so a 30 MB photo is a ~40 MB request.
     client_max_body_size 64m;
@@ -15,12 +21,25 @@ server {
     # Images may come from anywhere a memo links (and OpenStreetMap tiles when map previews
     # are on); scripts, styles and API calls only from here. EXTRA_CONNECT_SRC allows signing
     # in to other Memos servers, which must also allow this origin through CORS.
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https:; font-src 'self'; connect-src 'self' ${EXTRA_CONNECT_SRC}; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data: https:; font-src 'self'; connect-src 'self' ${EXTRA_CONNECT_SRC}; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
     add_header Referrer-Policy "no-referrer" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header Permissions-Policy "geolocation=(self), camera=(), microphone=(), payment=()" always;
+    # Only ever sent over HTTPS by the browser's reckoning, so harmless on a localhost trial.
+    # No includeSubDomains: other services on the parent domain are not this app's to commit.
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header Cross-Origin-Opener-Policy "same-origin" always;
+    add_header Cross-Origin-Resource-Policy "same-origin" always;
 
     location /api/ {
+        # Anything Memos returns here is data for fetch(), never a page: sandbox it, so a file
+        # some other user uploaded cannot run script in this origin should Memos ever serve one
+        # inline. A location-level add_header drops the server's, so the essentials are repeated.
+        add_header Content-Security-Policy "sandbox; default-src 'none'; frame-ancestors 'none'" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
         proxy_pass ${MEMOS_UPSTREAM};
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -29,6 +48,17 @@ server {
     }
 
     location /file/ {
+        # Anything Memos returns here is data for fetch(), never a page: sandbox it, so a file
+        # some other user uploaded cannot run script in this origin should Memos ever serve one
+        # inline. A location-level add_header drops the server's, so the essentials are repeated.
+        add_header Content-Security-Policy "sandbox; default-src 'none'; frame-ancestors 'none'" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        # Always a download if opened directly, whatever Memos says.
+        proxy_hide_header Content-Disposition;
+        add_header Content-Disposition "attachment" always;
         proxy_pass ${MEMOS_UPSTREAM};
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;
