@@ -19,7 +19,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with:
           # Platforms carry a minor version now: "android-37" no longer resolves.
           packages: "platforms;android-37.0 build-tools;37.0.0"
