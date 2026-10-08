@@ -9,14 +9,20 @@ package com.keltruc.mymemos.data.zip
 internal actual fun deflateRaw(data: ByteArray): ByteArray = Deflater(data).run()
 
 /** Damaged data surfaces as [ZipFormatException], as it does on the other platforms. */
-internal actual fun inflateRaw(data: ByteArray, expectedSize: Int): ByteArray =
-    try {
+internal actual fun inflateRaw(data: ByteArray, expectedSize: Int): ByteArray {
+    // The size comes from the archive itself, so a crafted zip could otherwise ask a tab for
+    // gigabytes up front. Nothing a memo export holds comes near this.
+    if (expectedSize !in 0..MAX_ENTRY_BYTES) throw ZipFormatException("entry too large: $expectedSize bytes")
+    return try {
         Inflater(data, expectedSize).run()
     } catch (e: IllegalStateException) {
         throw ZipFormatException("inflate failed: ${e.message}")
     } catch (e: IndexOutOfBoundsException) {
         throw ZipFormatException("inflate failed: ${e.message}")
     }
+}
+
+private const val MAX_ENTRY_BYTES = 256 * 1024 * 1024
 
 /**
  * RFC 1951 inflate, enough to read the zips other tools write: stored, fixed and dynamic
