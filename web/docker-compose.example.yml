@@ -1,0 +1,45 @@
+# Memos and the MyMemos web client side by side. Copy to docker-compose.yml, then:
+#
+#   docker compose up -d --build
+#
+# Memos' own UI is on :5230 and MyMemos on :8080. Put both behind your HTTPS reverse proxy:
+# the web client's locking uses WebCrypto and its offline cache uses a service worker, and
+# browsers only allow either on HTTPS (or localhost).
+
+services:
+  memos:
+    image: neosmemo/memos:0.30.0
+    restart: unless-stopped
+    volumes:
+      - memos-data:/var/opt/memos
+    ports:
+      - "5230:5230"
+
+  mymemos-web:
+    build:
+      context: ..
+      dockerfile: web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - memos
+    environment:
+      # Where nginx finds Memos on the compose network.
+      MEMOS_UPSTREAM: http://memos:5230
+      # The address people use for Memos itself, so share links open its public pages.
+      # Leave empty to build share links on this app's address instead.
+      PUBLIC_MEMOS_URL: ""
+    ports:
+      - "8080:8080"
+    read_only: true
+    # nginx writes its rendered config, pid and temp files here; nothing else is writable.
+    tmpfs:
+      - /tmp:uid=101,gid=101
+      - /var/cache/nginx:uid=101,gid=101
+      - /etc/nginx/conf.d:uid=101,gid=101
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  memos-data:

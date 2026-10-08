@@ -1,0 +1,62 @@
+# MyMemos web. The page and the Memos API share this origin: /api and /file go to Memos,
+# everything else is the app. Nothing is logged beyond nginx's defaults.
+
+server {
+    listen 8080;
+    server_name _;
+    root /usr/share/nginx/html;
+
+    # Attachments travel as base64 JSON, so a 30 MB photo is a ~40 MB request.
+    client_max_body_size 64m;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml application/manifest+json;
+
+    # Images may come from anywhere a memo links (and OpenStreetMap tiles when map previews
+    # are on); scripts, styles and API calls only from here. EXTRA_CONNECT_SRC allows signing
+    # in to other Memos servers, which must also allow this origin through CORS.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https:; font-src 'self'; connect-src 'self' ${EXTRA_CONNECT_SRC}; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Permissions-Policy "geolocation=(self), camera=(), microphone=(), payment=()" always;
+
+    location /api/ {
+        proxy_pass ${MEMOS_UPSTREAM};
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+
+    location /file/ {
+        proxy_pass ${MEMOS_UPSTREAM};
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Cache lifetimes use `expires` rather than add_header: an add_header inside a location
+    # would silently drop every header set above, the security policy included.
+
+    # Where share links should point: Memos' own pages, which this app does not serve.
+    location = /config.json {
+        default_type application/json;
+        expires -1;
+        return 200 '{"publicMemosUrl":"${PUBLIC_MEMOS_URL}"}';
+    }
+
+    # Built files carry content hashes; the shell and the worker must always be fresh.
+    location /assets/ {
+        expires max;
+        try_files $uri =404;
+    }
+
+    location = /sw.js {
+        expires -1;
+        try_files $uri =404;
+    }
+
+    location / {
+        expires -1;
+        try_files $uri /index.html;
+    }
+}
