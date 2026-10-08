@@ -76,7 +76,7 @@ data class Memo(
                 ?.trim()?.takeIf { it.isNotEmpty() }
 
         private val lockedTitleLine = Regex("^#\\s+(.+)$")
-        private val colourLine = Regex("(?m)^[ \\t]*#colour/[a-z]+[ \\t]*$\\n?")
+        private val colourLine = Regex("^[ \\t]*#colour/[a-z]+[ \\t]*$\\n?", RegexOption.MULTILINE)
     }
     val isPendingLocalChange: Boolean get() = syncStatus != SyncStatus.SYNCED
 }

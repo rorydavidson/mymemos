@@ -10,10 +10,10 @@ package com.keltruc.mymemos.data.text
 object TaskLine {
 
     /** An unticked task: `- [ ] text`, `* [ ] text`, `1. [ ] text`. */
-    private val open = Regex("""^(\s*)(?:[-*+]|\d+[.)]) \[ ] (.*)$""")
+    private val open = Regex("""^(\s*)(?:[-*+]|\d+[.)]) \[ \] (.*)$""")
 
     /** Either state, keeping the marker and anything trailing so ticking preserves them. */
-    private val any = Regex("""^(\s*(?:[-*+]|\d+[.)]) )\[([ xX])](.*)$""")
+    private val any = Regex("""^(\s*(?:[-*+]|\d+[.)]) )\[([ xX])\](.*)$""")
 
     data class Open(val lineIndex: Int, val text: String)
 

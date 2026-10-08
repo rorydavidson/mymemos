@@ -1,0 +1,17 @@
+**/build
+**/node_modules
+**/.gradle
+**/.kotlin
+.git
+.idea
+app
+apple
+ios
+macos
+core-database
+docs
+web/app/dist
+local.properties
+keystore.properties
+*.keystore
+*.jks

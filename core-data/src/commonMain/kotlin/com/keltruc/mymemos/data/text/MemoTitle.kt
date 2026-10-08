@@ -6,10 +6,10 @@ package com.keltruc.mymemos.data.text
  */
 object MemoTitle {
     private val heading = Regex("^#{1,6}\\s+(.+)$")
-    private val listMarker = Regex("^\\s*(?:[-*+]|\\d{1,9}[.)])\\s+(?:\\[[ xX]]\\s*)?")
+    private val listMarker = Regex("^\\s*(?:[-*+]|\\d{1,9}[.)])\\s+(?:\\[[ xX]\\]\\s*)?")
     // Bold, italic, code and strikethrough runs, so a title does not arrive full of asterisks.
     private val emphasis = Regex("(\\*\\*|__|\\*|_|`|~~)")
-    private val link = Regex("\\[([^]]*)]\\([^)]*\\)")
+    private val link = Regex("\\[([^\\]]*)\\]\\([^)]*\\)")
 
     /** Null when there is nothing worth showing; the caller supplies its own wording for that. */
     fun of(content: String): String? {

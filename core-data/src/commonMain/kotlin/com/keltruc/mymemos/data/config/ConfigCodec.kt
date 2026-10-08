@@ -18,7 +18,8 @@ object ConfigCodec {
     const val MAX_REMINDERS = 200
     const val MAX_RECURRING = 50
     const val MAX_NOTE_CHARS = 500
-    private val fence = Regex("```json\\s*\\n(.*?)\\n```", RegexOption.DOT_MATCHES_ALL)
+    // `[\s\S]` rather than DOT_MATCHES_ALL, which JavaScript lacks.
+    private val fence = Regex("```json\\s*\\n([\\s\\S]*?)\\n```")
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; prettyPrint = true }
 
     @Serializable

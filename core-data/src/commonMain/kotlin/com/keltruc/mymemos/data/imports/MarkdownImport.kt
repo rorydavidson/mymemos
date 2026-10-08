@@ -25,7 +25,8 @@ object MarkdownImport {
         val remoteName: String?,
     )
 
-    private val fence = Regex("\\A---\\r?\\n(.*?)\\r?\\n---[ \\t]*\\r?\\n?", RegexOption.DOT_MATCHES_ALL)
+    // `^` and `[\s\S]` rather than `\A` and DOT_MATCHES_ALL, which JavaScript lacks.
+    private val fence = Regex("^---\\r?\\n([\\s\\S]*?)\\r?\\n---[ \\t]*\\r?\\n?")
     private val entry = Regex("^([A-Za-z_][A-Za-z0-9_-]*):[ \\t]*(.*)$")
     private val listItem = Regex("^[ \\t]*-[ \\t]+(.*)$")
     // The app's own tag syntax; anything outside it would not survive a round trip through a memo.

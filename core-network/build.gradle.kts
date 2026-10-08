@@ -10,6 +10,11 @@ kotlin {
     macosArm64()
     iosArm64()
     iosSimulatorArm64()
+    // For the web client in web/core. Tests run under Node, which has fetch and WebCrypto.
+    js {
+        browser { testTask { enabled = false } }
+        nodejs()
+    }
 
     sourceSets {
         commonMain.dependencies {
@@ -29,6 +34,8 @@ kotlin {
         jvmMain.dependencies { api(libs.ktor.client.okhttp) }
         // One Darwin engine serves macOS and iOS alike.
         appleMain.dependencies { api(libs.ktor.client.darwin) }
+        // The browser's own fetch, so cookies and TLS are the browser's business.
+        jsMain.dependencies { api(libs.ktor.client.js) }
     }
 }
 

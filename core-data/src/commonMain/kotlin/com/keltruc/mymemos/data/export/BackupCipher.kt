@@ -11,10 +11,11 @@ import com.keltruc.mymemos.data.crypto.AesGcm
  */
 object BackupCipher {
     const val MAGIC = "MYMEMOS1"
-    private const val ITERATIONS = 200_000
+    // Internal rather than private so the web client's WebCrypto path matches.
+    internal const val ITERATIONS = 200_000
     private const val KEY_BITS = 256
-    private const val SALT = 16
-    private const val NONCE = 12
+    internal const val SALT = 16
+    internal const val NONCE = 12
 
     class WrongPasswordOrCorrupt : Exception("Wrong password or damaged backup")
 

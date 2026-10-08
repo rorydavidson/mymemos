@@ -1,7 +1,7 @@
 # MyMemos
 
-A client for a self-hosted [Memos](https://usememos.com) server, for Android, iOS and macOS,
-over one shared data layer. Offline-first:
+A client for a self-hosted [Memos](https://usememos.com) server, for Android, iOS, macOS and the
+web, over one shared data layer. Offline-first:
 memos live in a local Room database, the UI only ever reads from there, and changes are
 queued and pushed when the network returns. Built for Memos v0.30; newer server features
 are gated on the version the server reports.
@@ -185,6 +185,13 @@ needs an emulator or device attached:
 ./gradlew :core-data:connectedDebugAndroidTest
 ```
 
+The web client is a container that sits beside Memos; see `web/README.md`.
+
+```bash
+./gradlew :web-core:test
+docker build -f web/Dockerfile -t mymemos-web .
+```
+
 ## Layout
 
 | Module          | Purpose                                                              |
@@ -197,6 +204,8 @@ needs an emulator or device attached:
 | `apple/shared`  | `:apple-shared`, the Kotlin framework the Mac and iOS apps link: `MemosSession`, the Keychain, Application Support paths, and the date labels. One `appleMain` source set for all three Apple targets. |
 | `apple/ui`      | SwiftUI shared by the Mac and iOS apps: the session model and nearly every view. `#if os(macOS)` marks the few places AppKit and UIKit differ. |
 | `macos/app`     | The Mac's own shell: window, sidebar, menu bar, NSTextView editor, build and check scripts. |
+| `web/core`      | `:web-core`, Kotlin/JS: the rule files from `core-data` compiled for the browser, an IndexedDB store, ports of the sync engine and repository writes, WebCrypto locking, and `WebSession`, the surface the web UI calls. |
+| `web/app`       | The web UI: Preact and TypeScript built by Vite, a service worker and manifest so it installs as an app. `web/Dockerfile` and `web/docker` serve it from nginx beside Memos. |
 | `ios/app`       | The phone's own shell: tab bar, iPad split view, UITextView editor, background refresh, build and tour scripts, XcodeGen spec. `ios/share` and `ios/widget` are the share extension and the widgets. |
 
 ## Fonts and licences
