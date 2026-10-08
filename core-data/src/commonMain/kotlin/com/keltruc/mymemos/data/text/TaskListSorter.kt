@@ -7,7 +7,7 @@ package com.keltruc.mymemos.data.text
  * and unticked groups is preserved.
  */
 object TaskListSorter {
-    private val task = Regex("^(\\s*)[-*] \\[([ xX])] .*$")
+    private val task = Regex("^(\\s*)[-*] \\[([ xX])\\] .*$")
 
     fun sortCompletedToBottom(content: String): String {
         val lines = content.lines()

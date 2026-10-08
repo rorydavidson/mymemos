@@ -9,7 +9,7 @@ import com.keltruc.mymemos.model.NoteColour
  */
 object ColourTag {
     const val PREFIX = "colour/"
-    private val line = Regex("(?m)^[ \\t]*#colour/([a-z]+)[ \\t]*$\\n?")
+    private val line = Regex("^[ \\t]*#colour/([a-z]+)[ \\t]*$\\n?", RegexOption.MULTILINE)
 
     fun extract(content: String): NoteColour? =
         line.find(content)?.groupValues?.get(1)?.let { name -> NoteColour.entries.firstOrNull { it.name.equals(name, ignoreCase = true) } }

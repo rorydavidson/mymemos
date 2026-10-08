@@ -14,7 +14,7 @@ object MarkdownContinuation {
 
     // "- ", "* item", "+ [x] done". The box's trailing space is optional so an untouched "- [ ]"
     // still reads as an empty task rather than a bullet whose text happens to be "[ ]".
-    private val bullet = Regex("""^([ \t]*)([-*+]) (\[[ xX]] ?)?""")
+    private val bullet = Regex("""^([ \t]*)([-*+]) (\[[ xX]\] ?)?""")
     // Digits are capped so a silly long "number" cannot overflow the increment below.
     private val ordered = Regex("""^([ \t]*)(\d{1,9})([.)]) """)
 
