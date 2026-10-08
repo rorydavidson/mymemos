@@ -53,6 +53,32 @@ now has three places waiting on it rather than two.
   on sign out. If a device loses that token or it expires, the app shows a "Sign in again"
   banner rather than failing quietly.
 
+## The web client
+
+Built on 8 October 2026 on `feature/web-app`, so iPhones can use MyMemos without the App
+Store. `web/README.md` covers running, building and what a browser cannot do. What a reader of
+this file needs on top:
+
+- **The rule files are shared by path.** `web/core/build.gradle.kts` lists which `core-data`
+  files it compiles (`sharedLogic`) and which tests come with them. A new pure rule file is
+  shared by adding it to that list. A file that imports Room cannot be, which is why tag
+  extraction, the export format and template expansion were lifted into `Tags`,
+  `MarkdownFormat` and `Templates` with the old call sites delegating.
+- **Write regexes JavaScript can read.** No inline flags such as `(?m)`, no `\A`, no
+  `DOT_MATCHES_ALL`, and escape a literal `]`. `./gradlew :web-core:test` runs the shared tests
+  under Node and catches these.
+- **`WebSyncEngine` and `WebMemos` are ports**, not shared code, because the originals are
+  written against Room DAOs. Change `SyncEngine` or `MemoRepository` and change these to match.
+  One deliberate difference: an absorbed server memo with ops still queued keeps local tags,
+  references and location too, not just content, pin, visibility and state.
+- **`-PwebOnly`** configures only `core-model`, `core-network` and `web-core`, so the image
+  builds without an Android SDK.
+- **Verified** against `neosmemo/memos:0.30.0` in Docker, through the dev server and through
+  the built container under its CSP: sign-in mints and names a token, create, tick, lock,
+  unlock, export, backup and restore, and a three-way merge with a concurrent server edit.
+  Not verified: a real iPhone home-screen install, the service worker (it only registers on
+  HTTPS), Web Notifications, and attachments.
+
 ## The iOS client
 
 Built on 11 September 2026 over the same data layer, in one session, on branch
