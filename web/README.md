@@ -20,6 +20,10 @@ repository root:
 docker build -f web/Dockerfile -t mymemos-web .
 ```
 
+Every merge to `main` on GitHub also publishes the image as
+`ghcr.io/rorydavidson/mymemos-web:latest` (and a tag per commit), so a server can pull it
+instead of building: swap the compose file's `build:` block for `image:` with that name.
+
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `MEMOS_UPSTREAM` | `http://memos:5230` | Where nginx finds Memos. `/api` and `/file` are proxied there, so the page and the API share an origin and no CORS is needed. |
