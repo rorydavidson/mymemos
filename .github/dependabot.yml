@@ -1,0 +1,19 @@
+# Base images and actions are pinned, so something has to say when they move. Weekly PRs for
+# security and version updates; nothing merges without a person.
+version: 2
+updates:
+  - package-ecosystem: docker
+    directory: /web
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /web/app
+    schedule:
+      interval: weekly
+    # The Kotlin library is a local file: dependency, not something npm can update.
+    ignore:
+      - dependency-name: mymemos-web-core

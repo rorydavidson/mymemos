@@ -20,7 +20,16 @@ export function parse(hash = location.hash): Route {
   const [path, query = ''] = raw.split('?')
   const [view = 'memos', ...rest] = path.split('/')
   const params = new URLSearchParams(query)
-  return { view: view || 'memos', arg: decodeURIComponent(rest.join('/')), memo: params.get('m'), q: params.get('q') ?? '' }
+  return { view: view || 'memos', arg: safeDecode(rest.join('/')), memo: params.get('m'), q: params.get('q') ?? '' }
+}
+
+/** A malformed escape in a pasted link should land on a page, not take the app down. */
+function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s)
+  } catch {
+    return s
+  }
 }
 
 export function href(view: string, arg = '', extra: { memo?: string | null; q?: string } = {}): string {

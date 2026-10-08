@@ -193,7 +193,7 @@ export async function askPassword(wrong = false): Promise<boolean> {
 
 function PasswordForm(props: { wrong: boolean; done: (v: { password: string; remember: boolean } | null) => void }) {
   const [password, setPassword] = useState('')
-  const [remember, setRemember] = useState(true)
+  const [remember, setRemember] = useState(false)
   return (
     <Dialog
       title="Memo password"

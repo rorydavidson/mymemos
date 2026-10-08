@@ -4,6 +4,7 @@ import type { ImportResultRow, TemplateRow } from 'mymemos-web-core'
 import { attempt, refresh, saveFile, session, toast, useData } from '../core'
 import { askPassword, confirmDialog, Dialog, promptDialog, Switch } from '../components/ui'
 import { Icon } from '../components/Icon'
+import { remoteImagesAllowed, setRemoteImagesAllowed } from '../components/Markdown'
 import { href, openMemo, type Route } from '../router'
 
 type Theme = 'system' | 'light' | 'dark'
@@ -74,6 +75,7 @@ export function SettingsView(props: { route: Route }) {
 
 function Appearance() {
   const [theme, setTheme] = useState<Theme>(readTheme())
+  const [remoteImages, setRemoteImages] = useState(remoteImagesAllowed())
   const pick = (t: Theme) => {
     applyTheme(t)
     setTheme(t)
@@ -103,6 +105,17 @@ function Appearance() {
             hint="Tiles come from openstreetmap.org, which then learns roughly where a located memo was written. Off means nothing leaves this device."
             checked={session.mapTilesEnabled()}
             onChange={(v) => void setPref(() => session.setMapTiles(v))}
+          />
+        </div>
+        <div class="row" style={SWITCH_ROW}>
+          <Switch
+            label="Load images from other sites"
+            hint="Images a memo links to come from wherever they are hosted, which learns your address and when you read it. Off means each one waits for a tap."
+            checked={remoteImages}
+            onChange={(v) => {
+              setRemoteImagesAllowed(v)
+              setRemoteImages(v)
+            }}
           />
         </div>
       </div>

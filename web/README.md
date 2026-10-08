@@ -83,6 +83,25 @@ undo; places, journey and the graph; review, on this day, streak and heatmap; re
 recurring templates and the weekly digest; account, tokens, webhooks, notifications and
 statistics; admin; Markdown export and import; encrypted backup; several accounts.
 
+## Security
+
+- **One origin, locked down.** Scripts, styles and API calls only from the app's own origin;
+  no inline script or style; no framing. Everything nginx proxies from Memos (`/api`, `/file`)
+  is additionally sandboxed and served as a download, so a file someone else uploaded can
+  never run as a page here.
+- **Attachments** become object URLs only as raster images; HTML, SVG and the rest download.
+  Links on attachments must be http(s), and attachment names are checked before a request is
+  made with the credential.
+- **Images linked from memos** load only on a tap unless switched on in Settings, so a memo
+  someone else wrote cannot tell its author when, or from where, you read it.
+- **Imports and restores** refuse archives that claim too many files or too much data.
+  A restored backup's queued changes are replayed only for memos inside it.
+- **Logs** never contain query strings, which is where shared text arrives. A reverse proxy
+  in front logs on its own terms; check yours.
+- **Signing out** revokes this browser's token and says so if the server could not be told.
+- **CI** runs with a read-only token, pins the third-party actions that publish the image, and
+  Dependabot proposes updates to them, the base images and npm packages.
+
 ## What is different in a browser
 
 - **Nothing runs while no tab is open.** Reminders and the weekly digest appear (as system
@@ -92,7 +111,7 @@ statistics; admin; Markdown export and import; encrypted backup; several account
   mints a 90-day token per browser and revokes it on sign-out, and the password is never
   stored. The CSP is what keeps other script away from it.
 - **"Remember the memo password" lasts until the tab closes**, in session storage, rather than
-  for good.
+  for good, and is off unless ticked.
 - **Places have no reverse geocoding.** You name the place yourself; no geocoding service is
   contacted.
 - **Backups are the browser's own format.** The apps back up their SQLite database, which a

@@ -224,10 +224,16 @@ class WebSession internal constructor(
         if (store.templates.isEmpty()) seedTemplates()
     }
 
-    /** Revokes this browser's token on the server and forgets the account here. */
-    fun signOut(): Promise<Unit> = promised {
-        val account = active ?: return@promised
-        account.mintedTokenName?.let { name -> runCatching { api(account).deletePersonalAccessToken(name) } }
+    /**
+     * Revokes this browser's token on the server and forgets the account here. Returns false
+     * when the server could not be told, so the page can say the token is still live and
+     * needs revoking from Memos' own settings; the local copy goes either way.
+     */
+    fun signOut(): Promise<Boolean> = promised {
+        val account = active ?: return@promised true
+        val revoked = account.mintedTokenName?.let { name ->
+            runCatching { api(account).deletePersonalAccessToken(name) }.isSuccess
+        } ?: true
         registry.evict(account.serverUrl, account.token)
         val blobs = store.memosFor(account.id).flatMap { it.attachments }.map { it.localId }
         val rest = store.accounts.filter { it.id != account.id }
@@ -236,10 +242,13 @@ class WebSession internal constructor(
             putAccounts(rest, rest.firstOrNull()?.id)
         }
         blobs.forEach { store.deleteBlob(it) }
+        objectUrls.values.forEach { url -> js("URL.revokeObjectURL(url)") }
+        objectUrls.clear()
         if (rest.isEmpty()) {
             store.clearAll()
             forgetPassword()
         }
+        revoked
     }
 
     fun accounts(): Array<AccountRow> = store.accounts.map {
@@ -490,7 +499,7 @@ class WebSession internal constructor(
     // MARK: attachments
 
     fun attachments(localId: String): Array<AttachmentRow> = store.memo(localId)?.attachments.orEmpty().map {
-        AttachmentRow(it.localId, it.filename, it.mimeType, it.sizeBytes.toDouble(), it.mimeType.startsWith("image/"), it.remoteName != null, it.externalLink)
+        AttachmentRow(it.localId, it.filename, it.mimeType, it.sizeBytes.toDouble(), it.mimeType.lowercase() in RASTER_TYPES, it.remoteName != null, it.externalLink?.takeIf(::isWebUrl))
     }.toTypedArray()
 
     fun attach(localId: String, filename: String, mimeType: String, bytes: Uint8Array): Promise<Unit> = promised {
@@ -510,17 +519,18 @@ class WebSession internal constructor(
         objectUrls[attachmentLocalId]?.let { return@promised it }
         val memo = store.memo(memoLocalId) ?: return@promised null
         val a = memo.attachments.firstOrNull { it.localId == attachmentLocalId } ?: return@promised null
-        a.externalLink?.let { return@promised it }
+        a.externalLink?.let { return@promised it.takeIf(::isWebUrl) }
         var bytes = store.readBlob(a.localId)
         if (bytes == null) {
             val account = store.account(memo.accountId) ?: return@promised null
-            val remote = a.remoteName ?: return@promised null
+            // The name goes into a path sent with the credential; it must be an attachment's.
+            val remote = a.remoteName?.takeIf { attachmentName.matches(it) } ?: return@promised null
             bytes = runCatching {
                 registry.client(account.serverUrl, account.token).http.get("file/$remote/${encodeUri(a.filename)}").readRawBytes()
             }.getOrNull() ?: return@promised null
             runCatching { store.writeBlob(a.localId, bytes) }
         }
-        objectUrl(bytes, a.mimeType).also { objectUrls[attachmentLocalId] = it }
+        objectUrl(bytes, displayableType(a.mimeType)).also { objectUrls[attachmentLocalId] = it }
     }
 
     /** The account's avatar as something an `<img>` can show, or null for none. */
@@ -528,11 +538,11 @@ class WebSession internal constructor(
         val account = active ?: return@promised null
         when (val source = AvatarSource.of(account.avatarUrl, account.serverUrl)) {
             is AvatarSource.None -> null
-            is AvatarSource.Bytes -> objectUrl(source.bytes, "image/*")
+            is AvatarSource.Bytes -> objectUrl(source.bytes, IMAGE_FALLBACK)
             // Another site's image is linked, not fetched with the credential.
             is AvatarSource.Url -> if (!source.sameOrigin) source.url else runCatching {
                 val bytes = registry.client(account.serverUrl, account.token).http.get(source.url).readRawBytes()
-                objectUrl(bytes, "image/*")
+                objectUrl(bytes, IMAGE_FALLBACK)
             }.getOrNull()
         }
     }
@@ -1205,6 +1215,16 @@ class WebSession internal constructor(
         throw ApiException.from(e, json)
     }
 
+    /**
+     * The type an object URL is created with. A blob URL opened as a page runs in this
+     * origin, which holds the access token, so only raster images keep their own type: HTML,
+     * SVG and anything else the server labels arrive as an opaque download.
+     */
+    private fun displayableType(mime: String): String =
+        mime.lowercase().substringBefore(';').trim().takeIf { it in RASTER_TYPES } ?: "application/octet-stream"
+
+    private fun isWebUrl(url: String): Boolean = url.startsWith("https://", ignoreCase = true) || url.startsWith("http://", ignoreCase = true)
+
     private fun objectUrl(bytes: ByteArray, mime: String): String {
         val u8 = bytes.toUint8()
         return js("URL.createObjectURL(new Blob([u8], { type: mime }))") as String
@@ -1238,6 +1258,10 @@ class WebSession internal constructor(
 }
 
 private const val PASSWORD_KEY = "mymemos.memoPassword"
+private val RASTER_TYPES = setOf("image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/bmp")
+/** Avatars are decoded by an `<img>`, which sniffs raster formats; never a page-renderable type. */
+private const val IMAGE_FALLBACK = "image/png"
+private val attachmentName = Regex("^attachments/[A-Za-z0-9_-]+$")
 private const val TOKEN_LIFETIME_DAYS = 90
 /** Sunday evening, late enough that the week is genuinely over. */
 private const val DIGEST_HOUR = 18

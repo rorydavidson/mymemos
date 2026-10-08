@@ -3,6 +3,8 @@ package com.keltruc.mymemos.web
 import com.keltruc.mymemos.data.export.MarkdownFormat
 import com.keltruc.mymemos.data.imports.MarkdownImport
 import com.keltruc.mymemos.data.zip.ByteArraySink
+import com.keltruc.mymemos.data.zip.ZipEntry
+import com.keltruc.mymemos.data.zip.ZipFormatException
 import com.keltruc.mymemos.data.zip.ZipReader
 import com.keltruc.mymemos.data.zip.ZipWriter
 import com.keltruc.mymemos.model.SyncStatus
@@ -15,6 +17,7 @@ import com.keltruc.mymemos.web.store.TemplateRecord
 import com.keltruc.mymemos.web.store.WebStore
 import com.keltruc.mymemos.web.store.toModel
 import com.keltruc.mymemos.web.sync.WebMemos
+import com.keltruc.mymemos.web.sync.WebSyncEngine
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -88,7 +91,7 @@ internal class DataTransfer(private val store: WebStore, private val memos: WebM
     private fun read(file: PickedFile): List<Source> {
         val bytes = file.bytes.toByteArray()
         return if (ZipReader.looksLikeZip(bytes)) {
-            ZipReader.entries(bytes)
+            checkedEntries(bytes)
                 .filter { !it.isDirectory && it.name.substringAfterLast('/').endsWith(".md", ignoreCase = true) }
                 .map { Source(it.name, it.bytes.decodeToString(), it.modifiedEpochMs, MarkdownImport.tagForPath(it.name)) }
         } else {
@@ -122,21 +125,45 @@ internal class DataTransfer(private val store: WebStore, private val memos: WebM
      * another for the same user.
      */
     suspend fun restore(account: AccountRecord, plain: ByteArray) {
-        val entries = ZipReader.entries(plain).filter { !it.isDirectory }
+        val entries = checkedEntries(plain).filter { !it.isDirectory }
         val state = entries.firstOrNull { it.name == STATE } ?: error("Not a MyMemos web backup")
         val snapshot = json.decodeFromString(Snapshot.serializer(), state.bytes.decodeToString())
         val blobs = entries.filter { it.name.startsWith("attachments/") }.map { it.name.removePrefix("attachments/") to it.bytes }
         for ((id, bytes) in blobs) if ('/' !in id) store.writeBlob(id, bytes)
+        // Queued ops replay with this account's credential, so only those that act on a memo
+        // in the backup survive, and a delete only for the server memo that memo really is: a
+        // doctored backup must not be able to aim one at anything else.
+        val byId = snapshot.memos.associateBy { it.localId }
+        val ops = snapshot.ops.filter { op ->
+            val memo = byId[op.memoLocalId] ?: return@filter false
+            op.type != OpRecord.DELETE || runCatching {
+                json.decodeFromString(WebSyncEngine.DeletePayload.serializer(), op.payloadJson).remoteName == memo.remoteName
+            }.getOrDefault(false)
+        }
         store.write {
             deleteAllForAccount(account.id)
             snapshot.memos.forEach { upsertMemo(it.copy(accountId = account.id)) }
-            snapshot.ops.forEach { insertOp(it.copy(accountId = account.id)) }
+            ops.forEach { insertOp(it.copy(accountId = account.id)) }
             putTemplates(snapshot.templates)
             putPrefs(snapshot.prefs.copy(knownServers = (store.prefs.knownServers + snapshot.prefs.knownServers).distinct()))
         }
     }
 
+    /**
+     * The archive's entries, refused outright when there are implausibly many or they claim
+     * more than [MAX_ARCHIVE_BYTES] between them. Each entry is capped on inflate too, but
+     * a crafted zip can point thousands of entries at one compressed blob.
+     */
+    private fun checkedEntries(archive: ByteArray): List<ZipEntry> {
+        val entries = ZipReader.entries(archive)
+        if (entries.size > MAX_ENTRIES) throw ZipFormatException("too many files in the archive")
+        if (entries.sumOf { it.size.toLong() } > MAX_ARCHIVE_BYTES) throw ZipFormatException("archive too large to open here")
+        return entries
+    }
+
     private companion object {
         const val STATE = "web/state.json"
+        const val MAX_ENTRIES = 20_000
+        const val MAX_ARCHIVE_BYTES = 1024L * 1024 * 1024
     }
 }

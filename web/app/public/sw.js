@@ -1,7 +1,7 @@
 // The app shell, kept so MyMemos opens with no connection. Memos themselves live in
 // IndexedDB, not here, and nothing under /api or /file is ever cached by this worker: those
 // carry the credential and the server's answers, and are the page's business.
-const SHELL = 'mymemos-shell-v1'
+const SHELL = 'mymemos-shell-v2'
 const PRECACHE = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/fonts/GoogleSansFlex.ttf']
 
 self.addEventListener('install', (event) => {
@@ -28,8 +28,13 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone()
-          caches.open(SHELL).then((c) => c.put('/', copy))
+          // Only a good copy of the app shell itself becomes the offline page; a 404, an error
+          // page or a visit straight to some other file must not replace it.
+          const isShell = url.pathname === '/' || url.pathname === '/index.html'
+          if (isShell && res.ok && (res.headers.get('content-type') ?? '').startsWith('text/html')) {
+            const copy = res.clone()
+            caches.open(SHELL).then((c) => c.put('/', copy))
+          }
           return res
         })
         .catch(() => caches.match('/')),
