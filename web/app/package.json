@@ -15,7 +15,7 @@
     "@js-joda/timezone": "2.22.0",
     "commonmark": "0.31.2",
     "mymemos-web-core": "file:../core/build/dist/js/productionLibrary",
-    "preact": "10.29.8"
+    "preact": "11.0.0"
   },
   "devDependencies": {
     "@types/commonmark": "0.27.10",
