@@ -69,6 +69,9 @@ struct DetailPane: View {
         }
         .task(id: selection) { await load() }
         .task(id: model.sections.count) { await load() }
+        // An edit changes the row without changing the count, and the pane would keep
+        // showing the old text until the memo was picked again.
+        .task(id: model.selectedMemo) { await load() }
     }
 
     private func load() async {
