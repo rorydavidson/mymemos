@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks'
-import { attempt, refresh, session, toast, useData, useOnline } from '../core'
+import { attempt, refresh, session, syncNow, toast, useData, useOnline } from '../core'
 import { Icon } from '../components/Icon'
 import { MemoList } from '../components/MemoList'
 import { confirmDialog, Menu, promptDialog } from '../components/ui'
@@ -27,12 +27,38 @@ export function MemosView(props: { route: Route }) {
           onInput={(e) => setQ((e.target as HTMLInputElement).value)}
           aria-label="Search"
         />
+        <SyncButton />
         <ViewOptions />
       </div>
       <div class="pane-body">
         <MemoList sections={sections} empty={q.trim() ? 'No memos match.' : 'No memos yet. Press N or the New button to write one.'} />
       </div>
     </>
+  )
+}
+
+/**
+ * Sync now, with the last good sync on hover. It tracks its own busy state because the
+ * session does not announce a sync starting or finishing, only the data it changed.
+ */
+export function SyncButton(props: { label?: string }) {
+  const [busy, setBusy] = useState(false)
+  const s = session.syncState()
+  const running = busy || s.running
+  const run = async () => {
+    setBusy(true)
+    await syncNow()
+    setBusy(false)
+  }
+  const title = running ? 'Syncing…' : s.lastSuccessLabel ? `Sync now (last synced ${s.lastSuccessLabel})` : 'Sync now'
+  return props.label ? (
+    <button class={`btn tonal${running ? ' spinning' : ''}`} onClick={() => void run()} disabled={running} title={title}>
+      <Icon name="sync" size={18} /> {running ? 'Syncing…' : props.label}
+    </button>
+  ) : (
+    <button class={`icon-btn${running ? ' spinning' : ''}`} onClick={() => void run()} disabled={running} title={title} aria-label="Sync now">
+      <Icon name="sync" />
+    </button>
   )
 }
 

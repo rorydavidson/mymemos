@@ -12,12 +12,16 @@ struct SyncStatusButton: View {
 
     var body: some View {
         Button { Task { await model.sync() } } label: {
-            HStack(spacing: 6) {
-                icon
-                if let label = statusLabel {
-                    Text(label)
-                        .font(Type.rowMeta)
-                        .foregroundStyle(Theme.inkSoft)
+            // Ticks so "2m ago" ages on its own; otherwise it only redraws when the model
+            // publishes, and "Just now" would sit there for hours.
+            TimelineView(.periodic(from: .now, by: 30)) { context in
+                HStack(spacing: 6) {
+                    icon
+                    if let label = statusLabel(at: context.date) {
+                        Text(label)
+                            .font(Type.rowMeta)
+                            .foregroundStyle(Theme.inkSoft)
+                    }
                 }
             }
             .padding(.horizontal, 8)
@@ -49,11 +53,11 @@ struct SyncStatusButton: View {
         }
     }
 
-    private var statusLabel: String? {
+    private func statusLabel(at now: Date) -> String? {
         if case .failed = model.phase { return "Sync failed" }
         if model.isBusy { return nil }
         guard let synced = model.lastSynced else { return nil }
-        let seconds = Int(Date().timeIntervalSince(synced))
+        let seconds = Int(now.timeIntervalSince(synced))
         if seconds < 60 { return "Just now" }
         if seconds < 3600 { return "\(seconds / 60)m ago" }
         return "\(seconds / 3600)h ago"

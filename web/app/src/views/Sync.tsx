@@ -2,6 +2,7 @@ import { attempt, session, useData } from '../core'
 import { Icon } from '../components/Icon'
 import { MemoRows } from '../components/MemoList'
 import { openMemo, type Route } from '../router'
+import { SyncButton } from './Memos'
 
 /** Where sync stands: what is waiting, what the server refused, and conflict copies. */
 export function SyncView(props: { route: Route }) {
@@ -13,9 +14,7 @@ export function SyncView(props: { route: Route }) {
     <>
       <div class="pane-header">
         <h1>Sync</h1>
-        <button class="btn tonal" onClick={() => void attempt(() => session.sync(true))} disabled={s.running}>
-          <Icon name="sync" size={18} /> {s.running ? 'Syncing…' : 'Sync now'}
-        </button>
+        <SyncButton label="Sync now" />
       </div>
       <div class="pane-body">
         <div class="card-box">

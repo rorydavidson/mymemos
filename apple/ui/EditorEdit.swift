@@ -25,8 +25,14 @@ enum EditorEdit: Identifiable {
     func apply(to selected: String, wholeText: String, at range: NSRange) -> (String, Int) {
         switch self {
         case let .wrap(marker):
-            if selected.isEmpty { return (marker + marker, marker.count) }
-            return (marker + selected + marker, (marker + selected + marker).count)
+            // Spaces at either end stay outside the markers: `**bold **` is not bold in
+            // Markdown, and a double-clicked word often brings its trailing space with it.
+            let lead = String(selected.prefix { $0.isWhitespace })
+            let rest = selected.dropFirst(lead.count)
+            let trail = String(rest.reversed().prefix { $0.isWhitespace }.reversed())
+            let core = String(rest.dropLast(trail.count))
+            if core.isEmpty { return (selected + marker + marker, selected.count + marker.count) }
+            return (lead + marker + core + marker + trail, lead.count + core.count + marker.count * 2)
 
         case let .prefixLines(marker):
             // With nothing selected, the marker goes on the line the cursor is in.
