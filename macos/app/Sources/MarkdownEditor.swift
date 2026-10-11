@@ -55,16 +55,23 @@ struct MarkdownEditor: NSViewRepresentable {
         guard let view = scroll.documentView as? NSTextView else { return }
         if view.string != text { view.string = text }
 
-        if let edit = pendingEdit {
+        // Applied once. Clearing during an update loops, so the request is handed back on the
+        // next turn, and any redraw before then must not apply it again: each one would wrap
+        // the text in another pair of markers.
+        if let edit = pendingEdit, !context.coordinator.applyingEdit {
+            context.coordinator.applyingEdit = true
             context.coordinator.apply(edit, to: view)
-            // Clearing during an update loops, so hand it back on the next turn.
-            DispatchQueue.main.async { pendingEdit = nil }
+            DispatchQueue.main.async {
+                pendingEdit = nil
+                context.coordinator.applyingEdit = false
+            }
         }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
+        var applyingEdit = false
         private let parent: MarkdownEditor
         weak var textView: NSTextView?
 
