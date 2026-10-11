@@ -1,8 +1,28 @@
 # Session handoff
 
-Last updated: 2026-09-24
+Last updated: 2026-10-11
 
 ## State
+
+Branch `fix/markdown-and-sync`, 4 commits, not pushed, no PR. Off `main` after the web client merge.
+
+- Web keeps single line breaks (commonmark softbreak renders as `<br>`), matching Android and Mac.
+- Format buttons (Mac `EditorEdit.wrap`, web `Editor.tsx` wrap) keep edge whitespace outside
+  the markers. Cause of `**text **` showing literal asterisks. Existing memos with that
+  pattern still need hand fixing; the renderer is deliberately strict CommonMark.
+- Mac toolbar sync label ticks via `TimelineView` so "Just now" ages.
+- Web: `SyncButton` in the memo list header and on the Sync page; `syncNow()` in `core.ts`
+  toasts the outcome ("will retry" used to be silent). Sidebar shows the last sync time.
+
+Verified: Mac `build.sh`, `check-editor.sh`, wrap logic exercised standalone; web `tsc` and
+`vite build` pass. Not seen in a running app (no local Memos server, no Docker). The deployed
+web at mymemos.onetwozero.org needs its container rebuilt to pick this up.
+
+`web/app/node_modules` now installed; esbuild/fsevents install scripts were not approved.
+
+## Previous session (2026-09-24)
+
+### State
 
 Branch `feat/mac-list-polish`, not pushed, no PR yet. Mac feedback round, then locked-memo titles.
 
