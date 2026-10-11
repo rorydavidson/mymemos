@@ -20,6 +20,18 @@ web at mymemos.onetwozero.org needs its container rebuilt to pick this up.
 
 `web/app/node_modules` now installed; esbuild/fsevents install scripts were not approved.
 
+## Inline editing (branch `feature/inline-edit`, stacked on `fix/markdown-and-sync`, not pushed)
+
+Click a memo's text in the Mac detail pane or web memo pane to edit it there. Saves on
+leaving (another memo, click outside on web, Done, Cmd+Enter); Escape discards with a confirm
+if changed. Locked memos keep the sheet. Mac: `InlineEditor.swift`, macOS only (iOS untouched);
+`model.inlineSave` makes the sheet wait for an in-flight inline save. Web: `Editor` `inline`
+prop; header Edit button carries `data-pop-out`. Also fixed: Mac detail pane did not refresh
+after an edit (`Shell.swift` now keys on `model.selectedMemo`).
+
+Verified: Mac build, check-editor, web tsc + vite build. NOT tried live on either.
+Origin is now GitHub (rorydavidson/mymemos); PR #18 is the markdown/sync fix, auto-fix on.
+
 ## Previous session (2026-09-24)
 
 ### State
