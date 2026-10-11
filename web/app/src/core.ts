@@ -144,6 +144,25 @@ export async function attempt<T>(run: () => Promise<T>, failure = 'Could not do 
   }
 }
 
+/**
+ * Syncs now and says how it went. The session answers "will retry" rather than throwing when
+ * the server cannot be reached, so without this a failed Sync now looks like a working one.
+ */
+export async function syncNow(): Promise<void> {
+  try {
+    const outcome = await session.sync(true)
+    if (outcome === 'ok') toast('Synced')
+    else if (outcome === 'sign in again') toast('The server no longer accepts this browser’s sign-in')
+    else if (outcome === 'will retry') {
+      const reason = session.syncState().lastError
+      toast(`Could not sync${reason ? `: ${reason}` : ''}. It will try again shortly.`)
+    } else toast(`Could not sync: ${outcome}`)
+  } catch (e) {
+    toast(`Could not sync: ${errorText(e)}`)
+  }
+  refresh()
+}
+
 /** Uint8Array → a file the browser saves. */
 export function saveFile(bytes: Uint8Array, name: string, type: string): void {
   const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type }))

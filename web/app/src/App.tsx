@@ -183,7 +183,10 @@ function SyncLink() {
   return (
     <a href={href('sync')} title={s.lastSuccessLabel ? `Last synced ${s.lastSuccessLabel}` : 'Sync'}>
       <Icon name={s.failed > 0 || s.lastError ? 'warning' : 'sync'} />
-      <span class="label">{label}</span>
+      <span class="label">
+        {label}
+        {!s.running && s.lastSuccessLabel && <span class="sync-when">{s.lastSuccessLabel}</span>}
+      </span>
       {s.conflicts > 0 && <span class="badge">{s.conflicts}</span>}
     </a>
   )
