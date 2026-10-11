@@ -21,6 +21,9 @@ export function MemoView(props: { localId: string }) {
   const tagStyle = useTagStyles()
   const [menu, setMenu] = useState(false)
   const [editing, setEditing] = useState<{ text: string; locked: boolean } | null>(null)
+  // The memo being edited in place; tied to its id so a switch of memo never shows one
+  // memo's text in another's editor.
+  const [inline, setInline] = useState<{ id: string; text: string } | null>(null)
   const [dialog, setDialog] = useState<null | 'colour' | 'share' | 'reference' | 'reaction'>(null)
   const [reveal, setReveal] = useState<Reveal | null>(null)
   const dark = isDark()
@@ -59,6 +62,17 @@ export function MemoView(props: { localId: string }) {
     if (!locked) return setEditing({ text: detail.content, locked: false })
     const text = await unlockText()
     if (text != null) setEditing({ text, locked: true })
+  }
+
+  /**
+   * A click on the text edits it there. Links, tags and task boxes keep their own clicks, and
+   * a click that ends a text selection is someone copying, not editing.
+   */
+  const editInPlace = (e: MouseEvent) => {
+    if (locked) return
+    if ((e.target as HTMLElement).closest('a, button, input, label, img')) return
+    if (window.getSelection()?.toString()) return
+    setInline({ id, text: detail.content })
   }
 
   const remove = async () => {
@@ -131,7 +145,8 @@ export function MemoView(props: { localId: string }) {
         <button class={`icon-btn${row.pinned ? ' on' : ''}`} aria-label={row.pinned ? 'Unpin' : 'Pin'} aria-pressed={row.pinned} onClick={() => void session.setPinned(id, !row.pinned)}>
           <Icon name="pin" />
         </button>
-        <button class="icon-btn" aria-label="Edit" onClick={() => void edit()}>
+        {/* While editing in place, the editor sees this press and takes the text over itself. */}
+        <button class="icon-btn" aria-label="Edit" data-pop-out onClick={() => inline?.id !== id && void edit()}>
           <Icon name="edit" />
         </button>
         <button class="icon-btn" aria-label="More" aria-haspopup="menu" onClick={() => setMenu(!menu)}>
@@ -210,13 +225,24 @@ export function MemoView(props: { localId: string }) {
               Unlock to read
             </button>
           </div>
-        ) : (
-          <Markdown
-            source={body ?? ''}
-            tagStyle={tagStyle}
-            onTag={(t) => go('tag', t)}
-            onToggleTask={locked ? undefined : (line, checked) => void attempt(() => session.toggleTask(id, line, checked))}
+        ) : inline?.id === id ? (
+          <Editor
+            key={id}
+            inline
+            localId={id}
+            initial={inline.text}
+            onClose={() => setInline(null)}
+            onPopOut={(text) => setEditing({ text, locked: false })}
           />
+        ) : (
+          <div class={locked ? undefined : 'click-to-edit'} onClick={editInPlace} title={locked ? undefined : 'Click to edit'}>
+            <Markdown
+              source={body ?? ''}
+              tagStyle={tagStyle}
+              onTag={(t) => go('tag', t)}
+              onToggleTask={locked ? undefined : (line, checked) => void attempt(() => session.toggleTask(id, line, checked))}
+            />
+          </div>
         )}
 
         {row.tags.length > 0 && !locked && (
