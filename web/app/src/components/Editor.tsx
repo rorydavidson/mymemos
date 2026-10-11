@@ -84,10 +84,17 @@ export function Editor(props: EditorProps) {
     apply(before + s.insert + after, before.length + s.insert.length)
   }
 
-  /** Wraps the selection, or inserts the markers around the caret. */
+  /**
+   * Wraps the selection, or inserts the markers around the caret. Spaces at either end of the
+   * selection stay outside the markers: `**bold **` is not bold in Markdown, and a
+   * double-clicked word often brings its trailing space with it.
+   */
   const wrap = (left: string, right = left) => {
     const el = area.current!
-    const { selectionStart: a, selectionEnd: b } = el
+    let a = el.selectionStart
+    let b = el.selectionEnd
+    while (a < b && /\s/.test(text[a])) a++
+    while (b > a && /\s/.test(text[b - 1])) b--
     const next = text.slice(0, a) + left + text.slice(a, b) + right + text.slice(b)
     apply(next, b + left.length + (a === b ? 0 : right.length))
   }
