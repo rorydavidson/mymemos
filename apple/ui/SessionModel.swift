@@ -44,6 +44,9 @@ final class SessionModel: ObservableObject {
     /// Selection lives here rather than in a view because the menu bar acts on it.
     @Published var selection: String?
     @Published var editing: EditorTarget?
+    /// A save from the detail pane's in-place editor that may still be running. The sheet
+    /// editor waits for it, so it never opens on the text from before that edit.
+    var inlineSave: Task<Void, Never>?
     @Published var sortByModified = false
     @Published var compactList = false
     @Published var templates: [TemplateRow] = []

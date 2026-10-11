@@ -9,6 +9,13 @@ export interface EditorProps {
   initial: string
   /** The memo is locked: [initial] is its decrypted text and saving encrypts it again. */
   locked?: boolean
+  /**
+   * Editing in place in the memo pane rather than in a sheet. Leaving it saves: a click
+   * outside, picking another memo, or Ctrl/Cmd + Enter. Escape discards.
+   */
+  inline?: boolean
+  /** Inline only: save, then carry on in the full editor with the saved text. */
+  onPopOut?: (text: string) => void
   onClose: (savedId?: string) => void
 }
 
@@ -32,10 +39,23 @@ export function Editor(props: EditorProps) {
   const area = useRef<HTMLTextAreaElement>(null)
   const filePicker = useRef<HTMLInputElement>(null)
   const datePicker = useRef<HTMLInputElement>(null)
+  const box = useRef<HTMLDivElement>(null)
   const dirty = text !== props.initial || files.length > 0
+  // Set once the editor has saved or been discarded, so the several ways of leaving an
+  // inline edit (click outside, then the unmount that follows) write only once.
+  const finished = useRef(false)
+  // While Escape's "Discard changes?" is up, a click on it is not a click outside.
+  const confirming = useRef(false)
+  const latestDirty = useRef(dirty)
+  latestDirty.current = dirty
 
   useEffect(() => {
     area.current?.focus()
+    if (props.inline) {
+      const end = props.initial.length
+      area.current?.setSelectionRange(end, end)
+      setCursor(end)
+    }
     if (!isNew) return
     // The server's default visibility, remembered for when it cannot be asked.
     session.defaultVisibility().then(
@@ -116,11 +136,16 @@ export function Editor(props: EditorProps) {
     apply(text.slice(0, a) + s + text.slice(el.selectionEnd), a + s.length)
   }
 
-  const save = async () => {
-    if (saving) return
+  const save = async (): Promise<boolean> => {
+    if (saving || finished.current) return false
+    finished.current = true
     if (!text.trim() && files.length === 0) {
       props.onClose()
-      return
+      return true
+    }
+    if (props.inline && !dirty) {
+      props.onClose(props.localId)
+      return true
     }
     setSaving(true)
     try {
@@ -135,17 +160,61 @@ export function Editor(props: EditorProps) {
       }
       for (const f of files) await session.attach(id, f.name, f.type, new Uint8Array(await f.arrayBuffer()))
       props.onClose(id)
+      return true
     } catch (e) {
       toast(`Could not save: ${errorText(e)}`)
+      finished.current = false
       setSaving(false)
+      return false
     }
   }
+  // The listeners below are added once, so they reach the latest save through this.
+  const saveRef = useRef(save)
+  saveRef.current = save
 
   const close = async () => {
-    if (dirty && !isNew && !(await confirmDialog('Discard changes?', 'What you changed here will be lost.', 'Discard', true))) return
+    if (dirty && !isNew) {
+      confirming.current = true
+      const discard = await confirmDialog('Discard changes?', 'What you changed here will be lost.', 'Discard', true)
+      confirming.current = false
+      if (!discard) return
+    }
+    finished.current = true
     // A new memo's draft is kept, so leaving is never a loss.
     props.onClose()
   }
+
+  const popOut = async () => {
+    const current = text
+    if (await save()) props.onPopOut?.(current)
+  }
+
+  const popOutRef = useRef(popOut)
+  popOutRef.current = popOut
+
+  useEffect(() => {
+    if (!props.inline) return
+    const outside = (e: PointerEvent) => {
+      if (confirming.current || finished.current) return
+      const target = e.target as Element
+      if (!box.current || box.current.contains(target)) return
+      // The pane's own Edit button means "take this to the full editor", not "done".
+      if (target.closest?.('[data-pop-out]')) void popOutRef.current()
+      else void saveRef.current()
+    }
+    // An edit in place has no sheet to hold it, so closing the tab asks first.
+    const unloading = (e: BeforeUnloadEvent) => {
+      if (latestDirty.current && !finished.current) e.preventDefault()
+    }
+    document.addEventListener('pointerdown', outside, true)
+    addEventListener('beforeunload', unloading)
+    return () => {
+      document.removeEventListener('pointerdown', outside, true)
+      removeEventListener('beforeunload', unloading)
+      // Picking another memo unmounts this without a click outside it.
+      if (latestDirty.current && !finished.current) void saveRef.current()
+    }
+  }, [])
 
   const onKeyDown = (e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -178,8 +247,14 @@ export function Editor(props: EditorProps) {
 
   return (
     <>
-      <div class="sheet-backdrop" onClick={() => void close()} />
-      <div class="sheet-full editor" role="dialog" aria-label={isNew ? 'New memo' : 'Edit memo'}>
+      {!props.inline && <div class="sheet-backdrop" onClick={() => void close()} />}
+      <div
+        ref={box}
+        class={props.inline ? 'editor inline-editor' : 'sheet-full editor'}
+        role={props.inline ? undefined : 'dialog'}
+        aria-label={isNew ? 'New memo' : 'Edit memo'}
+      >
+        {!props.inline && (
         <div class="pane-header">
           <button class="icon-btn" onClick={() => void close()} aria-label="Close">
             <Icon name="close" />
@@ -189,6 +264,7 @@ export function Editor(props: EditorProps) {
             {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
+        )}
         <textarea
           ref={area}
           class="editor-text"
@@ -276,6 +352,20 @@ export function Editor(props: EditorProps) {
             </>
           )}
         </div>
+        {props.inline && (
+          <div class="toolbar">
+            <button class="btn text" onClick={() => void popOut()} disabled={saving}>
+              <Icon name="edit" size={18} /> Open in editor
+            </button>
+            <span class="spacer" />
+            <button class="btn text" onClick={() => void close()} disabled={saving}>
+              Cancel
+            </button>
+            <button class="btn" onClick={() => void save()} disabled={saving} title="Ctrl or Cmd + Enter">
+              {saving ? 'Saving…' : 'Done'}
+            </button>
+          </div>
+        )}
         {showTemplates && (
           <div class="menu" style={{ top: 'auto', bottom: '56px', right: '60px' }}>
             {session.templates().map((t) => (

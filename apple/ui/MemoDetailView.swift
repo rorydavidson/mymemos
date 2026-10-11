@@ -14,6 +14,15 @@ struct MemoDetailView: View {
     @State private var sharing = false
     @State private var confirmingDelete = false
     @State private var commentDraft = ""
+    #if os(macOS)
+    /// The memo's Markdown while it is being edited in place, nil when it is only being read.
+    @State private var draft: String?
+    /// What [draft] started as, and whose it is, so leaving an unchanged memo writes nothing
+    /// and a save made on the way to another memo lands on the right one.
+    @State private var draftOriginal = ""
+    @State private var draftId = ""
+    @State private var confirmingDiscard = false
+    #endif
     #if os(iOS)
     @State private var importing = false
     #endif
@@ -32,10 +41,26 @@ struct MemoDetailView: View {
                 } else if memo.locked {
                     lockedNotice
                 } else {
-                    MarkdownView(text: detail.bodyBelowTitle, hidesTagLines: true) { line, checked in
-                        Task { await model.toggleTask(memo.localId, line: line + Int(detail.bodyLineOffset), checked: checked) }
+                    #if os(macOS)
+                    if draft != nil {
+                        InlineEditor(
+                            model: model,
+                            text: Binding(get: { draft ?? "" }, set: { draft = $0 }),
+                            done: { finishEditing(save: true) },
+                            cancel: cancelEditing,
+                            popOut: edit
+                        )
+                        .frame(maxWidth: Theme.readingWidth, alignment: .leading)
+                    } else {
+                        readingBody
+                            .frame(minHeight: 44, alignment: .topLeading)
+                            .contentShape(Rectangle())
+                            .onTapGesture { Task { await startEditing() } }
+                            .help("Click to edit")
                     }
-                    .frame(maxWidth: Theme.readingWidth, alignment: .leading)
+                    #else
+                    readingBody
+                    #endif
                 }
 
                 if !memo.tags.isEmpty {
@@ -70,6 +95,19 @@ struct MemoDetailView: View {
         }
         // A tinted memo reads on its own colour here as it does on its card in the list.
         .background(Color.memoTint(memo.colourHex, isDark: scheme == .dark) ?? Theme.canvas)
+        #if os(macOS)
+        // Picking another memo, or leaving the pane, is "leaving" the edit: it is kept.
+        .onChange(of: detail.row.localId) { finishEditing(save: true) }
+        .onDisappear { finishEditing(save: true) }
+        // The sheet editor opening (Edit, ⌘E, Open in editor) takes over from this one.
+        .onChange(of: model.editing?.localId) { _, opened in
+            if opened != nil { finishEditing(save: true) }
+        }
+        .confirmationDialog("Discard your changes?", isPresented: $confirmingDiscard) {
+            Button("Discard", role: .destructive) { finishEditing(save: false) }
+            Button("Keep editing", role: .cancel) {}
+        }
+        #endif
         .task(id: detail.row.localId) {
             attachments = await model.attachments(detail.row.localId)
             if detail.onServer { await model.loadSocial(detail.row.localId) }
@@ -96,6 +134,51 @@ struct MemoDetailView: View {
         }
         #endif
     }
+
+    private var readingBody: some View {
+        MarkdownView(text: detail.bodyBelowTitle, hidesTagLines: true, selectable: !inlineEditing) { line, checked in
+            Task { await model.toggleTask(memo.localId, line: line + Int(detail.bodyLineOffset), checked: checked) }
+        }
+        .frame(maxWidth: Theme.readingWidth, alignment: .leading)
+    }
+
+    /// Where a click on the text starts an edit, the text cannot also be selectable: the
+    /// selection would take the click. Selecting and copying work in the editor instead.
+    private var inlineEditing: Bool {
+        #if os(macOS)
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    #if os(macOS)
+    private func startEditing() async {
+        guard draft == nil, let text = await model.rawContent(memo.localId) else { return }
+        draftOriginal = text
+        draftId = memo.localId
+        draft = text
+    }
+
+    /// Ends the edit straight away, so a second call on the way out does nothing, and saves
+    /// in the background. The pin is the edited memo's own, read before anything moves.
+    private func finishEditing(save: Bool) {
+        guard let text = draft else { return }
+        draft = nil
+        guard save, text != draftOriginal else { return }
+        let id = draftId
+        let pinned = model.memo(id)?.pinned ?? false
+        model.inlineSave = Task { await model.save(editing: id, text: text, visibility: "", pinned: pinned) }
+    }
+
+    private func cancelEditing() {
+        if draft != draftOriginal {
+            confirmingDiscard = true
+        } else {
+            finishEditing(save: false)
+        }
+    }
+    #endif
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {

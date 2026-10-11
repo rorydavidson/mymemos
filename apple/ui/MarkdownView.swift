@@ -15,6 +15,8 @@ struct MarkdownView: View {
     /// Leaves out lines that are only tags, for a view that already shows them as chips.
     /// A card always does.
     var hidesTagLines = false
+    /// Off where a click on the text means something else, such as starting an edit.
+    var selectable = true
     /// Called with the source line and the new state when a task's box is tapped. Nil leaves
     /// the boxes as pictures, which is what a preview wants.
     var onToggleTask: ((Int, Bool) -> Void)? = nil
@@ -28,7 +30,7 @@ struct MarkdownView: View {
         }
         .lineSpacing(card ? 2.5 : Theme.readingLeading)
 
-        if card {
+        if card || !selectable {
             stack.textSelection(.disabled)
         } else {
             stack.textSelection(.enabled)

@@ -447,6 +447,9 @@ a { color: var(--primary); }
   font-size: 16px;
   line-height: 1.6;
 }
+.click-to-edit { cursor: text; min-height: 44px; }
+.inline-editor { position: relative; border: 1px solid var(--outline-variant); border-radius: 14px; overflow: hidden; background: var(--card); }
+.inline-editor .editor-text { min-height: 320px; resize: vertical; }
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 6px 10px; border-top: 1px solid var(--outline-variant); background: var(--surface-low); }
 .toolbar select { padding: 6px 8px; border-radius: 999px; border: 1px solid var(--outline-variant); background: var(--card); }
 .suggest { position: absolute; z-index: 30; min-width: 200px; max-width: 320px; padding: 4px; border-radius: var(--r-s); background: var(--card); box-shadow: var(--shadow-high); }
