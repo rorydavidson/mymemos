@@ -58,8 +58,10 @@ function render(node: Node, ctx: Ctx, key: number): ComponentChildren {
     }
     case 'text':
       return <>{inline(node.literal ?? '', ctx, key)}</>
+    // A note's line breaks are kept, as the Android and Mac apps keep them; strict CommonMark
+    // would fold them into spaces and run a list of lines together.
     case 'softbreak':
-      return '\n'
+      return <br key={key} />
     case 'linebreak':
       return <br key={key} />
     case 'emph':
