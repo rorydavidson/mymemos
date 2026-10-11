@@ -15,6 +15,10 @@ struct MarkdownEditor: NSViewRepresentable {
     /// The `#tag` or `@date` under the cursor, for the completion bar. Nil when there is none.
     @Binding var currentWord: String?
     let session: MemosSession
+    /// Puts the cursor in the text, at the end, as soon as the view is on screen.
+    var focusOnAppear = false
+    /// Called when the text view gives up focus to something else in the window.
+    var onEndEditing: (() -> Void)? = nil
 
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSTextView.scrollableTextView()
@@ -36,6 +40,14 @@ struct MarkdownEditor: NSViewRepresentable {
         scroll.drawsBackground = false
         context.coordinator.textView = view
         context.coordinator.prime(view)
+        if focusOnAppear {
+            // The window is not there yet while the view is being made.
+            DispatchQueue.main.async {
+                view.window?.makeFirstResponder(view)
+                view.setSelectedRange(NSRange(location: (view.string as NSString).length, length: 0))
+                view.scrollRangeToVisible(view.selectedRange())
+            }
+        }
         return scroll
     }
 
@@ -84,6 +96,10 @@ struct MarkdownEditor: NSViewRepresentable {
                 parent.text = view.string
             }
             snapshot(view)
+        }
+
+        func textDidEndEditing(_ notification: Foundation.Notification) {
+            parent.onEndEditing?()
         }
 
         func textViewDidChangeSelection(_ notification: Foundation.Notification) {

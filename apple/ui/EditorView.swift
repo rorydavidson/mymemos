@@ -231,6 +231,7 @@ struct EditorView: View {
         guard !loaded else { return }
         loaded = true
         if let editing {
+            await model.inlineSave?.value
             text = await model.rawContent(editing) ?? ""
             pinned = model.memo(editing)?.pinned ?? false
         } else if let initialText {
